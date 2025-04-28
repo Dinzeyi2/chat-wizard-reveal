@@ -73,22 +73,28 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
         <PromptInputTextarea placeholder="Ask anything..." />
 
         <PromptInputActions className="flex items-center justify-between gap-2 pt-2">
-          <PromptInputAction tooltip="Attach files">
-            <label
-              htmlFor="file-upload"
-              className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl"
-            >
-              <input
-                ref={uploadInputRef}
-                type="file"
-                multiple
-                onChange={handleFileChange}
-                className="hidden"
-                id="file-upload"
-              />
-              <Paperclip className="text-primary size-5" />
-            </label>
-          </PromptInputAction>
+          <div className="flex gap-2">
+            <PromptInputAction tooltip="Attach files">
+              <label
+                htmlFor="file-upload"
+                className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl"
+              >
+                <input
+                  ref={uploadInputRef}
+                  type="file"
+                  multiple
+                  onChange={handleFileChange}
+                  className="hidden"
+                  id="file-upload"
+                />
+                <Paperclip className="text-primary size-5" />
+              </label>
+            </PromptInputAction>
+            <Button variant="outline" size="sm" className="rounded-full">Search</Button>
+            <Button variant="outline" size="sm" className="rounded-full">Reason</Button>
+            <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Deep research</Button>
+            <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Create image</Button>
+          </div>
 
           <PromptInputAction tooltip={loading ? "Stop generation" : "Send message"}>
             <Button
@@ -104,7 +110,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
       </PromptInput>
       
       <div className="text-xs text-center mt-2 text-gray-500">
-        ChatGPT can make mistakes. Consider checking important information.
+        ChatGPT can make mistakes. Check important info.
       </div>
     </div>
   );
