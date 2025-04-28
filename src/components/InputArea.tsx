@@ -42,26 +42,26 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto w-full p-4">
+    <div className="max-w-3xl mx-auto w-full px-4 pb-6">
       <PromptInput
         value={message}
         onValueChange={setMessage}
         isLoading={loading}
         onSubmit={handleSubmit}
-        className="w-full"
+        className="w-full bg-white border border-gray-200 shadow-sm"
       >
         {files.length > 0 && (
           <div className="flex flex-wrap gap-2 pb-2">
             {files.map((file, index) => (
               <div
                 key={index}
-                className="bg-secondary flex items-center gap-2 rounded-lg px-3 py-2 text-sm"
+                className="bg-gray-100 flex items-center gap-2 rounded-lg px-3 py-2 text-sm"
               >
                 <Paperclip className="size-4" />
                 <span className="max-w-[120px] truncate">{file.name}</span>
                 <button
                   onClick={() => handleRemoveFile(index)}
-                  className="hover:bg-secondary/50 rounded-full p-1"
+                  className="hover:bg-gray-200 rounded-full p-1"
                 >
                   <X className="size-4" />
                 </button>
@@ -70,37 +70,34 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
           </div>
         )}
 
-        <PromptInputTextarea placeholder="Ask anything..." />
+        <PromptInputTextarea 
+          placeholder="Type a message..." 
+          className="min-h-[20px] resize-none"
+        />
 
-        <PromptInputActions className="flex items-center justify-between gap-2 pt-2">
-          <div className="flex gap-2">
-            <PromptInputAction tooltip="Attach files">
-              <label
-                htmlFor="file-upload"
-                className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl"
-              >
-                <input
-                  ref={uploadInputRef}
-                  type="file"
-                  multiple
-                  onChange={handleFileChange}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <Paperclip className="text-primary size-5" />
-              </label>
-            </PromptInputAction>
-            <Button variant="outline" size="sm" className="rounded-full">Search</Button>
-            <Button variant="outline" size="sm" className="rounded-full">Reason</Button>
-            <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Deep research</Button>
-            <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Create image</Button>
-          </div>
+        <PromptInputActions className="flex items-center gap-2">
+          <PromptInputAction tooltip="Attach files">
+            <label
+              htmlFor="file-upload"
+              className="hover:bg-gray-100 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full"
+            >
+              <input
+                ref={uploadInputRef}
+                type="file"
+                multiple
+                onChange={handleFileChange}
+                className="hidden"
+                id="file-upload"
+              />
+              <Paperclip className="text-gray-500 size-5" />
+            </label>
+          </PromptInputAction>
 
-          <PromptInputAction tooltip={loading ? "Stop generation" : "Send message"}>
+          <PromptInputAction tooltip="Send message">
             <Button
               variant="default"
               size="icon"
-              className="h-8 w-8 rounded-full"
+              className="h-8 w-8 rounded-full bg-purple-600 hover:bg-purple-700"
               onClick={handleSubmit}
             >
               <ArrowUp className="size-5" />
@@ -108,10 +105,6 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
           </PromptInputAction>
         </PromptInputActions>
       </PromptInput>
-      
-      <div className="text-xs text-center mt-2 text-gray-500">
-        ChatGPT can make mistakes. Check important info.
-      </div>
     </div>
   );
 };
