@@ -1,12 +1,24 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
-// Since Deno doesn't support Node.js APIs directly, we'll use the fetch API
-// to communicate with Anthropic's API
-
 interface AppGenerationRequest {
   prompt: string;
+}
+
+// Function to estimate tokens in a string (rough approximation)
+function estimateTokens(text: string): number {
+  // Rough estimation: ~4 characters per token on average
+  return Math.ceil(text.length / 4);
+}
+
+// Function to truncate input to stay within token limit
+function truncateInput(prompt: string, maxTokens: number = 800): string {
+  const currentTokens = estimateTokens(prompt);
+  if (currentTokens <= maxTokens) return prompt;
+
+  // If too long, use OpenAI to summarize
+  // For now, do a simple truncation (you'll need to add OpenAI summarization later)
+  return prompt.slice(0, maxTokens * 4); // Rough approximation
 }
 
 serve(async (req) => {
@@ -25,9 +37,11 @@ serve(async (req) => {
       });
     }
 
+    // Enforce input token limit
+    const truncatedPrompt = truncateInput(prompt);
     const projectName = `project-${Date.now()}`;
     
-    // Generate architecture using Anthropic API
+    // Generate architecture using Anthropic API with enforced output token limit
     const architectureResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -37,7 +51,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "claude-3-sonnet-20240229",
-        max_tokens: 4000,
+        max_tokens: 5000, // Enforcing 5000 token limit for output
         temperature: 0.7,
         system: `You are an expert full stack developer specializing in modern web applications.
         When given a prompt for a web application, you will create a detailed architecture plan with:
@@ -46,6 +60,8 @@ serve(async (req) => {
         3. Project structure
         4. Component hierarchy
         5. Data models
+        
+        IMPORTANT: Keep your response concise and within 5000 tokens.
         
         Format your response as JSON with the following structure:
         {
@@ -61,7 +77,7 @@ serve(async (req) => {
         messages: [
           {
             role: "user",
-            content: `Design a full stack application architecture for: ${prompt}`
+            content: truncatedPrompt
           }
         ]
       })
@@ -101,7 +117,7 @@ serve(async (req) => {
     const filesToGenerate = fileList.slice(0, batchSize);
     
     for (const filePath of filesToGenerate) {
-      const fileContent = await generateFileContent(filePath, architecture, prompt);
+      const fileContent = await generateFileContent(filePath, architecture, truncatedPrompt);
       files.push({
         path: filePath,
         content: fileContent
@@ -159,14 +175,14 @@ async function generateFileContent(filePath: string, architecture: any, original
       "anthropic-version": "2023-06-01"
     },
     body: JSON.stringify({
-      model: "claude-3-opus-20240229",
-      max_tokens: 4000,
+      model: "claude-3-sonnet-20240229",
+      max_tokens: 5000, // Enforcing 5000 token limit for output
       temperature: 0.7,
       system: `You are an expert developer specializing in creating high-quality code files.
-      You will be given information about a file to generate within a full stack application.
       Generate ONLY the complete code for this specific file.
       Do not include explanations or comments outside the code.
       Make sure the code is production-ready, follows best practices, and implements modern patterns.
+      IMPORTANT: Keep your response within 5000 tokens.
       If generating React components with shadcn/ui, use the proper import syntax and components.`,
       messages: [
         {
@@ -179,7 +195,8 @@ async function generateFileContent(filePath: string, architecture: any, original
           
           Original request: "${originalPrompt}"
           
-          Generate the complete ${fileType} code for this file. Consider its role within the application architecture.`
+          Generate the complete ${fileType} code for this file. Consider its role within the application architecture.
+          Keep the implementation focused and within token limits.`
         }
       ]
     })
