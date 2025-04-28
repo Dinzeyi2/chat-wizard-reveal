@@ -123,7 +123,17 @@ serve(async (req) => {
       })
     });
 
+    if (!architectureResponse.ok) {
+      const errorText = await architectureResponse.text();
+      throw new Error(`Anthropic API error (${architectureResponse.status}): ${errorText}`);
+    }
+
     const architectureData = await architectureResponse.json();
+    
+    if (!architectureData || !architectureData.content || architectureData.content.length === 0) {
+      throw new Error("Empty or invalid response from Anthropic API");
+    }
+    
     const architectureContent = architectureData.content[0].text;
     let architecture;
     
@@ -135,9 +145,13 @@ serve(async (req) => {
       const jsonEnd = architectureContent.lastIndexOf('}');
       if (jsonStart >= 0 && jsonEnd > jsonStart) {
         const jsonPart = architectureContent.substring(jsonStart, jsonEnd + 1);
-        architecture = JSON.parse(jsonPart);
+        try {
+          architecture = JSON.parse(jsonPart);
+        } catch (nestedError) {
+          throw new Error(`Failed to parse architecture JSON: ${nestedError.message}. Content received: ${architectureContent.substring(0, 100)}...`);
+        }
       } else {
-        throw new Error("Failed to parse architecture JSON");
+        throw new Error(`Failed to find valid JSON in response: ${architectureContent.substring(0, 100)}...`);
       }
     }
 
@@ -146,10 +160,14 @@ serve(async (req) => {
     
     // Flatten file structure
     const fileList = [];
-    for (const section in architecture.fileStructure) {
-      for (const file of architecture.fileStructure[section]) {
-        fileList.push(file);
+    if (architecture && architecture.fileStructure) {
+      for (const section in architecture.fileStructure) {
+        for (const file of architecture.fileStructure[section]) {
+          fileList.push(file);
+        }
       }
+    } else {
+      throw new Error("Invalid architecture structure: missing fileStructure property");
     }
 
     // Get a batch of files (limit to 10 for demo purposes)
@@ -207,98 +225,142 @@ async function generateFileContent(filePath: string, architecture: any, original
 
   const fileType = fileTypeMap[fileExtension] || "Code";
 
-  const fileResponse = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") || "",
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify({
-      model: "claude-3-sonnet-20240229",
-      max_tokens: 5000, // Enforcing 5000 token limit for output
-      temperature: 0.7,
-      system: `You are an expert developer specializing in creating high-quality code files.
-      Generate ONLY the complete code for this specific file.
-      Do not include explanations or comments outside the code.
-      Make sure the code is production-ready, follows best practices, and implements modern patterns.
-      IMPORTANT: Keep your response within 5000 tokens.
-      If generating React components with shadcn/ui, use the proper import syntax and components.`,
-      messages: [
-        {
-          role: "user",
-          content: `Generate code for the file "${fileName}" in the directory "${relativeDir}" for this project:
-          
-          Project Name: ${architecture.projectName}
-          Project Description: ${architecture.description}
-          Technologies: ${architecture.technologies.join(", ")}
-          
-          Original request: "${originalPrompt}"
-          
-          Generate the complete ${fileType} code for this file. Consider its role within the application architecture.
-          Keep the implementation focused and within token limits.`
-        }
-      ]
-    })
-  });
+  try {
+    const fileResponse = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") || "",
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: "claude-3-sonnet-20240229",
+        max_tokens: 5000, // Enforcing 5000 token limit for output
+        temperature: 0.7,
+        system: `You are an expert developer specializing in creating high-quality code files.
+        Generate ONLY the complete code for this specific file.
+        Do not include explanations or comments outside the code.
+        Make sure the code is production-ready, follows best practices, and implements modern patterns.
+        IMPORTANT: Keep your response within 5000 tokens.
+        If generating React components with shadcn/ui, use the proper import syntax and components.`,
+        messages: [
+          {
+            role: "user",
+            content: `Generate code for the file "${fileName}" in the directory "${relativeDir}" for this project:
+            
+            Project Name: ${architecture.projectName}
+            Project Description: ${architecture.description}
+            Technologies: ${architecture.technologies.join(", ")}
+            
+            Original request: "${originalPrompt}"
+            
+            Generate the complete ${fileType} code for this file. Consider its role within the application architecture.
+            Keep the implementation focused and within token limits.`
+          }
+        ]
+      }),
+    });
 
-  const fileData = await fileResponse.json();
-  const fileContent = fileData.content[0].text;
-  
-  // Clean up the code (remove markdown code blocks if present)
-  let cleanedContent = fileContent;
-  if (fileContent.startsWith("```") && fileContent.endsWith("```")) {
-    cleanedContent = fileContent
-      .replace(/^```(\w+)?/, "")
-      .replace(/```$/, "")
-      .trim();
+    if (!fileResponse.ok) {
+      const errorText = await fileResponse.text();
+      throw new Error(`Anthropic API error (${fileResponse.status}) when generating file: ${errorText}`);
+    }
+
+    const fileData = await fileResponse.json();
+    
+    if (!fileData || !fileData.content || fileData.content.length === 0) {
+      throw new Error(`Empty or invalid response for file ${fileName}`);
+    }
+    
+    const fileContent = fileData.content[0].text;
+    
+    // Clean up the code (remove markdown code blocks if present)
+    let cleanedContent = fileContent;
+    if (fileContent.startsWith("```") && fileContent.endsWith("```")) {
+      cleanedContent = fileContent
+        .replace(/^```(\w+)?/, "")
+        .replace(/```$/, "")
+        .trim();
+    }
+
+    return cleanedContent;
+  } catch (error) {
+    console.error(`Error generating file ${filePath}:`, error);
+    return `// Error generating content for ${filePath}: ${error.message}`;
   }
-
-  return cleanedContent;
 }
 
 async function generatePackageJson(architecture: any): Promise<string> {
-  const packageResponse = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") || "",
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify({
-      model: "claude-3-opus-20240229",
-      max_tokens: 2000,
-      temperature: 0.7,
-      system: `You are an expert in JavaScript/Node.js development.
-      Generate a complete package.json file for a project with the following specifications.
-      The package.json should include all necessary dependencies, scripts, and configuration.
-      Format your response as valid JSON only.`,
-      messages: [
-        {
-          role: "user",
-          content: `Generate a complete package.json file for this project:
-          
-          Project Name: ${architecture.projectName}
-          Technologies: ${architecture.technologies.join(", ")}
-          
-          Include all necessary dependencies for these technologies, appropriate scripts (dev, build, start, etc.),
-          and any other configuration needed. If using shadcn/ui, include all required dependencies.`
-        }
-      ]
-    })
-  });
+  try {
+    const packageResponse = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") || "",
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: "claude-3-opus-20240229",
+        max_tokens: 2000,
+        temperature: 0.7,
+        system: `You are an expert in JavaScript/Node.js development.
+        Generate a complete package.json file for a project with the following specifications.
+        The package.json should include all necessary dependencies, scripts, and configuration.
+        Format your response as valid JSON only.`,
+        messages: [
+          {
+            role: "user",
+            content: `Generate a complete package.json file for this project:
+            
+            Project Name: ${architecture.projectName}
+            Technologies: ${architecture.technologies.join(", ")}
+            
+            Include all necessary dependencies for these technologies, appropriate scripts (dev, build, start, etc.),
+            and any other configuration needed. If using shadcn/ui, include all required dependencies.`
+          }
+        ]
+      })
+    });
 
-  const packageData = await packageResponse.json();
-  const packageContent = packageData.content[0].text;
-  
-  // Clean up the JSON (remove markdown code blocks if present)
-  let cleanedContent = packageContent;
-  if (packageContent.startsWith("```") && packageContent.endsWith("```")) {
-    cleanedContent = packageContent
-      .replace(/^```(\w+)?/, "")
-      .replace(/```$/, "")
-      .trim();
+    if (!packageResponse.ok) {
+      const errorText = await packageResponse.text();
+      throw new Error(`Anthropic API error (${packageResponse.status}) when generating package.json: ${errorText}`);
+    }
+
+    const packageData = await packageResponse.json();
+    
+    if (!packageData || !packageData.content || packageData.content.length === 0) {
+      throw new Error("Empty or invalid response for package.json");
+    }
+    
+    const packageContent = packageData.content[0].text;
+    
+    // Clean up the JSON (remove markdown code blocks if present)
+    let cleanedContent = packageContent;
+    if (packageContent.startsWith("```") && packageContent.endsWith("```")) {
+      cleanedContent = packageContent
+        .replace(/^```(\w+)?/, "")
+        .replace(/```$/, "")
+        .trim();
+    }
+
+    return cleanedContent;
+  } catch (error) {
+    console.error("Error generating package.json:", error);
+    return `{ 
+  "name": "${architecture.projectName || 'generated-app'}",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "next": "^13.4.0"
   }
-
-  return cleanedContent;
+}`;
+  }
 }
