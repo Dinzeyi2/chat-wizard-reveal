@@ -1,6 +1,4 @@
-
 import { useState, useRef, useEffect } from "react";
-import Sidebar from "@/components/Sidebar";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
 import WelcomeScreen from "@/components/WelcomeScreen";
@@ -59,9 +57,6 @@ const Index = () => {
 
   return (
     <div className="h-screen flex overflow-hidden bg-white">
-      {/* Sidebar */}
-      <Sidebar />
-      
       {/* Main content */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {/* Status bar */}
