@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -72,7 +71,7 @@ const Index = () => {
               <span>Temporary</span>
             </div>
             <div className="ml-2 w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white">
-              U
+              O
             </div>
           </div>
         </div>
@@ -89,7 +88,7 @@ const Index = () => {
           <div ref={messagesEndRef} />
         </div>
         
-        <div className="border-t p-4 pb-8">
+        <div className="p-4 pb-8">
           <InputArea onSendMessage={handleSendMessage} loading={loading} />
         </div>
       </div>

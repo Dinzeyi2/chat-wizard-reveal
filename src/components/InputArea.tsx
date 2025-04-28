@@ -48,20 +48,20 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
         onValueChange={setMessage}
         isLoading={loading}
         onSubmit={handleSubmit}
-        className="w-full border border-gray-300 bg-white shadow-sm"
+        className="w-full"
       >
         {files.length > 0 && (
           <div className="flex flex-wrap gap-2 pb-2">
             {files.map((file, index) => (
               <div
                 key={index}
-                className="bg-gray-100 flex items-center gap-2 rounded-full px-3 py-1 text-sm"
+                className="bg-secondary flex items-center gap-2 rounded-lg px-3 py-2 text-sm"
               >
                 <Paperclip className="size-4" />
                 <span className="max-w-[120px] truncate">{file.name}</span>
                 <button
                   onClick={() => handleRemoveFile(index)}
-                  className="hover:bg-gray-200 rounded-full p-1"
+                  className="hover:bg-secondary/50 rounded-full p-1"
                 >
                   <X className="size-4" />
                 </button>
@@ -70,14 +70,14 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
           </div>
         )}
 
-        <PromptInputTextarea placeholder="Ask anything..." className="py-3 px-4 min-h-[44px] text-gray-800" />
+        <PromptInputTextarea placeholder="Ask anything..." />
 
-        <PromptInputActions className="flex items-center justify-between gap-2 pt-2 px-3 pb-3">
+        <PromptInputActions className="flex items-center justify-between gap-2 pt-2">
           <div className="flex gap-2">
             <PromptInputAction tooltip="Attach files">
               <label
                 htmlFor="file-upload"
-                className="hover:bg-gray-100 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full"
+                className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl"
               >
                 <input
                   ref={uploadInputRef}
@@ -87,20 +87,20 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
                   className="hidden"
                   id="file-upload"
                 />
-                <Paperclip className="text-gray-500 size-5" />
+                <Paperclip className="text-primary size-5" />
               </label>
             </PromptInputAction>
-            <Button variant="outline" size="sm" className="rounded-full bg-gray-100 border-0 text-gray-600 hover:bg-gray-200">Search</Button>
-            <Button variant="outline" size="sm" className="rounded-full bg-gray-100 border-0 text-gray-600 hover:bg-gray-200">Reason</Button>
-            <Button variant="outline" size="sm" className="hidden md:flex rounded-full bg-gray-100 border-0 text-gray-600 hover:bg-gray-200">Deep research</Button>
-            <Button variant="outline" size="sm" className="hidden md:flex rounded-full bg-gray-100 border-0 text-gray-600 hover:bg-gray-200">Create image</Button>
+            <Button variant="outline" size="sm" className="rounded-full">Search</Button>
+            <Button variant="outline" size="sm" className="rounded-full">Reason</Button>
+            <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Deep research</Button>
+            <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Create image</Button>
           </div>
 
           <PromptInputAction tooltip={loading ? "Stop generation" : "Send message"}>
             <Button
               variant="default"
               size="icon"
-              className="h-8 w-8 rounded-full bg-black hover:bg-gray-800"
+              className="h-8 w-8 rounded-full"
               onClick={handleSubmit}
             >
               <ArrowUp className="size-5" />
