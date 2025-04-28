@@ -2,6 +2,7 @@
 import React from "react";
 import { Message } from "@/types/chat";
 import AppGeneratorDisplay from "./AppGeneratorDisplay";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface MarkdownRendererProps {
   content: string;
@@ -34,14 +35,23 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
         const codeContent = firstLine ? block.substring(firstLine.length + 1) : block;
         
         return (
-          <pre key={index} className="bg-gray-100 p-3 rounded my-2 overflow-x-auto">
-            <code className={`language-${language.trim()}`}>{codeContent}</code>
-          </pre>
+          <div key={index} className="mb-4">
+            <div className="bg-gray-100 text-gray-500 text-xs px-3 py-1 rounded-t-md border border-b-0 border-gray-200">
+              {language.trim() || "Code"}
+            </div>
+            <pre className="bg-gray-100 p-3 rounded-b-md border border-gray-200 overflow-x-auto">
+              <code className={`language-${language.trim()}`}>{codeContent}</code>
+            </pre>
+          </div>
         );
       }
     });
 
-  return <div className="whitespace-pre-wrap">{formattedContent}</div>;
+  return (
+    <ScrollArea className="max-h-[500px] pr-2">
+      <div className="whitespace-pre-wrap">{formattedContent}</div>
+    </ScrollArea>
+  );
 };
 
 export default MarkdownRenderer;
