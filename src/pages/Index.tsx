@@ -140,6 +140,7 @@ const Index = () => {
         
         setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
 
+        // Ensure consistent JSON format for app generation response
         const formattedResponse = `I've generated a full-stack application based on your request. Here's what I created:
 
 \`\`\`json

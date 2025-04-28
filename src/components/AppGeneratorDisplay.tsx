@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Message } from "@/types/chat";
 import { Button } from "@/components/ui/button";
@@ -37,9 +38,17 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   
   const getAppData = (): GeneratedApp | null => {
     try {
-      const appDataMatch = message.content.match(/```json([\s\S]*?)```/);
+      // Enhanced JSON extraction to be more robust
+      const jsonRegex = /```json([\s\S]*?)```/;
+      const appDataMatch = message.content.match(jsonRegex);
+      
       if (appDataMatch && appDataMatch[1]) {
-        return JSON.parse(appDataMatch[1]);
+        const jsonData = JSON.parse(appDataMatch[1]);
+        
+        // Validate that this is actually app data
+        if (jsonData && jsonData.projectName && Array.isArray(jsonData.files)) {
+          return jsonData;
+        }
       }
       return null;
     } catch (error) {
@@ -51,6 +60,8 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   const appData = getAppData();
   
   if (!appData) {
+    // Fallback to prevent display issues
+    console.error("Failed to parse app generation data");
     return <div className="whitespace-pre-wrap">{message.content}</div>;
   }
 

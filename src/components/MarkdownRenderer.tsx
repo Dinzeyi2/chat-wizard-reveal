@@ -10,10 +10,13 @@ interface MarkdownRendererProps {
 }
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message }) => {
-  // Check if this is an app generation message
-  const isAppGeneration = content.includes("```json") && 
-    (content.includes("projectName") || content.includes("files"));
-
+  // Consistent detection for app generation content
+  const isAppGeneration = 
+    content.includes("```json") && 
+    (content.includes("projectName") || 
+     content.includes("files") ||
+     content.includes("description"));
+  
   if (message && isAppGeneration) {
     return <AppGeneratorDisplay message={message} />;
   }
