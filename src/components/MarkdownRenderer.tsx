@@ -34,7 +34,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
         const codeContent = firstLine ? block.substring(firstLine.length + 1) : block;
         
         return (
-          <pre key={index} className="bg-gray-100 p-3 rounded my-2 overflow-x-auto">
+          <pre key={index} className="bg-gray-100 dark:bg-gray-800 p-3 rounded my-2 overflow-x-auto">
             <code className={`language-${language.trim()}`}>{codeContent}</code>
           </pre>
         );
