@@ -81,7 +81,7 @@ serve(async (req) => {
     
     const projectName = `project-${Date.now()}`;
     
-    // Generate architecture using Anthropic API with enforced output token limit
+    // Generate architecture using Anthropic API with CORRECTED output token limit (4096 max for claude-3-sonnet)
     const architectureResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -91,7 +91,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "claude-3-sonnet-20240229",
-        max_tokens: 5000,
+        max_tokens: 4000, // FIXED: Reduced from 5000 to 4000 to stay within the 4096 limit
         temperature: 0.7,
         system: `You are an expert full stack developer specializing in modern web applications.
         When given a prompt for a web application, you will create a detailed architecture plan with:
@@ -101,7 +101,7 @@ serve(async (req) => {
         4. Component hierarchy
         5. Data models
         
-        IMPORTANT: Keep your response concise and within 5000 tokens.
+        IMPORTANT: Keep your response concise and within 4000 tokens.
         
         Format your response as JSON with the following structure:
         {
@@ -125,6 +125,7 @@ serve(async (req) => {
 
     if (!architectureResponse.ok) {
       const errorText = await architectureResponse.text();
+      console.error(`Anthropic API error (${architectureResponse.status}): ${errorText}`);
       throw new Error(`Anthropic API error (${architectureResponse.status}): ${errorText}`);
     }
 
@@ -235,13 +236,13 @@ async function generateFileContent(filePath: string, architecture: any, original
       },
       body: JSON.stringify({
         model: "claude-3-sonnet-20240229",
-        max_tokens: 5000, // Enforcing 5000 token limit for output
+        max_tokens: 4000, // FIXED: Reduced from 5000 to 4000 to stay within the model's limits
         temperature: 0.7,
         system: `You are an expert developer specializing in creating high-quality code files.
         Generate ONLY the complete code for this specific file.
         Do not include explanations or comments outside the code.
         Make sure the code is production-ready, follows best practices, and implements modern patterns.
-        IMPORTANT: Keep your response within 5000 tokens.
+        IMPORTANT: Keep your response within 4000 tokens.
         If generating React components with shadcn/ui, use the proper import syntax and components.`,
         messages: [
           {
