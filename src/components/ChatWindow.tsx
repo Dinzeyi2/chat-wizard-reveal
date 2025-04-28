@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";
@@ -9,36 +10,34 @@ interface ChatWindowProps {
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ messages, loading }) => {
   return (
-    <div className="px-4 py-5 md:px-8 lg:px-12">
+    <div className="px-4 py-5 md:px-8 flex flex-col space-y-6">
       {messages.map((message) => (
-        <div key={message.id} className={`mb-8 ${message.role === "assistant" ? "bg-gray-50 -mx-4 md:-mx-8 lg:-mx-12 p-4 md:p-8 lg:p-12" : ""}`}>
-          <div className="flex items-start mb-1">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${message.role === "assistant" ? "bg-green-600" : "bg-purple-600"} text-white`}>
+        <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+          <div className={`flex items-start max-w-3xl ${message.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${message.role === "assistant" ? "bg-green-600 mr-3" : "bg-purple-600 ml-3"} text-white`}>
               {message.role === "assistant" ? "AI" : "U"}
             </div>
-            <div className="font-medium">
-              {message.role === "assistant" ? "ChatGPT" : "You"}
+            <div className={`${message.role === "user" ? "bg-gray-100 rounded-2xl rounded-tr-none" : "bg-white rounded-2xl rounded-tl-none border border-gray-200"} px-4 py-3`}>
+              <div className="text-gray-800">
+                <MarkdownRenderer content={message.content} />
+              </div>
             </div>
-          </div>
-          <div className="pl-11 text-gray-800">
-            <MarkdownRenderer content={message.content} />
           </div>
         </div>
       ))}
       
       {loading && (
-        <div className="mb-8 bg-gray-50 -mx-4 md:-mx-8 lg:-mx-12 p-4 md:p-8 lg:p-12">
-          <div className="flex items-start mb-1">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center mr-3 bg-green-600 text-white">
+        <div className="flex justify-start">
+          <div className="flex items-start max-w-3xl">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center mr-3 bg-green-600 text-white shrink-0">
               AI
             </div>
-            <div className="font-medium">ChatGPT</div>
-          </div>
-          <div className="pl-11">
-            <div className="flex space-x-2">
-              <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "0ms" }}></div>
-              <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "150ms" }}></div>
-              <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "300ms" }}></div>
+            <div className="bg-white rounded-2xl rounded-tl-none border border-gray-200 px-4 py-3">
+              <div className="flex space-x-2">
+                <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "0ms" }}></div>
+                <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "150ms" }}></div>
+                <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "300ms" }}></div>
+              </div>
             </div>
           </div>
         </div>
