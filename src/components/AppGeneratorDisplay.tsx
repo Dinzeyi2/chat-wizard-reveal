@@ -55,6 +55,8 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   }
   
   const handleViewFullProject = () => {
+    if (!appData) return;
+    
     // Convert GeneratedFiles to ArtifactFiles format
     const artifactFiles = appData.files.map((file, index) => ({
       id: `file-${index}`,
@@ -157,8 +159,8 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
 
       <Accordion type="single" collapsible className="w-full">
         <AccordionItem value="explanation">
-          <AccordionTrigger>AI Explanation</AccordionTrigger>
-          <AccordionContent>
+          <AccordionTrigger className="px-4">AI Explanation</AccordionTrigger>
+          <AccordionContent className="px-4">
             <div className="text-sm space-y-2 p-2">
               {appData.explanation ? (
                 <p>{appData.explanation}</p>

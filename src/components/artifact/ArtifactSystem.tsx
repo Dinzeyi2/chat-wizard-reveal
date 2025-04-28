@@ -44,6 +44,7 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
   const [isOpen, setIsOpen] = useState(false);
 
   const openArtifact = (artifact: Artifact) => {
+    console.log("Opening artifact:", artifact);
     setCurrentArtifact(artifact);
     setIsOpen(true);
   };
