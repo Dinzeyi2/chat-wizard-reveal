@@ -6,11 +6,15 @@ import WelcomeScreen from "@/components/WelcomeScreen";
 import { Message } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Loader2 } from "lucide-react";
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [isGeneratingApp, setIsGeneratingApp] = useState(false);
+  const [generationDialog, setGenerationDialog] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -35,41 +39,45 @@ const Index = () => {
     };
     
     setMessages(prev => [...prev, userMessage]);
-    setLoading(true);
     
-    try {
-      // Check if this is a request to generate an app
-      const isAppGeneration = 
-        (content.toLowerCase().includes("create") || 
-         content.toLowerCase().includes("build") || 
-         content.toLowerCase().includes("generate") ||
-         content.toLowerCase().includes("make") ||
-         content.toLowerCase().includes("develop") ||
-         content.toLowerCase().includes("code")) && 
-        (content.toLowerCase().includes("app") || 
-         content.toLowerCase().includes("website") || 
-         content.toLowerCase().includes("dashboard") || 
-         content.toLowerCase().includes("application") ||
-         content.toLowerCase().includes("platform") ||
-         content.toLowerCase().includes("clone") ||
-         content.toLowerCase().includes("system") ||
-         content.toLowerCase().includes("project") ||
-         content.toLowerCase().includes("site"));
+    // Check if this is a request to generate an app
+    const isAppGeneration = 
+      (content.toLowerCase().includes("create") || 
+       content.toLowerCase().includes("build") || 
+       content.toLowerCase().includes("generate") ||
+       content.toLowerCase().includes("make") ||
+       content.toLowerCase().includes("develop") ||
+       content.toLowerCase().includes("code")) && 
+      (content.toLowerCase().includes("app") || 
+       content.toLowerCase().includes("website") || 
+       content.toLowerCase().includes("dashboard") || 
+       content.toLowerCase().includes("application") ||
+       content.toLowerCase().includes("platform") ||
+       content.toLowerCase().includes("clone") ||
+       content.toLowerCase().includes("system") ||
+       content.toLowerCase().includes("project") ||
+       content.toLowerCase().includes("site"));
 
-      if (isAppGeneration) {
-        // Use generate-app function
-        console.log("Calling generate-app function with prompt:", content);
-        
-        // Add an initial processing message
-        const processingMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: "I'm working on generating your application. This may take a minute or two...",
-          timestamp: new Date()
-        };
-        
-        setMessages(prev => [...prev, processingMessage]);
-        
+    if (isAppGeneration) {
+      // Use generate-app function
+      console.log("Calling generate-app function with prompt:", content);
+      
+      // Show the generation dialog
+      setGenerationDialog(true);
+      setIsGeneratingApp(true);
+      setLoading(true);
+      
+      // Add an initial processing message
+      const processingMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "I'm working on generating your application. This may take a minute or two...",
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, processingMessage]);
+      
+      try {
         const { data, error } = await supabase.functions.invoke('generate-app', {
           body: { prompt: content }
         });
@@ -84,6 +92,9 @@ const Index = () => {
         }
 
         console.log("App generation successful:", data);
+        
+        // Hide the generation dialog
+        setGenerationDialog(false);
         
         // Replace the processing message
         setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
@@ -111,8 +122,40 @@ You can explore the file structure and content in the panel above. This is a sta
           title: "App Generated Successfully",
           description: `${appData.projectName} has been generated with ${appData.files.length} files.`,
         });
-      } else {
-        // Use regular chat function
+      } catch (error) {
+        console.error('Error calling function:', error);
+        setGenerationDialog(false);
+        setGenerationError(error.message || "An unexpected error occurred");
+        
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: error.message || "An unexpected error occurred",
+        });
+        
+        // Add error message
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `I'm sorry, but I encountered an error while processing your request: ${error.message || 'Please try again later.'}
+          
+If you were trying to generate an app, this might be due to limits with our AI model or connectivity issues. You can try:
+1. Using a shorter, more focused prompt
+2. Breaking down your request into smaller parts
+3. Trying again in a few minutes`,
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
+        setMessages(prev => [...prev, errorMessage]);
+      } finally {
+        setLoading(false);
+        setIsGeneratingApp(false);
+      }
+    } else {
+      // Use regular chat function
+      setLoading(true);
+      try {
         const { data, error } = await supabase.functions.invoke('chat', {
           body: { message: content }
         });
@@ -127,33 +170,28 @@ You can explore the file structure and content in the panel above. This is a sta
         };
         
         setMessages(prev => [...prev, aiMessage]);
-      }
-    } catch (error) {
-      console.error('Error calling function:', error);
-      setGenerationError(error.message || "An unexpected error occurred");
-      
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "An unexpected error occurred",
-      });
-      
-      // Add error message
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: `I'm sorry, but I encountered an error while processing your request: ${error.message || 'Please try again later.'}
+      } catch (error) {
+        console.error('Error calling function:', error);
+        setGenerationError(error.message || "An unexpected error occurred");
         
-If you were trying to generate an app, this might be due to limits with our AI model or connectivity issues. You can try:
-1. Using a shorter, more focused prompt
-2. Breaking down your request into smaller parts
-3. Trying again in a few minutes`,
-        timestamp: new Date()
-      };
-      
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setLoading(false);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: error.message || "An unexpected error occurred",
+        });
+        
+        // Add error message
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `I'm sorry, but I encountered an error while processing your request: ${error.message || 'Please try again later.'}`,
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => [...prev, errorMessage]);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -208,6 +246,30 @@ If you were trying to generate an app, this might be due to limits with our AI m
           <InputArea onSendMessage={handleSendMessage} loading={loading} />
         </div>
       </div>
+
+      {/* App Generation Dialog */}
+      <Dialog open={generationDialog} onOpenChange={setGenerationDialog}>
+        <DialogContent className="sm:max-w-md" onInteractOutside={e => {
+          // Prevent closing while generating
+          if (isGeneratingApp) {
+            e.preventDefault();
+          }
+        }}>
+          <DialogHeader>
+            <DialogTitle>Generating Your Application</DialogTitle>
+            <DialogDescription>
+              Please wait while we generate your application. This may take a minute or two.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center py-6">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+            <div className="text-center">
+              <p className="font-medium">Building app architecture...</p>
+              <p className="text-sm text-muted-foreground mt-1">This may take up to 2 minutes.</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -111,7 +111,7 @@ serve(async (req) => {
       });
     }
     
-    // Generate architecture using Anthropic API with CORRECTED output token limit (4096 max for claude-3-sonnet)
+    // Generate architecture using Anthropic API with reduced token limit to ensure we stay within model limits
     console.log("Calling Anthropic API for architecture generation");
     let architectureResponse;
     try {
@@ -124,7 +124,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           model: "claude-3-sonnet-20240229",
-          max_tokens: 3500, // FIXED: Further reduced to ensure we stay well within limits
+          max_tokens: 3500, // Further reduced to ensure we stay well within limits
           temperature: 0.7,
           system: `You are an expert full stack developer specializing in modern web applications.
           When given a prompt for a web application, you will create a detailed architecture plan with:
@@ -290,10 +290,20 @@ serve(async (req) => {
       });
     }
 
+    // Generate explanation of the codebase
+    let explanation;
+    try {
+      explanation = await generateExplanation(architecture, files);
+    } catch (error) {
+      console.error("Error generating explanation:", error);
+      explanation = "Failed to generate explanation due to an error.";
+    }
+
     console.log(`Successfully generated ${files.length} files`);
     return new Response(JSON.stringify({
       projectName: architecture.projectName,
       description: architecture.description,
+      explanation: explanation,
       files: files
     }), {
       status: 200,
@@ -337,7 +347,7 @@ async function generateFileContent(filePath: string, architecture: any, original
       },
       body: JSON.stringify({
         model: "claude-3-sonnet-20240229",
-        max_tokens: 3500, // FIXED: Further reduced to ensure we stay well within the model's limits
+        max_tokens: 3500, // Further reduced to ensure we stay within the model's limits
         temperature: 0.7,
         system: `You are an expert developer specializing in creating high-quality code files.
         Generate ONLY the complete code for this specific file.
@@ -464,5 +474,59 @@ async function generatePackageJson(architecture: any): Promise<string> {
     "next": "^13.4.0"
   }
 }`;
+  }
+}
+
+async function generateExplanation(architecture: any, files: any[]): Promise<string> {
+  try {
+    // Create a summary of the files
+    const fileSummary = files.map(f => `${f.path}`).join('\n');
+    
+    const explanationResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert software developer explaining a codebase to a user. Provide a clear, concise explanation of the generated application, its architecture, and key features."
+          },
+          {
+            role: "user",
+            content: `This application "${architecture.projectName}" was generated with the following description: "${architecture.description}"
+            
+            Technologies: ${architecture.technologies.join(", ")}
+            
+            Generated files:
+            ${fileSummary}
+            
+            Please provide a clear, concise explanation of:
+            1. The overall architecture of the application
+            2. The key components and their purposes
+            3. The main features implemented
+            4. How the technologies work together
+            5. What would be needed to extend this application
+            
+            Keep your explanation technical but accessible to developers of all levels.`
+          }
+        ],
+        max_tokens: 1000
+      })
+    });
+
+    if (!explanationResponse.ok) {
+      const errorText = await explanationResponse.text();
+      throw new Error(`OpenAI API error (${explanationResponse.status}): ${errorText}`);
+    }
+
+    const data = await explanationResponse.json();
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error("Error generating explanation:", error);
+    return "An explanation of this codebase could not be generated at this time.";
   }
 }
