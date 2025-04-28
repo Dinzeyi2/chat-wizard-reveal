@@ -492,7 +492,7 @@ async function generateExplanation(architecture: any, files: any[]): Promise<str
         messages: [
           {
             role: "system",
-            content: "You are an expert software developer explaining a codebase to a user. Provide a clear, concise explanation of the generated application, its architecture, and key features."
+            content: "You are an expert software developer explaining a codebase to a user. Provide a clear, detailed explanation of the generated application, its architecture, and key features in a way that's helpful for both beginners and experienced developers."
           },
           {
             role: "user",
@@ -503,17 +503,17 @@ async function generateExplanation(architecture: any, files: any[]): Promise<str
             Generated files:
             ${fileSummary}
             
-            Please provide a clear, concise explanation of:
+            Please provide a comprehensive explanation of:
             1. The overall architecture of the application
             2. The key components and their purposes
-            3. The main features implemented
+            3. The main features implemented and how they work
             4. How the technologies work together
             5. What would be needed to extend this application
             
-            Keep your explanation technical but accessible to developers of all levels.`
+            Keep your explanation technical but accessible, focusing on the implementation details and design patterns used."
           }
         ],
-        max_tokens: 1000
+        max_tokens: 1500  // Increased to allow for more detailed explanations
       })
     });
 
