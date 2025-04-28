@@ -1,11 +1,106 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import { useState, useRef, useEffect } from "react";
+import Sidebar from "@/components/Sidebar";
+import ChatWindow from "@/components/ChatWindow";
+import InputArea from "@/components/InputArea";
+import WelcomeScreen from "@/components/WelcomeScreen";
+import { Message } from "@/types/chat";
 
 const Index = () => {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  const handleSendMessage = async (content: string) => {
+    if (!content.trim()) return;
+    
+    // Add user message
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content,
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setLoading(true);
+    
+    // Simulate AI response after a delay
+    setTimeout(() => {
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: generateResponse(content),
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, aiMessage]);
+      setLoading(false);
+    }, 1000);
+  };
+  
+  // Simple response generator for demo purposes
+  const generateResponse = (prompt: string) => {
+    const responses = [
+      "I understand you're asking about " + prompt + ". Let me help you with that.",
+      "That's an interesting question about " + prompt + ". Here's what I know.",
+      "Regarding " + prompt + ", there are several things to consider.",
+      "Thanks for asking about " + prompt + ". I'd be happy to explain.",
+    ];
+    
+    return responses[Math.floor(Math.random() * responses.length)];
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
+    <div className="h-screen flex overflow-hidden bg-white">
+      {/* Sidebar */}
+      <Sidebar />
+      
+      {/* Main content */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        {/* Status bar */}
+        <div className="h-14 border-b flex items-center px-4 justify-between">
+          <div className="flex items-center">
+            <h1 className="text-lg font-medium text-gray-700">ChatGPT</h1>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="flex items-center text-sm text-gray-600">
+            <span className="mr-2">Saved memory full</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <div className="ml-5 px-3 py-1 rounded-full bg-gray-100 flex items-center">
+              <span>Temporary</span>
+            </div>
+            <div className="ml-2 w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white">
+              O
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto">
+          {messages.length === 0 ? (
+            <WelcomeScreen onSendMessage={handleSendMessage} />
+          ) : (
+            <ChatWindow 
+              messages={messages} 
+              loading={loading} 
+            />
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+        
+        <div className="p-4 pb-8">
+          <InputArea onSendMessage={handleSendMessage} loading={loading} />
+        </div>
       </div>
     </div>
   );
