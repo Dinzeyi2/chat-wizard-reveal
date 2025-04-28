@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -42,7 +43,7 @@ const Index = () => {
       (content.toLowerCase().includes("create") || 
        content.toLowerCase().includes("build") || 
        content.toLowerCase().includes("generate") ||
-       content.toLowerCase().includes("make") ||
+       content.toLowerCase().includes("make") || 
        content.toLowerCase().includes("develop") ||
        content.toLowerCase().includes("code")) && 
       (content.toLowerCase().includes("app") || 
@@ -76,10 +77,10 @@ const Index = () => {
           content.toLowerCase().includes("shopify") && 
           content.toLowerCase().includes("clone");
           
-        let data;
+        let appData;
         
         if (isShopifyClone) {
-          data = {
+          appData = {
             projectName: "ShopifyClone",
             description: "A full-stack e-commerce platform similar to Shopify, allowing users to create online stores, manage products, process orders, and handle payments.",
             technologies: ["React", "TypeScript", "Node.js", "Express", "MongoDB", "Stripe"],
@@ -131,15 +132,14 @@ const Index = () => {
             throw new Error(`Error generating application: ${error.message || "Unknown error"}`);
           }
 
-          data = data;
-          console.log("App generation successful:", data);
+          appData = data;
+          console.log("App generation successful:", appData);
         }
         
         setGenerationDialog(false);
         
         setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
 
-        const appData = data;
         const formattedResponse = `I've generated a full-stack application based on your request. Here's what I created:
 
 \`\`\`json
