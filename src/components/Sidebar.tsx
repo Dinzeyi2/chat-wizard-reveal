@@ -14,12 +14,6 @@ const sidebarItems: SidebarItem[] = [
   { id: "flirt", name: "Flirt Helper", icon: "❤️" },
 ];
 
-const recentChats = [
-  { id: "web", name: "WebContainer API in Lovable" },
-  { id: "affordable", name: "Affordable Claude Usage Tips" },
-  { id: "overview", name: "Lovable.dev Overview" },
-];
-
 const Sidebar = () => {
   return (
     <div className="w-64 h-full bg-gray-50 border-r flex flex-col">
@@ -72,24 +66,6 @@ const Sidebar = () => {
             <span className="text-sm">Library</span>
             <span className="ml-auto text-xs text-gray-500">5</span>
           </div>
-        </div>
-
-        <div className="mt-4 px-3">
-          <div className="text-xs text-gray-500 font-medium px-3 py-1">Yesterday</div>
-          {recentChats.map((chat) => (
-            <div key={chat.id} className="px-3 py-2 my-1 rounded-md cursor-pointer text-sm hover:bg-gray-200">
-              {chat.name}
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-4 px-3">
-          <div className="text-xs text-gray-500 font-medium px-3 py-1">Previous 7 Days</div>
-          {recentChats.map((chat) => (
-            <div key={chat.id} className="px-3 py-2 my-1 rounded-md cursor-pointer text-sm hover:bg-gray-200">
-              {chat.name}
-            </div>
-          ))}
         </div>
 
         <div className="mt-4 px-3 mb-4">
