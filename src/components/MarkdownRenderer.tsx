@@ -18,19 +18,6 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
     return <AppGeneratorDisplay message={message} />;
   }
 
-  // For raw code display (not in app generation format)
-  const isRawCode = content.includes("```") && !isAppGeneration;
-  
-  if (isRawCode) {
-    return (
-      <ScrollArea className="max-h-[500px] pr-2">
-        <div className="whitespace-pre-wrap">
-          {content}
-        </div>
-      </ScrollArea>
-    );
-  }
-
   // Process normal markdown with better formatting
   // This is a simple implementation - could be expanded with a full markdown parser
   const formattedContent = content

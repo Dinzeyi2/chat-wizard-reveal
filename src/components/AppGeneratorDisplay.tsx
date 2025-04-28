@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Message } from "@/types/chat";
 import { Button } from "@/components/ui/button";
@@ -52,12 +51,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   const appData = getAppData();
   
   if (!appData) {
-    // If we can't parse the JSON, just display the raw content
-    return (
-      <div className="whitespace-pre-wrap">
-        <pre>{message.content}</pre>
-      </div>
-    );
+    return <div className="whitespace-pre-wrap">{message.content}</div>;
   }
 
   const appIcon = () => {
