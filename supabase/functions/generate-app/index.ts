@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -123,7 +122,7 @@ serve(async (req) => {
           "anthropic-version": "2023-06-01"
         },
         body: JSON.stringify({
-          model: "claude-3-sonnet-20240229",
+          model: "claude-3-5-sonnet-20240620",
           max_tokens: 3500, // Further reduced to ensure we stay well within limits
           temperature: 0.7,
           system: `You are an expert full stack developer specializing in modern web applications.
@@ -346,7 +345,7 @@ async function generateFileContent(filePath: string, architecture: any, original
         "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
-        model: "claude-3-sonnet-20240229",
+        model: "claude-3-5-sonnet-20240620",
         max_tokens: 3500, // Further reduced to ensure we stay within the model's limits
         temperature: 0.7,
         system: `You are an expert developer specializing in creating high-quality code files.
@@ -412,7 +411,7 @@ async function generatePackageJson(architecture: any): Promise<string> {
         "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
-        model: "claude-3-opus-20240229",
+        model: "claude-3-5-sonnet-20240620",
         max_tokens: 2000,
         temperature: 0.7,
         system: `You are an expert in JavaScript/Node.js development.
