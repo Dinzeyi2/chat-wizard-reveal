@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -7,7 +8,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
-import { ArtifactProvider, ArtifactLayout } from "@/components/artifact/ArtifactSystem";
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -27,8 +27,10 @@ const Index = () => {
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
     
+    // Reset error state
     setGenerationError(null);
     
+    // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
@@ -38,6 +40,7 @@ const Index = () => {
     
     setMessages(prev => [...prev, userMessage]);
     
+    // Check if this is a request to generate an app
     const isAppGeneration = 
       (content.toLowerCase().includes("create") || 
        content.toLowerCase().includes("build") || 
@@ -56,12 +59,15 @@ const Index = () => {
        content.toLowerCase().includes("site"));
 
     if (isAppGeneration) {
+      // Use generate-app function
       console.log("Calling generate-app function with prompt:", content);
       
+      // Show the generation dialog
       setGenerationDialog(true);
       setIsGeneratingApp(true);
       setLoading(true);
       
+      // Add an initial processing message
       const processingMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
@@ -79,6 +85,7 @@ const Index = () => {
         if (error) {
           console.error("Supabase function error:", error);
           
+          // Replace the processing message with an error message
           setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
           
           throw new Error(`Error generating application: ${error.message || "Unknown error"}`);
@@ -86,10 +93,13 @@ const Index = () => {
 
         console.log("App generation successful:", data);
         
+        // Hide the generation dialog
         setGenerationDialog(false);
         
+        // Replace the processing message
         setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
 
+        // Format the response as JSON
         const appData = data;
         const formattedResponse = `I've generated a full-stack application based on your request. Here's what I created:
 
@@ -123,6 +133,7 @@ You can explore the file structure and content in the panel above. This is a sta
           description: error.message || "An unexpected error occurred",
         });
         
+        // Add error message
         const errorMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: "assistant",
@@ -142,6 +153,7 @@ If you were trying to generate an app, this might be due to limits with our AI m
         setIsGeneratingApp(false);
       }
     } else {
+      // Use regular chat function
       setLoading(true);
       try {
         const { data, error } = await supabase.functions.invoke('chat', {
@@ -168,6 +180,7 @@ If you were trying to generate an app, this might be due to limits with our AI m
           description: error.message || "An unexpected error occurred",
         });
         
+        // Add error message
         const errorMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: "assistant",
@@ -183,83 +196,81 @@ If you were trying to generate an app, this might be due to limits with our AI m
   };
 
   return (
-    <ArtifactProvider>
-      <div className="h-screen flex overflow-hidden bg-white">
-        <ArtifactLayout>
-          <div className="flex-1 flex flex-col h-full overflow-hidden">
-            <div className="h-14 border-b flex items-center px-4 justify-between">
-              <div className="flex items-center">
-                <h1 className="text-lg font-medium text-gray-700">ChatGPT</h1>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="flex items-center text-sm text-gray-600">
-                <span className="mr-2">Saved memory full</span>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                <div className="ml-5 px-3 py-1 rounded-full bg-gray-100 flex items-center">
-                  <span>Temporary</span>
-                </div>
-                <div className="ml-2 w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white">
-                  O
-                </div>
-              </div>
+    <div className="h-screen flex overflow-hidden bg-white">
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        <div className="h-14 border-b flex items-center px-4 justify-between">
+          <div className="flex items-center">
+            <h1 className="text-lg font-medium text-gray-700">ChatGPT</h1>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="flex items-center text-sm text-gray-600">
+            <span className="mr-2">Saved memory full</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <div className="ml-5 px-3 py-1 rounded-full bg-gray-100 flex items-center">
+              <span>Temporary</span>
             </div>
-            
-            <div className="flex-1 overflow-y-auto">
-              {messages.length === 0 ? (
-                <WelcomeScreen onSendMessage={handleSendMessage} />
-              ) : (
-                <ChatWindow 
-                  messages={messages} 
-                  loading={loading} 
-                />
-              )}
-              <div ref={messagesEndRef} />
-              
-              {generationError && (
-                <div className="px-4 py-3 mx-auto my-4 max-w-3xl bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-700">
-                    <strong>Error generating app:</strong> {generationError}
-                  </p>
-                  <p className="text-xs text-red-600 mt-1">
-                    Try refreshing the page and using a simpler prompt.
-                  </p>
-                </div>
-              )}
-            </div>
-            
-            <div className="p-4 pb-8">
-              <InputArea onSendMessage={handleSendMessage} loading={loading} />
+            <div className="ml-2 w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white">
+              O
             </div>
           </div>
-        </ArtifactLayout>
-
-        <Dialog open={generationDialog} onOpenChange={setGenerationDialog}>
-          <DialogContent className="sm:max-w-md" onInteractOutside={e => {
-            if (isGeneratingApp) {
-              e.preventDefault();
-            }
-          }}>
-            <DialogHeader>
-              <DialogTitle>Generating Your Application</DialogTitle>
-              <DialogDescription>
-                Please wait while we generate your application. This may take a minute or two.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex flex-col items-center justify-center py-6">
-              <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-              <div className="text-center">
-                <p className="font-medium">Building app architecture...</p>
-                <p className="text-sm text-muted-foreground mt-1">This may take up to 2 minutes.</p>
-              </div>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto">
+          {messages.length === 0 ? (
+            <WelcomeScreen onSendMessage={handleSendMessage} />
+          ) : (
+            <ChatWindow 
+              messages={messages} 
+              loading={loading} 
+            />
+          )}
+          <div ref={messagesEndRef} />
+          
+          {generationError && (
+            <div className="px-4 py-3 mx-auto my-4 max-w-3xl bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700">
+                <strong>Error generating app:</strong> {generationError}
+              </p>
+              <p className="text-xs text-red-600 mt-1">
+                Try refreshing the page and using a simpler prompt.
+              </p>
             </div>
-          </DialogContent>
-        </Dialog>
+          )}
+        </div>
+        
+        <div className="p-4 pb-8">
+          <InputArea onSendMessage={handleSendMessage} loading={loading} />
+        </div>
       </div>
-    </ArtifactProvider>
+
+      {/* App Generation Dialog */}
+      <Dialog open={generationDialog} onOpenChange={setGenerationDialog}>
+        <DialogContent className="sm:max-w-md" onInteractOutside={e => {
+          // Prevent closing while generating
+          if (isGeneratingApp) {
+            e.preventDefault();
+          }
+        }}>
+          <DialogHeader>
+            <DialogTitle>Generating Your Application</DialogTitle>
+            <DialogDescription>
+              Please wait while we generate your application. This may take a minute or two.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center py-6">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+            <div className="text-center">
+              <p className="font-medium">Building app architecture...</p>
+              <p className="text-sm text-muted-foreground mt-1">This may take up to 2 minutes.</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 };
 
