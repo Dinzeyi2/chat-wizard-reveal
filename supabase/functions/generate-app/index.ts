@@ -481,23 +481,18 @@ async function generateExplanation(architecture: any, files: any[]): Promise<str
     // Create a summary of the files
     const fileSummary = files.map(f => `${f.path}`).join('\n');
     
-    const openAiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openAiKey) {
-      throw new Error("OpenAI API key not configured");
-    }
-    
     const explanationResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${openAiKey}`
+        "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}`
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
-            content: "You are an expert software developer explaining a codebase to a user. Provide a clear, detailed explanation of the generated application, its architecture, and key features in a way that's helpful for both beginners and experienced developers."
+            content: "You are an expert software developer explaining a codebase to a user. Provide a clear, concise explanation of the generated application, its architecture, and key features."
           },
           {
             role: "user",
@@ -508,23 +503,23 @@ async function generateExplanation(architecture: any, files: any[]): Promise<str
             Generated files:
             ${fileSummary}
             
-            Please provide a comprehensive explanation of:
+            Please provide a clear, concise explanation of:
             1. The overall architecture of the application
             2. The key components and their purposes
-            3. The main features implemented and how they work
+            3. The main features implemented
             4. How the technologies work together
             5. What would be needed to extend this application
             
-            Keep your explanation technical but accessible, focusing on the implementation details and design patterns used."
+            Keep your explanation technical but accessible to developers of all levels.`
           }
         ],
-        max_tokens: 1500  // Increased to allow for more detailed explanations
+        max_tokens: 1000
       })
     });
 
     if (!explanationResponse.ok) {
       const errorText = await explanationResponse.text();
-      throw new Error(`Error from OpenAI API (${explanationResponse.status}): ${errorText}`);
+      throw new Error(`OpenAI API error (${explanationResponse.status}): ${errorText}`);
     }
 
     const data = await explanationResponse.json();
