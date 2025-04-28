@@ -157,7 +157,7 @@ serve(async (req) => {
     const filesToGenerate = fileList.slice(0, batchSize);
     
     for (const filePath of filesToGenerate) {
-      const fileContent = await generateFileContent(filePath, architecture, truncatedPrompt);
+      const fileContent = await generateFileContent(filePath, architecture, processedPrompt);
       files.push({
         path: filePath,
         content: fileContent

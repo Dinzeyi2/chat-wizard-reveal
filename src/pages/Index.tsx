@@ -35,17 +35,33 @@ const Index = () => {
     
     try {
       // Check if this is a request to generate an app
-      const isAppGeneration = content.toLowerCase().includes("create") && 
-        (content.toLowerCase().includes("app") || content.toLowerCase().includes("website") || 
-         content.toLowerCase().includes("dashboard") || content.toLowerCase().includes("application"));
+      const isAppGeneration = 
+        (content.toLowerCase().includes("create") || 
+         content.toLowerCase().includes("build") || 
+         content.toLowerCase().includes("generate") ||
+         content.toLowerCase().includes("make")) && 
+        (content.toLowerCase().includes("app") || 
+         content.toLowerCase().includes("website") || 
+         content.toLowerCase().includes("dashboard") || 
+         content.toLowerCase().includes("application") ||
+         content.toLowerCase().includes("platform") ||
+         content.toLowerCase().includes("clone") ||
+         content.toLowerCase().includes("system") ||
+         content.toLowerCase().includes("project"));
 
       if (isAppGeneration) {
         // Use generate-app function
+        console.log("Calling generate-app function with prompt:", content);
         const { data, error } = await supabase.functions.invoke('generate-app', {
           body: { prompt: content }
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error("Supabase function error:", error);
+          throw error;
+        }
+
+        console.log("App generation successful:", data);
 
         // Format the response as JSON
         const appData = data;
