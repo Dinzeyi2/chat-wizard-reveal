@@ -4,7 +4,7 @@ import { Message } from "@/types/chat";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Download, FileCode, ChevronDown, ChevronRight, ShoppingBag } from "lucide-react";
+import { Download, FileCode, ChevronRight, ChevronDown, ShoppingBag, Code } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Accordion, 
@@ -176,54 +176,71 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
     ];
   };
 
+  // New Lovable-style UI based on the image
   return (
-    <div className="border rounded-lg overflow-hidden mt-4 bg-white shadow">
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-4 text-white flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="bg-white p-2 rounded-lg text-blue-600">
-            {appIcon()}
+    <div className="my-6 space-y-6">
+      {/* Title Section */}
+      <div>
+        <h3 className="text-xl font-semibold mb-2">I've generated a full-stack application: {appData.projectName}</h3>
+        <p className="text-gray-600">{appData.description}</p>
+      </div>
+      
+      {/* Code View Button - Styled like the example */}
+      <div className="bg-gray-900 text-white p-6 rounded-lg">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center">
+            <Code className="mr-2" />
+            <span className="font-medium">Generated: {appData.projectName}</span>
           </div>
           <div>
-            <h3 className="font-semibold text-lg">{appData.projectName}</h3>
-            <p className="text-xs text-blue-100">Generated Application</p>
+            <Button 
+              variant="outline" 
+              className="text-white border-gray-600 hover:bg-gray-800"
+              onClick={handleDownload}
+            >
+              <Download className="h-4 w-4 mr-1" />
+              <span>Download</span>
+            </Button>
           </div>
         </div>
-        <Button 
-          variant="secondary" 
-          size="sm" 
-          className="bg-white text-blue-700 hover:bg-blue-50"
-          onClick={handleDownload}
-        >
-          <Download className="h-4 w-4 mr-1" />
-          <span>Download</span>
-        </Button>
-      </div>
-
-      <div className="p-5 space-y-4">
-        {generateSummary()}
         
-        <div className="mt-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Main Features:</h4>
-          <ul className="grid grid-cols-2 gap-2">
-            {getMainFeatures().map((feature, index) => (
-              <li key={index} className="flex items-center gap-2 text-sm text-gray-600">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-                {feature}
-              </li>
-            ))}
-          </ul>
+        <div className="text-center my-8">
+          <Button 
+            variant="outline"
+            size="lg"
+            className="bg-transparent text-white border border-gray-600 hover:bg-gray-800 px-8 py-6 h-auto"
+            onClick={handleViewFullProject}
+          >
+            <span className="text-lg">View code</span>
+          </Button>
         </div>
-        
-        <Button 
-          variant="default" 
-          className="w-full mt-3 bg-blue-600 hover:bg-blue-700"
-          onClick={handleViewFullProject}
-        >
-          <span>View Code & Files</span>
-          <ChevronRight className="h-4 w-4 ml-1" />
-        </Button>
       </div>
-
+      
+      {/* Details Section */}
+      <div className="space-y-4">
+        <h4 className="font-semibold">This application includes:</h4>
+        <ol className="list-decimal pl-6 space-y-2">
+          {appData.files.length > 0 && (
+            <li>
+              <span className="font-medium">{appData.files.length} files</span> organized in a structured project
+            </li>
+          )}
+          {appData.technologies && (
+            <li>
+              <span className="font-medium">Technologies used:</span> {appData.technologies.join(', ')}
+            </li>
+          )}
+          <li>
+            <span className="font-medium">Main features:</span>
+            <ul className="list-disc pl-6 pt-1">
+              {getMainFeatures().map((feature, index) => (
+                <li key={index}>{feature}</li>
+              ))}
+            </ul>
+          </li>
+        </ol>
+      </div>
+      
       <Accordion type="single" collapsible className="w-full">
         <AccordionItem value="explanation">
           <AccordionTrigger className="px-5 py-3 hover:bg-gray-50">Application Details</AccordionTrigger>
