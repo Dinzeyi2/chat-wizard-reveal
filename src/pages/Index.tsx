@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -31,22 +32,66 @@ const Index = () => {
     setLoading(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('chat', {
-        body: { message: content }
-      });
+      // Check if this is a request to generate an app
+      const isAppGeneration = content.toLowerCase().includes("create") && 
+        (content.toLowerCase().includes("app") || content.toLowerCase().includes("website") || 
+         content.toLowerCase().includes("dashboard") || content.toLowerCase().includes("application"));
 
-      if (error) throw error;
+      if (isAppGeneration) {
+        // Use generate-app function
+        const { data, error } = await supabase.functions.invoke('generate-app', {
+          body: { prompt: content }
+        });
 
-      const aiMessage: Message = {
+        if (error) throw error;
+
+        // Format the response as JSON
+        const appData = data;
+        const formattedResponse = `I've generated a full-stack application based on your request. Here's what I created:
+
+\`\`\`json
+${JSON.stringify(appData, null, 2)}
+\`\`\`
+
+You can explore the file structure and content in the panel above. This is a starting point that you can further customize and expand.`;
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: formattedResponse,
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => [...prev, aiMessage]);
+      } else {
+        // Use regular chat function
+        const { data, error } = await supabase.functions.invoke('chat', {
+          body: { message: content }
+        });
+
+        if (error) throw error;
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.response,
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => [...prev, aiMessage]);
+      }
+    } catch (error) {
+      console.error('Error calling function:', error);
+      
+      // Add error message
+      const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.response,
+        content: `I'm sorry, but I encountered an error while processing your request. ${error.message || 'Please try again later.'}`,
         timestamp: new Date()
       };
       
-      setMessages(prev => [...prev, aiMessage]);
-    } catch (error) {
-      console.error('Error calling chat function:', error);
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setLoading(false);
     }
