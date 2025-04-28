@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -11,14 +12,51 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-// Function to truncate input to stay within token limit
-function truncateInput(prompt: string, maxTokens: number = 800): string {
-  const currentTokens = estimateTokens(prompt);
-  if (currentTokens <= maxTokens) return prompt;
+// Function to summarize long inputs using OpenAI
+async function summarizeWithOpenAI(text: string): Promise<string> {
+  const openAiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!openAiKey) {
+    throw new Error("OpenAI API key not configured");
+  }
 
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${openAiKey}`
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert at summarizing application requirements. Summarize the input while preserving all critical information about the desired application's functionality, features, and requirements. Keep your summary concise but comprehensive."
+        },
+        {
+          role: "user",
+          content: `Summarize this application request in 800 tokens or less while preserving all important details: ${text}`
+        }
+      ],
+      max_tokens: 800
+    })
+  });
+
+  const data = await response.json();
+  return data.choices[0].message.content;
+}
+
+// Function to process input and ensure it's within token limits
+async function processInput(prompt: string, maxTokens: number = 800): Promise<string> {
+  const currentTokens = estimateTokens(prompt);
+  
+  // If within limits, return as is
+  if (currentTokens <= maxTokens) {
+    return prompt;
+  }
+  
   // If too long, use OpenAI to summarize
-  // For now, do a simple truncation (you'll need to add OpenAI summarization later)
-  return prompt.slice(0, maxTokens * 4); // Rough approximation
+  console.log(`Input exceeds ${maxTokens} tokens, summarizing with OpenAI...`);
+  return await summarizeWithOpenAI(prompt);
 }
 
 serve(async (req) => {
@@ -37,8 +75,10 @@ serve(async (req) => {
       });
     }
 
-    // Enforce input token limit
-    const truncatedPrompt = truncateInput(prompt);
+    // Process and potentially summarize input
+    const processedPrompt = await processInput(prompt);
+    console.log("Processed prompt length (chars):", processedPrompt.length);
+    
     const projectName = `project-${Date.now()}`;
     
     // Generate architecture using Anthropic API with enforced output token limit
@@ -51,7 +91,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "claude-3-sonnet-20240229",
-        max_tokens: 5000, // Enforcing 5000 token limit for output
+        max_tokens: 5000,
         temperature: 0.7,
         system: `You are an expert full stack developer specializing in modern web applications.
         When given a prompt for a web application, you will create a detailed architecture plan with:
@@ -77,7 +117,7 @@ serve(async (req) => {
         messages: [
           {
             role: "user",
-            content: truncatedPrompt
+            content: processedPrompt
           }
         ]
       })
