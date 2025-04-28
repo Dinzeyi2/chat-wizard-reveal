@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -481,11 +482,16 @@ async function generateExplanation(architecture: any, files: any[]): Promise<str
     // Create a summary of the files
     const fileSummary = files.map(f => `${f.path}`).join('\n');
     
+    const openAiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!openAiKey) {
+      throw new Error("OpenAI API key not configured");
+    }
+    
     const explanationResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}`
+        "Authorization": `Bearer ${openAiKey}`
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
@@ -519,7 +525,7 @@ async function generateExplanation(architecture: any, files: any[]): Promise<str
 
     if (!explanationResponse.ok) {
       const errorText = await explanationResponse.text();
-      throw new Error(`OpenAI API error (${explanationResponse.status}): ${errorText}`);
+      throw new Error(`Error from OpenAI API (${explanationResponse.status}): ${errorText}`);
     }
 
     const data = await explanationResponse.json();
