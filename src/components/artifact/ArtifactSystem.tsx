@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
-import { FileCode, X, ExternalLink, ChevronRight, Download } from 'lucide-react';
+import { FileCode, X, ExternalLink, ChevronRight, Download, File } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 // Types
@@ -160,11 +159,11 @@ export const ArtifactViewer: React.FC = () => {
       return (
         <React.Fragment key={folderPath}>
           <li 
-            className="flex items-center py-1 cursor-pointer text-sm text-gray-600 hover:bg-gray-100"
+            className="flex items-center py-1 cursor-pointer text-gray-300 hover:bg-zinc-800"
             style={{ paddingLeft: `${indent * 12 + 12}px` }}
             onClick={() => toggleFolder(folderPath)}
           >
-            <span className="mr-1 text-gray-500">
+            <span className="mr-1 text-gray-400">
               {isExpanded ? (
                 <ChevronRight className="h-3.5 w-3.5 transform rotate-90" />
               ) : (
@@ -183,11 +182,17 @@ export const ArtifactViewer: React.FC = () => {
                 return (
                   <li 
                     key={file.id}
-                    className={`py-1 cursor-pointer text-sm hover:bg-gray-100 ${activeFile === file.id ? 'bg-blue-50 text-blue-700' : 'text-gray-600'}`}
+                    className={`py-1 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400' : 'text-gray-300'}`}
                     style={{ paddingLeft: `${indent * 12 + 28}px` }}
                     onClick={() => setActiveFile(file.id)}
                   >
-                    {fileName}
+                    <div className="flex items-center">
+                      <File className="h-4 w-4 mr-2 text-gray-500" />
+                      {fileName}
+                      {activeFile === file.id && 
+                        <span className="text-green-400 ml-2 text-xs">+31</span>
+                      }
+                    </div>
                   </li>
                 );
               })}
@@ -204,10 +209,16 @@ export const ArtifactViewer: React.FC = () => {
         {rootFiles.map(file => (
           <li 
             key={file.id}
-            className={`py-1 pl-3 cursor-pointer text-sm hover:bg-gray-100 ${activeFile === file.id ? 'bg-blue-50 text-blue-700' : 'text-gray-600'}`}
+            className={`py-1 pl-3 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400' : 'text-gray-300'}`}
             onClick={() => setActiveFile(file.id)}
           >
-            {file.path}
+            <div className="flex items-center px-2 py-1">
+              <File className="h-4 w-4 mr-2 text-gray-500" />
+              {file.path}
+              {activeFile === file.id && 
+                <span className="text-green-400 ml-2 text-xs">+31</span>
+              }
+            </div>
           </li>
         ))}
       </ul>
@@ -244,9 +255,9 @@ export const ArtifactViewer: React.FC = () => {
         
         <div className="artifact-viewer-content flex flex-1 overflow-hidden">
           {/* File explorer */}
-          <div className="file-explorer w-1/4 min-w-[220px] border-r bg-gray-50 overflow-y-auto">
-            <div className="sticky top-0 bg-gray-100 border-b px-3 py-2">
-              <h4 className="text-sm font-medium text-gray-500">Files</h4>
+          <div className="file-explorer w-1/4 min-w-[220px] border-r border-zinc-800 bg-black overflow-y-auto">
+            <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 px-3 py-2">
+              <h4 className="text-sm font-medium text-gray-400">Files</h4>
             </div>
             {renderFileTree()}
           </div>
@@ -255,15 +266,15 @@ export const ArtifactViewer: React.FC = () => {
           <div className="file-content flex-1 overflow-auto flex flex-col">
             {currentFile ? (
               <>
-                <div className="file-path px-4 py-2 text-xs text-gray-500 bg-gray-100 border-b flex justify-between items-center">
+                <div className="file-path px-4 py-2 text-xs text-gray-400 bg-zinc-900 border-b border-zinc-800 flex justify-between items-center">
                   <span>{currentFile.path}</span>
-                  <span className="text-gray-400">{getLanguageFromPath(currentFile.path).toUpperCase()}</span>
+                  <span className="text-gray-500">{getLanguageFromPath(currentFile.path).toUpperCase()}</span>
                 </div>
-                <div className="code-container flex-1 overflow-auto">
+                <div className="code-container flex-1 overflow-auto bg-zinc-900">
                   <SyntaxHighlighter 
                     language={getLanguageFromPath(currentFile.path)}
                     style={vs2015}
-                    customStyle={{ margin: 0, padding: '16px', height: '100%', fontSize: '14px', lineHeight: '1.5' }}
+                    customStyle={{ margin: 0, padding: '16px', height: '100%', fontSize: '14px', lineHeight: '1.5', backgroundColor: '#18181b' }}
                     showLineNumbers={true}
                   >
                     {currentFile.content}
@@ -271,7 +282,7 @@ export const ArtifactViewer: React.FC = () => {
                 </div>
               </>
             ) : (
-              <div className="no-file-selected p-4 text-center text-gray-500 mt-8">
+              <div className="no-file-selected p-4 text-center text-gray-500 mt-8 bg-zinc-900">
                 Select a file to view its content
               </div>
             )}
