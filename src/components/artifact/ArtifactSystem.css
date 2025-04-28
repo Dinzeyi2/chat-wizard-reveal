@@ -1,0 +1,53 @@
+
+/* Artifact System Styles */
+.artifact-system {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.chat-area {
+  height: 100%;
+  overflow-y: auto;
+  transition: width 0.3s ease;
+}
+
+.artifact-expanded-view {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 60%;
+  height: 100%;
+  background-color: white;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.artifact-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.file-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.code-container {
+  min-height: 300px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .chat-area.w-[40%] {
+    width: 0;
+  }
+  
+  .artifact-expanded-view {
+    width: 100%;
+  }
+}

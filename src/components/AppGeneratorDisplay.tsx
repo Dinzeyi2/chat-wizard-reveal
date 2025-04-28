@@ -12,6 +12,7 @@ import {
   AccordionItem, 
   AccordionTrigger 
 } from "@/components/ui/accordion";
+import { useArtifact } from "./artifact/ArtifactSystem";
 
 interface GeneratedFile {
   path: string;
@@ -22,6 +23,7 @@ interface GeneratedApp {
   projectName: string;
   description: string;
   files: GeneratedFile[];
+  explanation?: string;
 }
 
 interface AppGeneratorDisplayProps {
@@ -29,8 +31,8 @@ interface AppGeneratorDisplayProps {
 }
 
 const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) => {
-  const [selectedFile, setSelectedFile] = useState<GeneratedFile | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const { openArtifact } = useArtifact();
   
   // Parse the app data from the message content
   const getAppData = (): GeneratedApp | null => {
@@ -52,8 +54,23 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
     return <div>{message.content}</div>;
   }
   
-  const handleFileSelect = (file: GeneratedFile) => {
-    setSelectedFile(file);
+  const handleViewFullProject = () => {
+    // Convert GeneratedFiles to ArtifactFiles format
+    const artifactFiles = appData.files.map((file, index) => ({
+      id: `file-${index}`,
+      name: file.path.split('/').pop() || file.path,
+      path: file.path,
+      language: getLanguageFromPath(file.path),
+      content: file.content
+    }));
+
+    // Open the artifact
+    openArtifact({
+      id: `artifact-${Date.now()}`,
+      title: appData.projectName,
+      description: appData.description,
+      files: artifactFiles
+    });
   };
 
   const handleDownload = () => {
@@ -128,117 +145,46 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
       <div className="p-4 space-y-4">
         {generateSummary()}
         
-        <Collapsible 
-          open={isOpen}
-          onOpenChange={setIsOpen}
-          className="border rounded-lg"
+        <Button 
+          variant="outline" 
+          className="w-full flex items-center justify-center gap-2"
+          onClick={handleViewFullProject}
         >
-          <CollapsibleTrigger asChild>
-            <Button 
-              variant="outline" 
-              className="w-full flex items-center justify-between p-3"
-            >
-              <span>View Full Project</span>
-              {isOpen ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-            </Button>
-          </CollapsibleTrigger>
-          
-          <CollapsibleContent>
-            <div className="flex h-[500px]">
-              {/* File explorer */}
-              <div className="w-64 border-r">
-                <ScrollArea className="h-full">
-                  <div className="p-2">
-                    <h4 className="text-xs font-medium uppercase text-muted-foreground mb-2 px-2">Files</h4>
-                    <div className="space-y-1">
-                      {appData.files.map((file) => (
-                        <button
-                          key={file.path}
-                          onClick={() => handleFileSelect(file)}
-                          className={`w-full text-left text-sm px-2 py-1 rounded ${
-                            selectedFile?.path === file.path
-                              ? "bg-accent text-accent-foreground"
-                              : "hover:bg-muted"
-                          }`}
-                        >
-                          {file.path}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </ScrollArea>
-              </div>
-              
-              {/* File content */}
-              <div className="flex-1">
-                {selectedFile ? (
-                  <Tabs defaultValue="code" className="flex flex-col h-full">
-                    <div className="border-b px-3">
-                      <TabsList>
-                        <TabsTrigger value="code">Code</TabsTrigger>
-                        <TabsTrigger value="preview">Preview</TabsTrigger>
-                      </TabsList>
-                    </div>
-                    
-                    <TabsContent value="code" className="flex-1 overflow-auto p-0 m-0">
-                      <ScrollArea className="h-full">
-                        <pre className="p-4">
-                          <code className={`language-${getLanguageFromPath(selectedFile.path)}`}>
-                            {selectedFile.content}
-                          </code>
-                        </pre>
-                      </ScrollArea>
-                    </TabsContent>
-                    
-                    <TabsContent value="preview" className="flex-1 p-4 mt-0">
-                      <div className="border rounded h-full flex items-center justify-center">
-                        <p className="text-muted-foreground text-sm">
-                          Preview not available
-                        </p>
-                      </div>
-                    </TabsContent>
-                  </Tabs>
-                ) : (
-                  <div className="h-full flex items-center justify-center">
-                    <p className="text-muted-foreground text-sm">
-                      Select a file to view its content
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-
-        <Accordion type="single" collapsible className="w-full">
-          <AccordionItem value="explanation">
-            <AccordionTrigger>AI Explanation</AccordionTrigger>
-            <AccordionContent>
-              <div className="text-sm space-y-2 p-2">
-                <p><strong>Architecture Overview:</strong> This {appData.projectName} application follows a typical web application structure with clearly separated concerns.</p>
-                
-                <p><strong>Frontend:</strong> The UI is built with React components organized in a logical hierarchy, with pages for different views and reusable components for common UI elements.</p>
-                
-                <p><strong>Data Management:</strong> The application handles data through a combination of state management and API calls to backend services.</p>
-                
-                <p><strong>Key Features:</strong></p>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>E-commerce functionality with product listings and cart management</li>
-                  <li>User authentication and store management</li>
-                  <li>Responsive design for mobile and desktop</li>
-                  <li>Modern UI with intuitive navigation</li>
-                </ul>
-                
-                <p><strong>Tech Stack:</strong> Built using React with modern JavaScript/TypeScript, styling with CSS, and backend integration.</p>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+          <span>View Full Project</span>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
       </div>
+
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="explanation">
+          <AccordionTrigger>AI Explanation</AccordionTrigger>
+          <AccordionContent>
+            <div className="text-sm space-y-2 p-2">
+              {appData.explanation ? (
+                <p>{appData.explanation}</p>
+              ) : (
+                <>
+                  <p><strong>Architecture Overview:</strong> This {appData.projectName} application follows a typical web application structure with clearly separated concerns.</p>
+                  
+                  <p><strong>Frontend:</strong> The UI is built with React components organized in a logical hierarchy, with pages for different views and reusable components for common UI elements.</p>
+                  
+                  <p><strong>Data Management:</strong> The application handles data through a combination of state management and API calls to backend services.</p>
+                  
+                  <p><strong>Key Features:</strong></p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>E-commerce functionality with product listings and cart management</li>
+                    <li>User authentication and store management</li>
+                    <li>Responsive design for mobile and desktop</li>
+                    <li>Modern UI with intuitive navigation</li>
+                  </ul>
+                  
+                  <p><strong>Tech Stack:</strong> Built using React with modern JavaScript/TypeScript, styling with CSS, and backend integration.</p>
+                </>
+              )}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 };
