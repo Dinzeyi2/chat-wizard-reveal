@@ -12,10 +12,9 @@ import {
 interface InputAreaProps {
   onSendMessage: (message: string) => void;
   loading: boolean;
-  deepReasoningMode?: boolean;
 }
 
-const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading, deepReasoningMode = false }) => {
+const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -71,7 +70,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading, deepReaso
           </div>
         )}
 
-        <PromptInputTextarea placeholder={deepReasoningMode ? "Ask anything with deep reasoning..." : "Ask anything..."} />
+        <PromptInputTextarea placeholder="Ask anything with deep reasoning..." />
 
         <PromptInputActions className="flex items-center justify-between gap-2 pt-2">
           <div className="flex gap-2">
@@ -92,19 +91,10 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading, deepReaso
               </label>
             </PromptInputAction>
             
-            {deepReasoningMode ? (
-              <Button variant="outline" size="sm" className="rounded-full flex items-center gap-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700">
-                <Brain className="size-4" />
-                <span>Deep Reasoning</span>
-              </Button>
-            ) : (
-              <>
-                <Button variant="outline" size="sm" className="rounded-full">Search</Button>
-                <Button variant="outline" size="sm" className="rounded-full">Reason</Button>
-                <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Deep research</Button>
-                <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Create image</Button>
-              </>
-            )}
+            <Button variant="outline" size="sm" className="rounded-full flex items-center gap-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700">
+              <Brain className="size-4" />
+              <span>Deep Reasoning</span>
+            </Button>
           </div>
 
           <PromptInputAction tooltip={loading ? "Stop generation" : "Send message"}>
@@ -121,9 +111,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading, deepReaso
       </PromptInput>
       
       <div className="text-xs text-center mt-2 text-gray-500">
-        {deepReasoningMode 
-          ? "Deep Reasoning Mode: Enhanced answers with comprehensive analysis." 
-          : "ChatGPT can make mistakes. Check important info."}
+        Deep Reasoning: Enhanced answers with comprehensive analysis.
       </div>
     </div>
   );

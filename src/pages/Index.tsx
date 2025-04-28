@@ -5,13 +5,10 @@ import InputArea from "@/components/InputArea";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import { Message } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
-  const [deepReasoningMode, setDeepReasoningMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,9 +32,8 @@ const Index = () => {
     setLoading(true);
     
     try {
-      // Call appropriate function based on mode
-      const endpoint = deepReasoningMode ? 'deep-reasoning' : 'chat';
-      const { data, error } = await supabase.functions.invoke(endpoint, {
+      // Always use deep reasoning
+      const { data, error } = await supabase.functions.invoke('deep-reasoning', {
         body: { message: content }
       });
 
@@ -52,7 +48,7 @@ const Index = () => {
       
       setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
-      console.error(`Error calling ${deepReasoningMode ? 'deep-reasoning' : 'chat'} function:`, error);
+      console.error(`Error calling deep-reasoning function:`, error);
     } finally {
       setLoading(false);
     }
@@ -69,16 +65,8 @@ const Index = () => {
             </svg>
           </div>
           <div className="flex items-center text-sm text-gray-600 gap-4">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="deep-reasoning"
-                checked={deepReasoningMode}
-                onCheckedChange={setDeepReasoningMode}
-              />
-              <Label htmlFor="deep-reasoning">Deep Reasoning</Label>
-            </div>
-            <div className="ml-2 px-3 py-1 rounded-full bg-gray-100 flex items-center">
-              <span>Temporary</span>
+            <div className="px-3 py-1 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
+              <span>Deep Reasoning</span>
             </div>
             <div className="ml-2 w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white">
               O
@@ -102,7 +90,6 @@ const Index = () => {
           <InputArea 
             onSendMessage={handleSendMessage} 
             loading={loading} 
-            deepReasoningMode={deepReasoningMode}
           />
         </div>
       </div>
