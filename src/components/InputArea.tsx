@@ -1,6 +1,6 @@
 
 import { useState, useRef } from "react";
-import { ArrowUp, Paperclip, X, Brain } from "lucide-react";
+import { ArrowUp, Paperclip, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   PromptInput,
@@ -70,32 +70,25 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
           </div>
         )}
 
-        <PromptInputTextarea placeholder="Ask anything with deep reasoning..." />
+        <PromptInputTextarea placeholder="Ask anything..." />
 
         <PromptInputActions className="flex items-center justify-between gap-2 pt-2">
-          <div className="flex gap-2">
-            <PromptInputAction tooltip="Attach files">
-              <label
-                htmlFor="file-upload"
-                className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl"
-              >
-                <input
-                  ref={uploadInputRef}
-                  type="file"
-                  multiple
-                  onChange={handleFileChange}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <Paperclip className="text-primary size-5" />
-              </label>
-            </PromptInputAction>
-            
-            <Button variant="outline" size="sm" className="rounded-full flex items-center gap-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700">
-              <Brain className="size-4" />
-              <span>Deep Reasoning</span>
-            </Button>
-          </div>
+          <PromptInputAction tooltip="Attach files">
+            <label
+              htmlFor="file-upload"
+              className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl"
+            >
+              <input
+                ref={uploadInputRef}
+                type="file"
+                multiple
+                onChange={handleFileChange}
+                className="hidden"
+                id="file-upload"
+              />
+              <Paperclip className="text-primary size-5" />
+            </label>
+          </PromptInputAction>
 
           <PromptInputAction tooltip={loading ? "Stop generation" : "Send message"}>
             <Button
@@ -111,7 +104,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
       </PromptInput>
       
       <div className="text-xs text-center mt-2 text-gray-500">
-        Deep Reasoning: Enhanced answers with comprehensive analysis.
+        ChatGPT can make mistakes. Consider checking important information.
       </div>
     </div>
   );

@@ -65,9 +65,6 @@ const Index = () => {
             </svg>
           </div>
           <div className="flex items-center text-sm text-gray-600 gap-4">
-            <div className="px-3 py-1 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
-              <span>Deep Reasoning</span>
-            </div>
             <div className="ml-2 w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white">
               O
             </div>
