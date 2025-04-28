@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";

@@ -3,6 +3,7 @@ import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import { Message } from "@/types/chat";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -29,37 +30,31 @@ const Index = () => {
     setMessages(prev => [...prev, userMessage]);
     setLoading(true);
     
-    // Simulate AI response after a delay
-    setTimeout(() => {
+    try {
+      const { data, error } = await supabase.functions.invoke('chat', {
+        body: { message: content }
+      });
+
+      if (error) throw error;
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: generateResponse(content),
+        content: data.response,
         timestamp: new Date()
       };
       
       setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      console.error('Error calling chat function:', error);
+    } finally {
       setLoading(false);
-    }, 1000);
-  };
-  
-  // Simple response generator for demo purposes
-  const generateResponse = (prompt: string) => {
-    const responses = [
-      "I understand you're asking about " + prompt + ". Let me help you with that.",
-      "That's an interesting question about " + prompt + ". Here's what I know.",
-      "Regarding " + prompt + ", there are several things to consider.",
-      "Thanks for asking about " + prompt + ". I'd be happy to explain.",
-    ];
-    
-    return responses[Math.floor(Math.random() * responses.length)];
+    }
   };
 
   return (
     <div className="h-screen flex overflow-hidden bg-white">
-      {/* Main content */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
-        {/* Status bar */}
         <div className="h-14 border-b flex items-center px-4 justify-between">
           <div className="flex items-center">
             <h1 className="text-lg font-medium text-gray-700">ChatGPT</h1>
