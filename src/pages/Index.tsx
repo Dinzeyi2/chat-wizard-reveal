@@ -5,11 +5,13 @@ import InputArea from "@/components/InputArea";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import { Message } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -63,6 +65,11 @@ You can explore the file structure and content in the panel above. This is a sta
         };
         
         setMessages(prev => [...prev, aiMessage]);
+        
+        toast({
+          title: "App Generated Successfully",
+          description: `${appData.projectName} has been generated with ${appData.files.length} files.`,
+        });
       } else {
         // Use regular chat function
         const { data, error } = await supabase.functions.invoke('chat', {
@@ -82,6 +89,12 @@ You can explore the file structure and content in the panel above. This is a sta
       }
     } catch (error) {
       console.error('Error calling function:', error);
+      
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "An unexpected error occurred",
+      });
       
       // Add error message
       const errorMessage: Message = {
