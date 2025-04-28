@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -21,6 +22,9 @@ const Index = () => {
 
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
+    
+    // Reset error state
+    setGenerationError(null);
     
     // Add user message
     const userMessage: Message = {
@@ -39,7 +43,9 @@ const Index = () => {
         (content.toLowerCase().includes("create") || 
          content.toLowerCase().includes("build") || 
          content.toLowerCase().includes("generate") ||
-         content.toLowerCase().includes("make")) && 
+         content.toLowerCase().includes("make") ||
+         content.toLowerCase().includes("develop") ||
+         content.toLowerCase().includes("code")) && 
         (content.toLowerCase().includes("app") || 
          content.toLowerCase().includes("website") || 
          content.toLowerCase().includes("dashboard") || 
@@ -47,21 +53,40 @@ const Index = () => {
          content.toLowerCase().includes("platform") ||
          content.toLowerCase().includes("clone") ||
          content.toLowerCase().includes("system") ||
-         content.toLowerCase().includes("project"));
+         content.toLowerCase().includes("project") ||
+         content.toLowerCase().includes("site"));
 
       if (isAppGeneration) {
         // Use generate-app function
         console.log("Calling generate-app function with prompt:", content);
+        
+        // Add an initial processing message
+        const processingMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "I'm working on generating your application. This may take a minute or two...",
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => [...prev, processingMessage]);
+        
         const { data, error } = await supabase.functions.invoke('generate-app', {
           body: { prompt: content }
         });
 
         if (error) {
           console.error("Supabase function error:", error);
-          throw error;
+          
+          // Replace the processing message with an error message
+          setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
+          
+          throw new Error(`Error generating application: ${error.message || "Unknown error"}`);
         }
 
         console.log("App generation successful:", data);
+        
+        // Replace the processing message
+        setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
 
         // Format the response as JSON
         const appData = data;
@@ -74,7 +99,7 @@ ${JSON.stringify(appData, null, 2)}
 You can explore the file structure and content in the panel above. This is a starting point that you can further customize and expand.`;
 
         const aiMessage: Message = {
-          id: (Date.now() + 1).toString(),
+          id: (Date.now() + 2).toString(),
           role: "assistant",
           content: formattedResponse,
           timestamp: new Date()
@@ -105,6 +130,7 @@ You can explore the file structure and content in the panel above. This is a sta
       }
     } catch (error) {
       console.error('Error calling function:', error);
+      setGenerationError(error.message || "An unexpected error occurred");
       
       toast({
         variant: "destructive",
@@ -116,7 +142,12 @@ You can explore the file structure and content in the panel above. This is a sta
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `I'm sorry, but I encountered an error while processing your request. ${error.message || 'Please try again later.'}`,
+        content: `I'm sorry, but I encountered an error while processing your request: ${error.message || 'Please try again later.'}
+        
+If you were trying to generate an app, this might be due to limits with our AI model or connectivity issues. You can try:
+1. Using a shorter, more focused prompt
+2. Breaking down your request into smaller parts
+3. Trying again in a few minutes`,
         timestamp: new Date()
       };
       
@@ -160,6 +191,17 @@ You can explore the file structure and content in the panel above. This is a sta
             />
           )}
           <div ref={messagesEndRef} />
+          
+          {generationError && (
+            <div className="px-4 py-3 mx-auto my-4 max-w-3xl bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700">
+                <strong>Error generating app:</strong> {generationError}
+              </p>
+              <p className="text-xs text-red-600 mt-1">
+                Try refreshing the page and using a simpler prompt.
+              </p>
+            </div>
+          )}
         </div>
         
         <div className="p-4 pb-8">

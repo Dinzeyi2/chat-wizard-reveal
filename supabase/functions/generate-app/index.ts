@@ -41,6 +41,12 @@ async function summarizeWithOpenAI(text: string): Promise<string> {
     })
   });
 
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`OpenAI API error (${response.status}): ${errorText}`);
+    throw new Error(`OpenAI API error: ${response.status}`);
+  }
+
   const data = await response.json();
   return data.choices[0].message.content;
 }
@@ -60,15 +66,21 @@ async function processInput(prompt: string, maxTokens: number = 800): Promise<st
 }
 
 serve(async (req) => {
+  console.log("Generate app function called");
+  
   // Handle CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const { prompt } = await req.json() as AppGenerationRequest;
+    const requestData = await req.json();
+    console.log("Request data:", JSON.stringify(requestData));
+    
+    const { prompt } = requestData as AppGenerationRequest;
 
     if (!prompt) {
+      console.error("Missing prompt in request");
       return new Response(JSON.stringify({ error: "Prompt is required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -76,120 +88,209 @@ serve(async (req) => {
     }
 
     // Process and potentially summarize input
-    const processedPrompt = await processInput(prompt);
-    console.log("Processed prompt length (chars):", processedPrompt.length);
+    let processedPrompt;
+    try {
+      processedPrompt = await processInput(prompt);
+      console.log("Processed prompt length (chars):", processedPrompt.length);
+    } catch (error) {
+      console.error("Error processing prompt:", error);
+      return new Response(JSON.stringify({ error: `Error processing prompt: ${error.message}` }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
     
     const projectName = `project-${Date.now()}`;
+
+    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!anthropicKey) {
+      console.error("Anthropic API key not configured");
+      return new Response(JSON.stringify({ error: "Anthropic API key not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
     
     // Generate architecture using Anthropic API with CORRECTED output token limit (4096 max for claude-3-sonnet)
-    const architectureResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") || "",
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: "claude-3-sonnet-20240229",
-        max_tokens: 4000, // FIXED: Reduced from 5000 to 4000 to stay within the 4096 limit
-        temperature: 0.7,
-        system: `You are an expert full stack developer specializing in modern web applications.
-        When given a prompt for a web application, you will create a detailed architecture plan with:
-        1. A list of all files needed (frontend, backend, configuration)
-        2. Technologies to use (React, Next.js, Express, etc.)
-        3. Project structure
-        4. Component hierarchy
-        5. Data models
-        
-        IMPORTANT: Keep your response concise and within 4000 tokens.
-        
-        Format your response as JSON with the following structure:
-        {
-          "projectName": "name-of-project",
-          "description": "Brief description",
-          "technologies": ["tech1", "tech2"],
-          "fileStructure": {
-            "frontend": ["file1", "file2"],
-            "backend": ["file1", "file2"],
-            "config": ["file1", "file2"]
-          }
-        }`,
-        messages: [
+    console.log("Calling Anthropic API for architecture generation");
+    let architectureResponse;
+    try {
+      architectureResponse = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01"
+        },
+        body: JSON.stringify({
+          model: "claude-3-sonnet-20240229",
+          max_tokens: 3500, // FIXED: Further reduced to ensure we stay well within limits
+          temperature: 0.7,
+          system: `You are an expert full stack developer specializing in modern web applications.
+          When given a prompt for a web application, you will create a detailed architecture plan with:
+          1. A list of all files needed (frontend, backend, configuration)
+          2. Technologies to use (React, Next.js, Express, etc.)
+          3. Project structure
+          4. Component hierarchy
+          5. Data models
+          
+          IMPORTANT: Keep your response concise and within 3500 tokens.
+          
+          Format your response as JSON with the following structure:
           {
-            role: "user",
-            content: processedPrompt
-          }
-        ]
-      })
-    });
+            "projectName": "name-of-project",
+            "description": "Brief description",
+            "technologies": ["tech1", "tech2"],
+            "fileStructure": {
+              "frontend": ["file1", "file2"],
+              "backend": ["file1", "file2"],
+              "config": ["file1", "file2"]
+            }
+          }`,
+          messages: [
+            {
+              role: "user",
+              content: processedPrompt
+            }
+          ]
+        })
+      });
+    } catch (error) {
+      console.error("Error making Anthropic API request:", error);
+      return new Response(JSON.stringify({ error: `Failed to contact Anthropic API: ${error.message}` }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
 
     if (!architectureResponse.ok) {
       const errorText = await architectureResponse.text();
       console.error(`Anthropic API error (${architectureResponse.status}): ${errorText}`);
-      throw new Error(`Anthropic API error (${architectureResponse.status}): ${errorText}`);
+      return new Response(JSON.stringify({ error: `Anthropic API error (${architectureResponse.status})` }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
 
+    console.log("Architecture response received");
     const architectureData = await architectureResponse.json();
     
     if (!architectureData || !architectureData.content || architectureData.content.length === 0) {
-      throw new Error("Empty or invalid response from Anthropic API");
+      console.error("Empty or invalid response from Anthropic API");
+      return new Response(JSON.stringify({ error: "Empty or invalid response from Anthropic API" }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
     
     const architectureContent = architectureData.content[0].text;
+    console.log("Architecture content received:", architectureContent.substring(0, 200) + "...");
+    
     let architecture;
     
     try {
       architecture = JSON.parse(architectureContent);
-    } catch (error) {
+    } catch (jsonError) {
+      console.error("Failed to parse JSON response:", jsonError);
       // Handle case where response isn't valid JSON
-      const jsonStart = architectureContent.indexOf('{');
-      const jsonEnd = architectureContent.lastIndexOf('}');
-      if (jsonStart >= 0 && jsonEnd > jsonStart) {
-        const jsonPart = architectureContent.substring(jsonStart, jsonEnd + 1);
-        try {
+      try {
+        const jsonStart = architectureContent.indexOf('{');
+        const jsonEnd = architectureContent.lastIndexOf('}');
+        if (jsonStart >= 0 && jsonEnd > jsonStart) {
+          const jsonPart = architectureContent.substring(jsonStart, jsonEnd + 1);
           architecture = JSON.parse(jsonPart);
-        } catch (nestedError) {
-          throw new Error(`Failed to parse architecture JSON: ${nestedError.message}. Content received: ${architectureContent.substring(0, 100)}...`);
+          console.log("Successfully extracted JSON from response");
+        } else {
+          throw new Error("No valid JSON found in response");
         }
-      } else {
-        throw new Error(`Failed to find valid JSON in response: ${architectureContent.substring(0, 100)}...`);
+      } catch (extractError) {
+        console.error("Failed to extract JSON:", extractError);
+        return new Response(JSON.stringify({ 
+          error: "Failed to parse architecture data", 
+          content: architectureContent.substring(0, 500) // Include part of the content for debugging
+        }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
       }
     }
 
     // Generate files based on architecture
+    if (!architecture || !architecture.fileStructure) {
+      console.error("Invalid architecture structure received");
+      return new Response(JSON.stringify({ 
+        error: "Invalid architecture structure", 
+        architecture: architecture || "null" 
+      }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+    
     const files = [];
     
     // Flatten file structure
     const fileList = [];
-    if (architecture && architecture.fileStructure) {
-      for (const section in architecture.fileStructure) {
-        for (const file of architecture.fileStructure[section]) {
-          fileList.push(file);
-        }
+    for (const section in architecture.fileStructure) {
+      for (const file of architecture.fileStructure[section]) {
+        fileList.push(file);
       }
-    } else {
-      throw new Error("Invalid architecture structure: missing fileStructure property");
     }
 
-    // Get a batch of files (limit to 10 for demo purposes)
-    const batchSize = 10;
+    // Get a smaller batch of files (reducing from 10 to 5 to minimize API calls)
+    const batchSize = 5;
     const filesToGenerate = fileList.slice(0, batchSize);
+    console.log(`Generating ${filesToGenerate.length} files`);
     
     for (const filePath of filesToGenerate) {
-      const fileContent = await generateFileContent(filePath, architecture, processedPrompt);
-      files.push({
-        path: filePath,
-        content: fileContent
-      });
+      try {
+        console.log(`Generating file: ${filePath}`);
+        const fileContent = await generateFileContent(filePath, architecture, processedPrompt);
+        files.push({
+          path: filePath,
+          content: fileContent
+        });
+      } catch (fileError) {
+        console.error(`Error generating file ${filePath}:`, fileError);
+        files.push({
+          path: filePath,
+          content: `// Error generating content: ${fileError.message}`
+        });
+      }
     }
 
     // Create package.json
-    const packageJson = await generatePackageJson(architecture);
-    files.push({
-      path: "package.json",
-      content: packageJson
-    });
+    try {
+      console.log("Generating package.json");
+      const packageJson = await generatePackageJson(architecture);
+      files.push({
+        path: "package.json",
+        content: packageJson
+      });
+    } catch (packageError) {
+      console.error("Error generating package.json:", packageError);
+      // Use a simplified fallback package.json
+      files.push({
+        path: "package.json",
+        content: `{ 
+  "name": "${architecture.projectName || 'generated-app'}",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "next": "^13.4.0"
+  }
+}`
+      });
+    }
 
+    console.log(`Successfully generated ${files.length} files`);
     return new Response(JSON.stringify({
       projectName: architecture.projectName,
       description: architecture.description,
@@ -199,8 +300,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   } catch (error) {
-    console.error("Error:", error.message);
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error("Fatal error in generate-app function:", error);
+    return new Response(JSON.stringify({ error: `${error.message}`, stack: error.stack }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
@@ -236,13 +337,13 @@ async function generateFileContent(filePath: string, architecture: any, original
       },
       body: JSON.stringify({
         model: "claude-3-sonnet-20240229",
-        max_tokens: 4000, // FIXED: Reduced from 5000 to 4000 to stay within the model's limits
+        max_tokens: 3500, // FIXED: Further reduced to ensure we stay well within the model's limits
         temperature: 0.7,
         system: `You are an expert developer specializing in creating high-quality code files.
         Generate ONLY the complete code for this specific file.
         Do not include explanations or comments outside the code.
         Make sure the code is production-ready, follows best practices, and implements modern patterns.
-        IMPORTANT: Keep your response within 4000 tokens.
+        IMPORTANT: Keep your response within 3500 tokens.
         If generating React components with shadcn/ui, use the proper import syntax and components.`,
         messages: [
           {
