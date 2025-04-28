@@ -1,3 +1,4 @@
+
 import React from "react";
 import { SidebarItem } from "@/types/chat";
 
@@ -44,7 +45,7 @@ const Sidebar = () => {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div>
         <div className="px-3 py-2">
           {sidebarItems.map((item) => (
             <div key={item.id} className={`flex items-center px-3 py-2 my-1 rounded-md cursor-pointer ${item.selected ? "bg-gray-200" : "hover:bg-gray-200"}`}>
