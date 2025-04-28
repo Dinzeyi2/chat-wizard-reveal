@@ -1,13 +1,17 @@
+
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import { Message } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
+  const [deepReasoningMode, setDeepReasoningMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -31,7 +35,9 @@ const Index = () => {
     setLoading(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('chat', {
+      // Call appropriate function based on mode
+      const endpoint = deepReasoningMode ? 'deep-reasoning' : 'chat';
+      const { data, error } = await supabase.functions.invoke(endpoint, {
         body: { message: content }
       });
 
@@ -46,7 +52,7 @@ const Index = () => {
       
       setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
-      console.error('Error calling chat function:', error);
+      console.error(`Error calling ${deepReasoningMode ? 'deep-reasoning' : 'chat'} function:`, error);
     } finally {
       setLoading(false);
     }
@@ -62,12 +68,16 @@ const Index = () => {
               <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
             </svg>
           </div>
-          <div className="flex items-center text-sm text-gray-600">
-            <span className="mr-2">Saved memory full</span>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            <div className="ml-5 px-3 py-1 rounded-full bg-gray-100 flex items-center">
+          <div className="flex items-center text-sm text-gray-600 gap-4">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="deep-reasoning"
+                checked={deepReasoningMode}
+                onCheckedChange={setDeepReasoningMode}
+              />
+              <Label htmlFor="deep-reasoning">Deep Reasoning</Label>
+            </div>
+            <div className="ml-2 px-3 py-1 rounded-full bg-gray-100 flex items-center">
               <span>Temporary</span>
             </div>
             <div className="ml-2 w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white">
@@ -89,7 +99,11 @@ const Index = () => {
         </div>
         
         <div className="p-4 pb-8">
-          <InputArea onSendMessage={handleSendMessage} loading={loading} />
+          <InputArea 
+            onSendMessage={handleSendMessage} 
+            loading={loading} 
+            deepReasoningMode={deepReasoningMode}
+          />
         </div>
       </div>
     </div>
