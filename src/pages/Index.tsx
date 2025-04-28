@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -40,14 +39,17 @@ const Index = () => {
     
     setMessages(prev => [...prev, userMessage]);
     
-    // Check if this is a request to generate an app
+    // Enhanced app generation detection - more keywords and patterns to better match create/build/generate requests
     const isAppGeneration = 
-      (content.toLowerCase().includes("create") || 
+      // Improved creation intent detection
+      ((content.toLowerCase().includes("create") || 
        content.toLowerCase().includes("build") || 
        content.toLowerCase().includes("generate") ||
        content.toLowerCase().includes("make") ||
        content.toLowerCase().includes("develop") ||
-       content.toLowerCase().includes("code")) && 
+       content.toLowerCase().includes("code") ||
+       content.toLowerCase().includes("implement")) && 
+      // Better app/product detection
       (content.toLowerCase().includes("app") || 
        content.toLowerCase().includes("website") || 
        content.toLowerCase().includes("dashboard") || 
@@ -56,7 +58,10 @@ const Index = () => {
        content.toLowerCase().includes("clone") ||
        content.toLowerCase().includes("system") ||
        content.toLowerCase().includes("project") ||
-       content.toLowerCase().includes("site"));
+       content.toLowerCase().includes("site") ||
+       content.toLowerCase().includes("tool"))) ||
+      // Specific "AI, build me X" pattern detection
+      content.toLowerCase().match(/\b(ai|claude|anthropic|assistant),?\s+(create|build|make|generate|develop)/i);
 
     if (isAppGeneration) {
       // Use generate-app function

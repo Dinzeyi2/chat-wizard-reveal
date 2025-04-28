@@ -18,12 +18,11 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
   }
 
   // Process normal markdown with better formatting
-  // This is a simple implementation - could be expanded with a full markdown parser
   const formattedContent = content
     .split('```')
     .map((block, index) => {
       if (index % 2 === 0) {
-        // Text outside code blocks - just wrap paragraphs
+        // Text outside code blocks - wrap paragraphs
         return block.split('\n\n').map((para, i) => 
           <p key={i} className="mb-4">{para}</p>
         );

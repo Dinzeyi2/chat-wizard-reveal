@@ -72,20 +72,24 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
     return languageMap[extension] || 'plaintext';
   };
 
+  // Extract the explanation text from appData to display outside the card
+  const explanationText = appData.description || 'Generated application';
+  const detailedExplanation = appData.explanation || '';
+
   return (
     <div className="mt-6 space-y-6">
       {/* Main explanatory text - displayed outside the code card */}
       <div className="text-base space-y-4">
-        <p>{appData.description}</p>
+        <p>{explanationText}</p>
         
         <p>
           This {appData.projectName} application includes {appData.files.length} files with
           various components and functionality for the requested features.
         </p>
         
-        {appData.explanation && (
+        {detailedExplanation && (
           <div className="mt-4">
-            {appData.explanation.split('\n\n').map((paragraph, i) => (
+            {detailedExplanation.split('\n\n').map((paragraph, i) => (
               <p key={i} className="mb-3">{paragraph}</p>
             ))}
           </div>
@@ -94,22 +98,6 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
 
       {/* Code card - styled similar to the example image */}
       <div className="border rounded-lg bg-[#1e1e1e] text-white overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#333333]">
-          <div className="flex items-center gap-2">
-            <FileCode className="h-5 w-5 text-[#abb2bf]" />
-            <h3 className="font-medium text-[#f8f8f8]">{appData.projectName}</h3>
-          </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="flex items-center gap-1 bg-[#333333] border-[#444444] text-[#d4d4d4] hover:bg-[#444444]"
-            onClick={handleDownload}
-          >
-            <Download className="h-4 w-4" />
-            <span>Download</span>
-          </Button>
-        </div>
-
         {/* Center button similar to example */}
         <div className="flex justify-center py-5">
           <Button
@@ -129,6 +117,22 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
           onOpenChange={setIsOpen}
         >
           <CollapsibleContent>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#333333]">
+              <div className="flex items-center gap-2">
+                <FileCode className="h-5 w-5 text-[#abb2bf]" />
+                <h3 className="font-medium text-[#f8f8f8]">{appData.projectName}</h3>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="flex items-center gap-1 bg-[#333333] border-[#444444] text-[#d4d4d4] hover:bg-[#444444]"
+                onClick={handleDownload}
+              >
+                <Download className="h-4 w-4" />
+                <span>Download</span>
+              </Button>
+            </div>
+            
             <div className="flex h-[500px] border-t border-[#444444]">
               {/* File explorer */}
               <div className="w-64 border-r border-[#444444]">
