@@ -1,7 +1,7 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
-import { FileCode, X, ExternalLink, ChevronRight, Download, File } from 'lucide-react';
+import { FileCode, X, ExternalLink, ChevronRight, Download, File, Code } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 // Types
@@ -69,6 +69,7 @@ export const ArtifactViewer: React.FC = () => {
   const { currentArtifact, closeArtifact, isOpen } = useArtifact();
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
+  const [activeTab, setActiveTab] = useState<'code' | 'preview'>('code');
 
   useEffect(() => {
     if (currentArtifact && currentArtifact.files.length > 0) {
@@ -112,7 +113,6 @@ export const ArtifactViewer: React.FC = () => {
     return languageMap[extension] || 'plaintext';
   };
 
-  // Create a file tree structure
   const getFileTree = () => {
     const tree: Record<string, ArtifactFile[]> = {};
     const rootFiles: ArtifactFile[] = [];
@@ -228,23 +228,50 @@ export const ArtifactViewer: React.FC = () => {
   return (
     <div className="artifact-expanded-view">
       <div className="artifact-viewer h-full flex flex-col">
-        <div className="artifact-viewer-header flex justify-between items-center p-3 bg-gray-800 text-white">
-          <h3 className="text-lg font-medium flex items-center gap-2">
-            <FileCode size={18} />
-            {currentArtifact.title}
-          </h3>
-          <div className="flex items-center gap-2">
+        <div className="artifact-viewer-header flex justify-between items-center">
+          <div className="file-viewer-tabs">
+            <Button 
+              variant="ghost"
+              size="sm"
+              className={`file-viewer-tab ${activeTab === 'preview' ? 'active' : ''}`}
+              onClick={() => setActiveTab('preview')}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+              Preview
+            </Button>
+            <Button 
+              variant="ghost"
+              size="sm"
+              className={`file-viewer-tab ${activeTab === 'code' ? 'active' : ''}`}
+              onClick={() => setActiveTab('code')}
+            >
+              <Code size={18} />
+              Code
+            </Button>
+          </div>
+          <div className="file-viewer-actions">
             <Button 
               variant="ghost" 
               size="sm"
-              className="text-gray-300 hover:text-white hover:bg-gray-700"
+              className="text-gray-400 hover:text-white hover:bg-transparent"
+            >
+              <ExternalLink size={16} />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="text-gray-400 hover:text-white hover:bg-transparent"
             >
               <Download size={16} />
             </Button>
             <Button 
               variant="ghost" 
               size="sm"
-              className="text-gray-300 hover:text-white hover:bg-gray-700"
+              className="text-gray-400 hover:text-white hover:bg-transparent"
               onClick={closeArtifact}
               aria-label="Close artifact viewer"
             >
@@ -254,7 +281,6 @@ export const ArtifactViewer: React.FC = () => {
         </div>
         
         <div className="artifact-viewer-content flex flex-1 overflow-hidden">
-          {/* File explorer */}
           <div className="file-explorer w-1/4 min-w-[220px] border-r border-zinc-800 bg-black overflow-y-auto">
             <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 px-3 py-2">
               <h4 className="text-sm font-medium text-gray-400">Files</h4>
@@ -262,7 +288,6 @@ export const ArtifactViewer: React.FC = () => {
             {renderFileTree()}
           </div>
           
-          {/* File content */}
           <div className="file-content flex-1 overflow-auto flex flex-col">
             {currentFile ? (
               <>
