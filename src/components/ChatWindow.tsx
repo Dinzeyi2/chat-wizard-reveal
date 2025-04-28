@@ -23,7 +23,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, loading }) => {
           ) : (
             <div>
               <div className="ml-0 bg-white border border-gray-200 rounded-3xl px-6 py-4 max-w-3xl">
-                <MarkdownRenderer content={message.content} message={message} />
+                {message.content.includes("I've generated a full-stack application") ? (
+                  <MarkdownRenderer content={message.content} message={message} />
+                ) : (
+                  <MarkdownRenderer content={message.content} />
+                )}
               </div>
             </div>
           )}
