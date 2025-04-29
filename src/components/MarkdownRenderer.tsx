@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Message } from "@/types/chat";
 import AppGeneratorDisplay from "./AppGeneratorDisplay";
@@ -10,41 +11,65 @@ interface MarkdownRendererProps {
 }
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message }) => {
-  // Simplified detection for app generation content - more lenient to catch all cases
+  // Very lenient detection for app generation content
   const isAppGeneration = React.useMemo(() => {
-    // Any of these conditions should trigger app generation view
+    // If no message, can't be app generation
+    if (!message) return false;
     
-    // 1. Has JSON content with app indicators
-    const hasJsonStructure = content.includes("```json") && 
-                           (content.includes("projectName") || 
-                            content.includes("files") || 
-                            content.includes("fileStructure"));
+    // Check for obvious app generation keywords
+    const appKeywords = ['app', 'application', 'website', 'project', 'web app', 'dashboard'];
+    const generationKeywords = ['generated', 'created', 'built', 'developed', 'made'];
     
-    // 2. Has multiple code blocks
+    // Combine words to create strong indicators
+    const strongIndicators = [];
+    generationKeywords.forEach(gen => {
+      appKeywords.forEach(app => {
+        strongIndicators.push(`${gen} ${app}`);
+        strongIndicators.push(`${gen} a ${app}`);
+        strongIndicators.push(`${gen} an ${app}`);
+        strongIndicators.push(`${gen} this ${app}`);
+      });
+    });
+    
+    // Check for any of these strong indicators in the content
+    const hasStrongIndicator = strongIndicators.some(indicator => 
+      content.toLowerCase().includes(indicator.toLowerCase())
+    );
+    
+    // Check for JSON content or multiple code blocks
+    const hasJsonContent = content.includes('```json');
     const codeBlockCount = (content.match(/```/g) || []).length;
-    const hasMultipleCodeBlocks = codeBlockCount >= 4; // At least 2 code blocks (each has opening and closing ```)
+    const hasMultipleCodeBlocks = codeBlockCount >= 4; // At least 2 blocks (each having opening and closing ```)
     
-    // 3. Contains phrases that suggest app generation
-    const hasAppPhrases = content.includes("I've generated") ||
-                          content.includes("I've built") || 
-                          content.includes("I've created") ||
-                          content.includes("Here's what I created") ||
-                          content.includes("generated app") ||
-                          content.includes("generated application") ||
-                          content.includes("full-stack application") ||
-                          content.includes("created a web app") ||
-                          content.includes("built an app");
+    // Check for file structure indicators
+    const fileStructureIndicators = [
+      'src/', 'components/', 'pages/', 'public/', 'package.json',
+      'index.js', 'index.jsx', 'index.ts', 'index.tsx',
+      'app.js', 'app.jsx', 'app.ts', 'app.tsx'
+    ];
+    const hasFileStructure = fileStructureIndicators.some(indicator => 
+      content.toLowerCase().includes(indicator.toLowerCase())
+    );
     
-    // 4. Contains file structure indicators
-    const hasFileStructure = content.includes("src/") || 
-                            content.includes("components/") ||
-                            content.includes("pages/") ||
-                            content.includes("public/") ||
-                            content.includes("package.json");
+    // If the message contains "I've generated" or "Here's what I created" type phrases
+    const generationPhrases = [
+      "i've generated", "i've created", "i've built", "i've developed",
+      "i have generated", "i have created", "i have built", "i have developed",
+      "here's what i created", "here's what i built", "here's what i generated",
+      "here is what i created", "here is what i built", "here is what i generated"
+    ];
     
-    // Return true if ANY condition is met - very lenient to ensure we catch all cases
-    return hasJsonStructure || hasMultipleCodeBlocks || hasAppPhrases || hasFileStructure;
-  }, [content]);
+    const hasGenerationPhrase = generationPhrases.some(phrase => 
+      content.toLowerCase().includes(phrase)
+    );
+    
+    // Look for files array structure
+    const hasFilesStructure = content.includes('"files"') && content.includes('"path"') && content.includes('"content"');
+    
+    // Be VERY lenient - if ANY of these conditions are met, treat it as app generation
+    return hasStrongIndicator || hasJsonContent || hasMultipleCodeBlocks || 
+           hasFileStructure || hasGenerationPhrase || hasFilesStructure;
+  }, [content, message]);
   
   if (message && isAppGeneration) {
     return (

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Message } from "@/types/chat";
 import { Button } from "@/components/ui/button";
@@ -85,6 +86,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
     setAppData(extractAppData());
   }, [message]);
   
+  // Improved and simplified function to extract code blocks from message content
   const extractCodeBlocks = () => {
     const codeBlockRegex = /```(\w+)?\n([\s\S]*?)\n```/g;
     const codeFiles = [];
@@ -109,17 +111,6 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
       });
     }
     
-    // If no code blocks found, create a single file with the message content
-    if (codeFiles.length === 0) {
-      codeFiles.push({
-        id: "raw-content",
-        name: "content.md",
-        path: "content.md",
-        language: "markdown",
-        content: message.content
-      });
-    }
-    
     return codeFiles;
   };
   
@@ -139,39 +130,61 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
     return langMap[lang.toLowerCase()] || 'txt';
   };
 
+  // Completely rewritten handleViewFullProject to be more robust
   const handleViewFullProject = () => {
-    console.log("Opening artifact viewer - simplified approach");
+    console.log("Opening artifact viewer with message content:", message.content.substring(0, 100) + "...");
     
-    // Create a guaranteed artifact that will always work
+    // Create a guaranteed artifact ID
     const artifactId = `artifact-${Date.now()}`;
+    // Default title that will always work
     const projectTitle = appData?.projectName || "Generated Application";
     
-    // Create files array - either from parsed appData or directly from message content
-    const files = appData?.files?.length > 0 
-      ? appData.files.map((file, index) => ({
-          id: `file-${index}`,
-          name: file.path.split('/').pop() || `file-${index}`,
-          path: file.path,
-          language: getLanguageFromPath(file.path),
-          content: file.content
-        }))
-      : extractCodeBlocks();
-        
-    // Always create a valid artifact
+    // Try three different approaches to get files, with guaranteed fallbacks
+    let files = [];
+    
+    // Method 1: Try to get files from parsed app data
+    if (appData?.files && appData.files.length > 0) {
+      console.log("Using parsed app data files");
+      files = appData.files.map((file, index) => ({
+        id: `file-${index}`,
+        name: file.path.split('/').pop() || `file-${index}`,
+        path: file.path,
+        language: getLanguageFromPath(file.path),
+        content: file.content
+      }));
+    }
+    
+    // Method 2: If no files from app data, try to extract code blocks
+    if (files.length === 0) {
+      console.log("Falling back to code block extraction");
+      const extractedFiles = extractCodeBlocks();
+      if (extractedFiles.length > 0) {
+        files = extractedFiles;
+      }
+    }
+    
+    // Method 3: Ultimate fallback - create at least one file with the message content
+    if (files.length === 0) {
+      console.log("Using ultimate fallback - creating content file");
+      files = [{
+        id: "content-file",
+        name: "generated-content.md",
+        path: "generated-content.md",
+        language: "markdown",
+        content: message.content
+      }];
+    }
+    
+    // Ensure we have a valid artifact to open
     const artifact = {
       id: artifactId,
       title: projectTitle,
-      description: appData?.description || "Generated code",
-      files: files.length > 0 ? files : [{
-        id: "content-file",
-        name: "content.md",
-        path: "content.md",
-        language: "markdown",
-        content: message.content
-      }]
+      description: appData?.description || "Generated application",
+      files: files
     };
     
-    // Open the artifact
+    // Open the artifact with our guaranteed valid artifact object
+    console.log("Opening artifact with", files.length, "files");
     openArtifact(artifact);
   };
 
