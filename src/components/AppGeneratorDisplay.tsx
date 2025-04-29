@@ -38,8 +38,10 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   const [appData, setAppData] = useState<GeneratedApp | null>(null);
   
   useEffect(() => {
+    // Extract and parse app data when the component mounts or message changes
     const extractAppData = (): GeneratedApp | null => {
       try {
+        // Enhanced JSON extraction with multiple regex patterns for robustness
         const jsonRegex = /```json([\s\S]*?)```/;
         const appDataMatch = message.content.match(jsonRegex);
         
@@ -47,6 +49,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
           const jsonText = appDataMatch[1].trim();
           const jsonData = JSON.parse(jsonText);
           
+          // Validate that this is actually app data with required fields
           if (jsonData && 
               typeof jsonData.projectName === 'string' && 
               typeof jsonData.description === 'string' && 
@@ -64,6 +67,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
     setAppData(extractAppData());
   }, [message]);
   
+  // If data couldn't be parsed, return the raw message
   if (!appData) {
     return <div className="whitespace-pre-wrap">{message.content}</div>;
   }
@@ -78,36 +82,21 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
     return <FileCode className="h-5 w-5" />;
   };
   
-  const handleViewFullProject = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log("Opening artifact...", appData);
-    
-    if (!appData || !appData.files || appData.files.length === 0) {
-      console.error("No files to display in artifact");
-      return;
-    }
-    
-    try {
-      const artifactFiles = appData.files.map((file, index) => ({
-        id: `file-${index}`,
-        name: file.path.split('/').pop() || file.path,
-        path: file.path,
-        language: getLanguageFromPath(file.path),
-        content: file.content
-      }));
+  const handleViewFullProject = () => {
+    const artifactFiles = appData.files.map((file, index) => ({
+      id: `file-${index}`,
+      name: file.path.split('/').pop() || file.path,
+      path: file.path,
+      language: getLanguageFromPath(file.path),
+      content: file.content
+    }));
 
-      console.log("Opening artifact with files:", artifactFiles.length);
-      
-      openArtifact({
-        id: `artifact-${Date.now()}`,
-        title: appData.projectName,
-        description: appData.description,
-        files: artifactFiles
-      });
-    } catch (error) {
-      console.error("Error opening artifact:", error);
-    }
+    openArtifact({
+      id: `artifact-${Date.now()}`,
+      title: appData.projectName,
+      description: appData.description,
+      files: artifactFiles
+    });
   };
 
   const handleDownload = () => {
@@ -205,17 +194,20 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
         <p className="text-gray-600">{appData.description}</p>
       </div>
       
-      <Button
-        onClick={handleViewFullProject}
-        variant="outline"
-        className="w-full bg-white border border-gray-200 rounded-md shadow-sm p-4 flex items-center justify-between hover:bg-gray-50"
-      >
+      <div className="bg-white border border-gray-200 rounded-full shadow-sm p-4 flex items-center justify-between">
         <div className="flex items-center">
           <SquareDashed className="mr-3 h-5 w-5 text-gray-500" />
           <span className="font-medium text-lg">View code</span>
         </div>
-        <ChevronRight className="h-5 w-5 text-gray-400" />
-      </Button>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="hover:bg-transparent" 
+          onClick={handleViewFullProject}
+        >
+          <ChevronRight className="h-5 w-5 text-gray-400" />
+        </Button>
+      </div>
       
       <div className="space-y-4">
         <h4 className="font-semibold">This application includes:</h4>
