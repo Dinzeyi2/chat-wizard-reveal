@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -323,19 +322,6 @@ If you were trying to generate an app, this might be due to limits with our AI m
                   <p className="text-xs text-red-600 mt-1">
                     Try refreshing the page and using a simpler prompt.
                   </p>
-                </div>
-              )}
-              
-              {currentProjectId && (
-                <div className="px-4 py-3 mx-auto my-4 max-w-3xl bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-700">
-                    <strong>Active application:</strong> You can now ask me to modify the application I generated. For example:
-                  </p>
-                  <ul className="text-xs text-blue-600 mt-2 list-disc pl-5">
-                    <li>Change the color scheme to use blue instead of green</li>
-                    <li>Add a search bar to the header</li>
-                    <li>Update the login page to use shadcn/ui components</li>
-                  </ul>
                 </div>
               )}
             </div>
