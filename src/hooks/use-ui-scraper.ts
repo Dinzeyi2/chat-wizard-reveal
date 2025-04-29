@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { EnhancedPerplexityUIScraper, DesignCodeResult } from "@/utils/EnhancedPerplexityUIScraper";
 import { ClaudeCodeCustomizer } from "@/utils/ClaudeCodeCustomizer";
+import { UICodeGenerator } from "@/utils/UICodeGenerator";
 import { useToast } from "@/hooks/use-toast";
 
 interface UseUiScraperOptions {
@@ -26,6 +27,7 @@ export const useUiScraper = (apiKeyOrOptions?: string | UseUiScraperOptions, opt
   const [error, setError] = useState<Error | null>(null);
   const [result, setResult] = useState<DesignCodeResult | null>(null);
   const [customizedResult, setCustomizedResult] = useState<any | null>(null);
+  const [generatedCode, setGeneratedCode] = useState<any | null>(null);
   const { toast } = useToast();
 
   const findDesignCode = async (prompt: string, apiKey?: string) => {
@@ -134,12 +136,59 @@ export const useUiScraper = (apiKeyOrOptions?: string | UseUiScraperOptions, opt
     }
   };
 
+  // New function that uses the combined UICodeGenerator for a more streamlined experience
+  const generateCodeFromPrompt = async (prompt: string, perplexityKey?: string, claudeKey?: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const generator = new UICodeGenerator({
+        perplexityApiKey: perplexityKey || perplexityApiKey,
+        claudeApiKey: claudeKey || claudeApiKey,
+        debug: true
+      });
+      
+      toast({
+        title: "Generating Code",
+        description: "Finding and customizing UI design..."
+      });
+      
+      const result = await generator.generateCode(prompt);
+      setGeneratedCode(result);
+      
+      if (result.success) {
+        toast({
+          title: "Code Generated",
+          description: `Successfully generated ${result.metadata?.componentType || 'component'} code`
+        });
+        return result;
+      } else {
+        throw new Error(result.error || "Failed to generate code");
+      }
+    } catch (err: any) {
+      const error = err instanceof Error ? err : new Error(err?.message || "Unknown error");
+      setError(error);
+      uiScraperOptions.onError?.(error);
+      
+      toast({
+        title: "Error Generating Code",
+        description: error.message,
+        variant: "destructive"
+      });
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     findDesignCode,
     customizeDesignCode,
+    generateCodeFromPrompt,  // New integrated function
     isLoading,
     error,
     result,
-    customizedResult
+    customizedResult,
+    generatedCode
   };
 };

@@ -135,12 +135,13 @@ export class UICodeGenerator {
       
       // 1. Extract design system preferences from the prompt
       const designSystem = this.extractDesignSystemPreference(userPrompt);
+      const componentType = this.extractComponentType(userPrompt);
       
       // 2. Get example code snippets for the design system to provide context
       const exampleSnippets = await this.fetchDesignSystemExamples(designSystem);
       
       // 3. Create a special prompt for Claude with example snippets
-      const claudePrompt = this.createClaudeFallbackPrompt(userPrompt, designSystem, exampleSnippets);
+      const claudePrompt = this.createClaudeFallbackPrompt(userPrompt, designSystem, componentType, exampleSnippets);
       
       // 4. Call Claude API directly
       const claudeResponse = await this.callClaudeDirectly(claudePrompt);
@@ -157,7 +158,7 @@ export class UICodeGenerator {
           explanation: claudeResponse.explanation || 'Generated with Claude'
         },
         metadata: {
-          componentType: this.extractComponentType(userPrompt),
+          componentType: componentType,
           designSystem: designSystem,
           timestamp: new Date().toISOString(),
           usedFallback: true
@@ -213,6 +214,12 @@ export class UICodeGenerator {
       return 'card';
     } else if (lowerPrompt.includes('navbar') || lowerPrompt.includes('navigation')) {
       return 'navbar';
+    } else if (lowerPrompt.includes('button')) {
+      return 'button';
+    } else if (lowerPrompt.includes('modal') || lowerPrompt.includes('dialog')) {
+      return 'modal';
+    } else if (lowerPrompt.includes('list')) {
+      return 'list';
     }
     
     // Default to component
@@ -257,6 +264,16 @@ export function CardDemo() {
       </CardFooter>
     </Card>
   )
+}`,
+      `import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+export function InputDemo() {
+  return (
+    <div className="grid w-full max-w-sm items-center gap-1.5">
+      <Label htmlFor="email">Email</Label>
+      <Input type="email" id="email" placeholder="Email" />
+    </div>
+  )
 }`
     ];
     
@@ -272,12 +289,12 @@ export function CardDemo() {
   /**
    * Create a prompt for Claude fallback generation
    */
-  private createClaudeFallbackPrompt(userPrompt: string, designSystem: string, exampleSnippets: string[]): string {
+  private createClaudeFallbackPrompt(userPrompt: string, designSystem: string, componentType: string, exampleSnippets: string[]): string {
     return `
 You are an expert UI developer specializing in creating beautiful React applications.
 
 # TASK
-I need you to create a component based on my requirements. I could not find an exact match, so please create it from scratch.
+I need you to create a ${componentType} based on my requirements. I could not find an exact match, so please create it from scratch.
 
 # USER REQUIREMENTS
 "${userPrompt}"
@@ -293,9 +310,10 @@ ${exampleSnippets.map((snippet, index) => `Example ${index + 1}:\n\`\`\`jsx\n${s
 # TECHNICAL REQUIREMENTS
 - Create a React component that fulfills the user's requirements
 - Use ${designSystem} components and styling
-- Make the component fully responsive
+- Use TypeScript with proper type definitions
+- Make the component fully responsive and accessible
 - Ensure the code is clean, well-organized, and follows best practices
-- Add appropriate TypeScript types
+- Add appropriate TypeScript types and comments
 
 # INSTRUCTIONS
 1. Create a component that fulfills the user requirements
@@ -420,5 +438,20 @@ Finally, provide a brief explanation of the component and how to use it.
   getHistory(): GenerationHistoryItem[] {
     return [...this.generationHistory];
   }
-}
 
+  /**
+   * Determines if the prompt is likely a request for code generation
+   * This helps decide whether to use this generator or the standard chat API
+   */
+  static isCodeGenerationRequest(prompt: string): boolean {
+    const promptLower = prompt.toLowerCase();
+    const codeGenerationKeywords = [
+      'create', 'generate', 'build', 'implement', 'develop', 
+      'design', 'code', 'make a', 'make me', 'write', 
+      'component', 'function', 'class', 'module', 'interface',
+      'feature', 'ui', 'form', 'button', 'card', 'modal'
+    ];
+    
+    return codeGenerationKeywords.some(keyword => promptLower.includes(keyword));
+  }
+}
