@@ -4,6 +4,10 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  metadata?: {
+    projectId?: string;
+    [key: string]: any;
+  };
 }
 
 export interface SidebarItem {

@@ -11,35 +11,65 @@ interface MarkdownRendererProps {
 }
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message }) => {
+  // Extract project ID from app generation/modification response
+  const projectId = React.useMemo(() => {
+    if (!content) return null;
+    
+    // Try to find project ID in JSON blocks
+    const jsonRegex = /```json\n([\s\S]*?)```/;
+    const jsonMatch = content.match(jsonRegex);
+    
+    if (jsonMatch && jsonMatch[1]) {
+      try {
+        const jsonData = JSON.parse(jsonMatch[1]);
+        return jsonData.projectId;
+      } catch (e) {
+        console.error("Error parsing JSON for projectId:", e);
+      }
+    }
+    
+    // Try to find projectId in the message data
+    if (message && message.metadata && message.metadata.projectId) {
+      return message.metadata.projectId;
+    }
+    
+    return null;
+  }, [content, message]);
+  
   // Very lenient detection for app generation content
   const isAppGeneration = React.useMemo(() => {
     // If no message, can't be app generation
     if (!message) return false;
     
-    // Check for obvious app generation keywords
-    const appKeywords = ['app', 'application', 'website', 'project', 'web app', 'dashboard'];
-    const generationKeywords = ['generated', 'created', 'built', 'developed', 'made'];
+    // Check for JSON content that looks like an app
+    const hasJsonContent = content.includes('```json');
+    const hasProjectName = content.includes('"projectName"');
+    const hasFiles = content.includes('"files"');
     
-    // Combine words to create strong indicators
-    const strongIndicators = [];
-    generationKeywords.forEach(gen => {
-      appKeywords.forEach(app => {
-        strongIndicators.push(`${gen} ${app}`);
-        strongIndicators.push(`${gen} a ${app}`);
-        strongIndicators.push(`${gen} an ${app}`);
-        strongIndicators.push(`${gen} this ${app}`);
-      });
-    });
+    // Check for common app generation phrases
+    const generationPhrases = [
+      "i've generated", "i have generated", 
+      "i've created", "i have created", 
+      "i've built", "i have built", 
+      "here's what i created", "here's what i built",
+      "here is what i created", "here is what i built"
+    ];
     
-    // Check for any of these strong indicators in the content
-    const hasStrongIndicator = strongIndicators.some(indicator => 
-      content.toLowerCase().includes(indicator.toLowerCase())
+    const hasGenerationPhrase = generationPhrases.some(phrase => 
+      content.toLowerCase().includes(phrase)
     );
     
-    // Check for JSON content or multiple code blocks
-    const hasJsonContent = content.includes('```json');
-    const codeBlockCount = (content.match(/```/g) || []).length;
-    const hasMultipleCodeBlocks = codeBlockCount >= 4; // At least 2 blocks (each having opening and closing ```)
+    // Check for obvious app generation keywords
+    const appKeywords = ['app', 'application', 'website', 'project', 'web app', 'dashboard'];
+    const generationKeywords = ['generated', 'created', 'built', 'developed', 'made', 'modified', 'updated'];
+    
+    const hasAppKeyword = appKeywords.some(keyword => 
+      content.toLowerCase().includes(keyword)
+    );
+    
+    const hasGenerationKeyword = generationKeywords.some(keyword => 
+      content.toLowerCase().includes(keyword)
+    );
     
     // Check for file structure indicators
     const fileStructureIndicators = [
@@ -51,30 +81,21 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
       content.toLowerCase().includes(indicator.toLowerCase())
     );
     
-    // If the message contains "I've generated" or "Here's what I created" type phrases
-    const generationPhrases = [
-      "i've generated", "i've created", "i've built", "i've developed",
-      "i have generated", "i have created", "i have built", "i have developed",
-      "here's what i created", "here's what i built", "here's what i generated",
-      "here is what i created", "here is what i built", "here is what i generated"
-    ];
+    // Count code blocks - multiple code blocks often indicate an app
+    const codeBlockCount = (content.match(/```/g) || []).length;
+    const hasMultipleCodeBlocks = codeBlockCount >= 4; // At least 2 blocks
     
-    const hasGenerationPhrase = generationPhrases.some(phrase => 
-      content.toLowerCase().includes(phrase)
-    );
-    
-    // Look for files array structure
-    const hasFilesStructure = content.includes('"files"') && content.includes('"path"') && content.includes('"content"');
-    
-    // Be VERY lenient - if ANY of these conditions are met, treat it as app generation
-    return hasStrongIndicator || hasJsonContent || hasMultipleCodeBlocks || 
-           hasFileStructure || hasGenerationPhrase || hasFilesStructure;
-  }, [content, message]);
+    // Be VERY lenient - if multiple conditions are met, treat it as app generation
+    return (hasJsonContent && (hasProjectName || hasFiles)) || 
+           (hasGenerationPhrase && (hasAppKeyword || hasFileStructure)) ||
+           (hasGenerationKeyword && hasAppKeyword && (hasFileStructure || hasMultipleCodeBlocks)) ||
+           (projectId !== null); // If we detected a projectId, it's definitely app generation
+  }, [content, message, projectId]);
   
   if (message && isAppGeneration) {
     return (
       <ArtifactProvider>
-        <AppGeneratorDisplay message={message} />
+        <AppGeneratorDisplay message={message} projectId={projectId} />
       </ArtifactProvider>
     );
   }

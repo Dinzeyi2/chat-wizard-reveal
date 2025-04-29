@@ -309,8 +309,85 @@ serve(async (req) => {
       explanation = "Failed to generate explanation due to an error.";
     }
 
+    // Create the application data object
+    const appData = {
+      projectName: architecture.projectName,
+      description: architecture.description,
+      explanation: explanation,
+      files: files,
+      technologies: architecture.technologies || []
+    };
+
+    // Store the generated app in the database
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    
+    let projectId = null;
+    
+    if (supabaseUrl && supabaseServiceKey) {
+      try {
+        // Get user_id from the JWT if available
+        let userId = null;
+        const authHeader = req.headers.get("authorization");
+        
+        if (authHeader && authHeader.startsWith("Bearer ")) {
+          const token = authHeader.substring(7);
+          try {
+            // Simple JWT parsing to extract user_id
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+              return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            
+            const payload = JSON.parse(jsonPayload);
+            userId = payload.sub;
+          } catch (e) {
+            console.error("Error parsing JWT:", e);
+          }
+        }
+        
+        // If we couldn't get a user_id, use a placeholder
+        if (!userId) {
+          userId = "00000000-0000-0000-0000-000000000000"; // Anonymous user
+        }
+        
+        // Create a new project record
+        const projectResponse = await fetch(`${supabaseUrl}/rest/v1/app_projects`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": supabaseServiceKey,
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+            "Prefer": "return=representation"
+          },
+          body: JSON.stringify({
+            id: crypto.randomUUID(),
+            user_id: userId,
+            version: 1,
+            app_data: appData,
+            original_prompt: prompt,
+            created_at: new Date().toISOString()
+          })
+        });
+        
+        if (projectResponse.ok) {
+          const project = await projectResponse.json();
+          projectId = project[0].id;
+          console.log("Stored app project with ID:", projectId);
+        } else {
+          console.error("Failed to store app project:", await projectResponse.text());
+        }
+      } catch (dbError) {
+        console.error("Database error when storing app:", dbError);
+      }
+    } else {
+      console.log("Supabase credentials not found, skipping database storage");
+    }
+
     console.log(`Successfully generated ${files.length} files`);
     return new Response(JSON.stringify({
+      projectId: projectId,
       projectName: architecture.projectName,
       description: architecture.description,
       explanation: explanation,

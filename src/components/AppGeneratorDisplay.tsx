@@ -26,13 +26,15 @@ interface GeneratedApp {
   files: GeneratedFile[];
   explanation?: string;
   technologies?: string[];
+  projectId?: string;
 }
 
 interface AppGeneratorDisplayProps {
   message: Message;
+  projectId?: string | null;
 }
 
-const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) => {
+const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, projectId: propProjectId }) => {
   const [isOpen, setIsOpen] = useState(false);
   const { openArtifact } = useArtifact();
   const [appData, setAppData] = useState<GeneratedApp | null>(null);
@@ -52,7 +54,14 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
               typeof jsonData.projectName === 'string' && 
               typeof jsonData.description === 'string' && 
               Array.isArray(jsonData.files)) {
-            return jsonData;
+            
+            // Include the project ID if provided from props or found in JSON
+            const extractedData = {
+              ...jsonData,
+              projectId: propProjectId || jsonData.projectId || null
+            };
+            
+            return extractedData;
           }
         }
         
@@ -68,7 +77,8 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
                 projectName: jsonData.projectName || "Generated Application",
                 description: jsonData.description || "Generated application files",
                 files: jsonData.files,
-                technologies: jsonData.technologies || []
+                technologies: jsonData.technologies || [],
+                projectId: propProjectId || jsonData.projectId || null
               };
             }
           } catch (e) {
@@ -84,7 +94,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
     };
     
     setAppData(extractAppData());
-  }, [message]);
+  }, [message, propProjectId]);
   
   // Improved and simplified function to extract code blocks from message content
   const extractCodeBlocks = () => {
@@ -133,6 +143,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   // Completely rewritten handleViewFullProject to be more robust
   const handleViewFullProject = () => {
     console.log("Opening artifact viewer with message content:", message.content.substring(0, 100) + "...");
+    console.log("Project ID:", appData?.projectId || propProjectId || "none");
     
     // Create a guaranteed artifact ID
     const artifactId = `artifact-${Date.now()}`;
@@ -180,7 +191,10 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
       id: artifactId,
       title: projectTitle,
       description: appData?.description || "Generated application",
-      files: files
+      files: files,
+      metadata: {
+        projectId: appData?.projectId || propProjectId || null
+      }
     };
     
     // Open the artifact with our guaranteed valid artifact object
@@ -209,6 +223,8 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   };
 
   const generateSummary = () => {
+    if (!appData) return null;
+    
     const fileTypes = appData.files
       .map(file => file.path.split('.').pop()?.toLowerCase())
       .filter((value, index, self) => value && self.indexOf(value) === index);
@@ -253,6 +269,8 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   };
 
   const getMainFeatures = () => {
+    if (!appData) return [];
+    
     const isEcommerce = 
       appData.description.toLowerCase().includes('ecommerce') || 
       appData.description.toLowerCase().includes('e-commerce') ||
@@ -276,11 +294,36 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
     ];
   };
 
+  // If no app data could be extracted, show a simple message
+  if (!appData) {
+    return (
+      <div className="my-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+        <p className="text-gray-600">Unable to extract application data. Click the button below to view any code that might be available.</p>
+        <Button 
+          variant="outline" 
+          className="mt-3" 
+          onClick={handleViewFullProject}
+        >
+          <Code className="mr-2 h-4 w-4" /> View Available Code
+        </Button>
+      </div>
+    );
+  }
+
+  // Detect if this is a modified app or an original generation
+  const isModification = message.content.toLowerCase().includes('modified') || 
+                        message.content.toLowerCase().includes('updated') || 
+                        message.content.toLowerCase().includes('changed');
+
   return (
     <div className="my-6 space-y-6">
       <div>
-        <h3 className="text-xl font-semibold mb-2">I've generated a full-stack application: {appData?.projectName || "Application"}</h3>
-        <p className="text-gray-600">{appData?.description || "Generated application"}</p>
+        <h3 className="text-xl font-semibold mb-2">
+          {isModification 
+            ? `I've updated the ${appData.projectName} application` 
+            : `I've generated a full-stack application: ${appData.projectName}`}
+        </h3>
+        <p className="text-gray-600">{appData.description}</p>
       </div>
       
       <div className="bg-white border border-gray-200 rounded-full shadow-sm p-4 flex items-center justify-between">
@@ -298,31 +341,29 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
         </Button>
       </div>
       
-      {appData && (
-        <div className="space-y-4">
-          <h4 className="font-semibold">This application includes:</h4>
-          <ol className="list-decimal pl-6 space-y-2">
-            {appData.files.length > 0 && (
-              <li>
-                <span className="font-medium">{appData.files.length} files</span> organized in a structured project
-              </li>
-            )}
-            {appData.technologies && (
-              <li>
-                <span className="font-medium">Technologies used:</span> {appData.technologies.join(', ')}
-              </li>
-            )}
+      <div className="space-y-4">
+        <h4 className="font-semibold">This application includes:</h4>
+        <ol className="list-decimal pl-6 space-y-2">
+          {appData.files.length > 0 && (
             <li>
-              <span className="font-medium">Main features:</span>
-              <ul className="list-disc pl-6 pt-1">
-                {getMainFeatures().map((feature, index) => (
-                  <li key={index}>{feature}</li>
-                ))}
-              </ul>
+              <span className="font-medium">{appData.files.length} files</span> organized in a structured project
             </li>
-          </ol>
-        </div>
-      )}
+          )}
+          {appData.technologies && appData.technologies.length > 0 && (
+            <li>
+              <span className="font-medium">Technologies used:</span> {appData.technologies.join(', ')}
+            </li>
+          )}
+          <li>
+            <span className="font-medium">Main features:</span>
+            <ul className="list-disc pl-6 pt-1">
+              {getMainFeatures().map((feature, index) => (
+                <li key={index}>{feature}</li>
+              ))}
+            </ul>
+          </li>
+        </ol>
+      </div>
       
       <Accordion type="single" collapsible className="w-full">
         <AccordionItem value="explanation">

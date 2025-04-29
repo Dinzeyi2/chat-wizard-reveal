@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -15,6 +16,7 @@ const Index = () => {
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [isGeneratingApp, setIsGeneratingApp] = useState(false);
   const [generationDialog, setGenerationDialog] = useState(false);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -38,6 +40,7 @@ const Index = () => {
     
     setMessages(prev => [...prev, userMessage]);
     
+    // Check if this is a standard app generation request
     const isAppGeneration = 
       (content.toLowerCase().includes("create") || 
        content.toLowerCase().includes("build") || 
@@ -55,6 +58,15 @@ const Index = () => {
        content.toLowerCase().includes("project") ||
        content.toLowerCase().includes("site"));
 
+    // Check if this is a modification request for an existing app
+    const isModificationRequest = 
+      currentProjectId && // We have a current project ID
+      (content.toLowerCase().includes("change") ||
+       content.toLowerCase().includes("modify") ||
+       content.toLowerCase().includes("update") ||
+       content.toLowerCase().includes("add") ||
+       content.toLowerCase().includes("fix"));
+    
     if (isAppGeneration) {
       console.log("Calling generate-app function with prompt:", content);
       
@@ -86,6 +98,7 @@ const Index = () => {
 
         const appData = data;
         console.log("App generation successful:", appData);
+        setCurrentProjectId(appData.projectId);
         
         setGenerationDialog(false);
         
@@ -103,6 +116,9 @@ You can explore the file structure and content in the panel above. This is a sta
           id: (Date.now() + 2).toString(),
           role: "assistant",
           content: formattedResponse,
+          metadata: {
+            projectId: appData.projectId
+          },
           timestamp: new Date()
         };
         
@@ -140,6 +156,74 @@ If you were trying to generate an app, this might be due to limits with our AI m
       } finally {
         setLoading(false);
         setIsGeneratingApp(false);
+      }
+    } else if (isModificationRequest) {
+      console.log("Calling chat function with modification request for project:", currentProjectId);
+      
+      setLoading(true);
+      
+      const processingMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "I'm working on modifying your application. This may take a moment...",
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, processingMessage]);
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('chat', {
+          body: { 
+            message: content,
+            projectId: currentProjectId 
+          }
+        });
+
+        if (error) throw error;
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.response,
+          metadata: {
+            projectId: data.projectId || currentProjectId
+          },
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
+        setMessages(prev => [...prev, aiMessage]);
+        
+        // Update current project ID if we got a new one from the modification
+        if (data.projectId && data.projectId !== currentProjectId) {
+          setCurrentProjectId(data.projectId);
+        }
+        
+        toast({
+          title: "App Modified Successfully",
+          description: "Your application has been updated with your requested changes.",
+        });
+      } catch (error) {
+        console.error('Error calling function:', error);
+        setGenerationError(error.message || "An unexpected error occurred");
+        
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: error.message || "An unexpected error occurred",
+        });
+        
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `I'm sorry, but I encountered an error while modifying your application: ${error.message || 'Please try again later.'}`,
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
+        setMessages(prev => [...prev, errorMessage]);
+      } finally {
+        setLoading(false);
       }
     } else {
       setLoading(true);
@@ -239,6 +323,19 @@ If you were trying to generate an app, this might be due to limits with our AI m
                   <p className="text-xs text-red-600 mt-1">
                     Try refreshing the page and using a simpler prompt.
                   </p>
+                </div>
+              )}
+              
+              {currentProjectId && (
+                <div className="px-4 py-3 mx-auto my-4 max-w-3xl bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-700">
+                    <strong>Active application:</strong> You can now ask me to modify the application I generated. For example:
+                  </p>
+                  <ul className="text-xs text-blue-600 mt-2 list-disc pl-5">
+                    <li>Change the color scheme to use blue instead of green</li>
+                    <li>Add a search bar to the header</li>
+                    <li>Update the login page to use shadcn/ui components</li>
+                  </ul>
                 </div>
               )}
             </div>
