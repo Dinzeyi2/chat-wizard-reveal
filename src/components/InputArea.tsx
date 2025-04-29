@@ -36,7 +36,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
-  const { findDesignCode, isLoading: isScraperLoading } = useUiScraper("", {
+  const { findDesignCode, isLoading: isScraperLoading } = useUiScraper(undefined, {
     onSuccess: (data) => {
       if (data.code) {
         const enhancedPrompt = `

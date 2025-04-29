@@ -9,15 +9,15 @@ interface UseUiScraperOptions {
   onError?: (error: Error) => void;
 }
 
-export const useUiScraper = (perplexityApiKey?: string, claudeApiKey?: string, options?: UseUiScraperOptions) => {
+export const useUiScraper = (perplexityApiKey?: string, options?: UseUiScraperOptions, claudeApiKey?: string) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [result, setResult] = useState<DesignCodeResult | null>(null);
   const [customizedResult, setCustomizedResult] = useState<any | null>(null);
   const { toast } = useToast();
 
-  const findDesignCode = async (prompt: string, apiKeys?: {perplexity?: string, claude?: string}) => {
-    const perplexityKey = apiKeys?.perplexity || perplexityApiKey;
+  const findDesignCode = async (prompt: string, apiKey?: string) => {
+    const perplexityKey = apiKey || perplexityApiKey;
     
     if (!perplexityKey) {
       const error = new Error("Perplexity API key is required");
@@ -66,10 +66,10 @@ export const useUiScraper = (perplexityApiKey?: string, claudeApiKey?: string, o
     }
   };
 
-  const customizeDesignCode = async (design: DesignCodeResult, claudeKey?: string) => {
-    const apiKey = claudeKey || claudeApiKey;
+  const customizeDesignCode = async (design: DesignCodeResult, apiKey?: string) => {
+    const claudeKey = apiKey || claudeApiKey;
     
-    if (!apiKey) {
+    if (!claudeKey) {
       const error = new Error("Claude API key is required");
       setError(error);
       options?.onError?.(error);
@@ -92,7 +92,7 @@ export const useUiScraper = (perplexityApiKey?: string, claudeApiKey?: string, o
       setIsLoading(true);
       setError(null);
       
-      const customizer = new ClaudeCodeCustomizer(apiKey);
+      const customizer = new ClaudeCodeCustomizer(claudeKey);
       const customized = await customizer.customizeCode(design);
       
       setCustomizedResult(customized);
