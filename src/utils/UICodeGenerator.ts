@@ -1,17 +1,10 @@
+
 /**
  * UI Code Generator - Main Integration
- * This module integrates the Perplexity AI Design Scraper with the Claude Code Customizer
- * to create a comprehensive UI code generation system
+ * This module uses Claude directly to generate UI code
  */
 
-import { 
-  EnhancedPerplexityUIScraper, 
-  DesignCodeResult 
-} from "@/utils/EnhancedPerplexityUIScraper";
-import { ClaudeCodeCustomizer } from "@/utils/ClaudeCodeCustomizer";
-
 interface UICodeGeneratorConfig {
-  perplexityApiKey?: string;
   claudeApiKey?: string;
   debug?: boolean;
 }
@@ -45,22 +38,16 @@ interface GenerationResult {
 }
 
 export class UICodeGenerator {
-  private perplexityApiKey?: string;
   private claudeApiKey?: string;
   private debug: boolean;
-  private scraper: EnhancedPerplexityUIScraper;
-  private customizer: ClaudeCodeCustomizer;
   private generationHistory: GenerationHistoryItem[];
+  private claudeEndpoint: string = "https://api.anthropic.com/v1/messages";
+  private model: string = "claude-3-5-sonnet-20240620";
   
   constructor(config: UICodeGeneratorConfig = {}) {
     // Extract configuration
-    this.perplexityApiKey = config.perplexityApiKey;
     this.claudeApiKey = config.claudeApiKey;
     this.debug = config.debug || false;
-    
-    // Initialize components
-    this.scraper = new EnhancedPerplexityUIScraper(this.perplexityApiKey || '');
-    this.customizer = new ClaudeCodeCustomizer(this.claudeApiKey || '');
     
     // Track generation history for potential reuse
     this.generationHistory = [];
@@ -73,52 +60,48 @@ export class UICodeGenerator {
    */
   async generateCode(userPrompt: string): Promise<GenerationResult> {
     try {
-      // 1. Log the request
+      // Log the request
       this.log('Generating code for prompt:', userPrompt);
       
-      // Skip the Perplexity search which is causing issues and go straight to Claude
-      this.log('Using direct Claude fallback for code generation');
-      return await this.claudeFallbackGeneration(userPrompt);
+      if (!this.claudeApiKey) {
+        throw new Error("Claude API key is required for code generation");
+      }
       
+      // Use direct Claude generation
+      return await this.claudeGeneration(userPrompt);
     } catch (error: any) {
       this.log('Error generating code:', error.message);
-      
-      // Try fallback if there was an error in the main flow
-      try {
-        this.log('Attempting Claude fallback after error...');
-        return await this.claudeFallbackGeneration(userPrompt);
-      } catch (fallbackError: any) {
-        // If fallback also fails, return the original error
-        return {
-          success: false,
-          error: error.message,
-          prompt: userPrompt
-        };
-      }
+      return {
+        success: false,
+        error: error.message,
+        prompt: userPrompt
+      };
     }
   }
 
   /**
-   * Fallback generation using Claude directly when Perplexity fails
+   * Generate code using Claude directly
    * @param userPrompt - User's design request
    * @returns Generated code and metadata
    */
-  private async claudeFallbackGeneration(userPrompt: string): Promise<GenerationResult> {
+  private async claudeGeneration(userPrompt: string): Promise<GenerationResult> {
     try {
-      this.log('Using Claude fallback for direct code generation');
+      this.log('Using Claude for direct code generation');
       
       // 1. Extract design system preferences from the prompt
       const designSystem = this.extractDesignSystemPreference(userPrompt);
       const componentType = this.extractComponentType(userPrompt);
+      const isFullStack = this.isFullStackRequest(userPrompt);
+      const styles = this.extractStyles(userPrompt);
       
-      // 2. Get example code snippets for the design system to provide context
-      const exampleSnippets = await this.fetchDesignSystemExamples(designSystem);
+      // 2. Create a prompt for Claude
+      const claudePrompt = this.createClaudePrompt(userPrompt, componentType, designSystem, styles, isFullStack);
       
-      // 3. Create a special prompt for Claude with example snippets
-      const claudePrompt = this.createClaudeFallbackPrompt(userPrompt, designSystem, componentType, exampleSnippets);
+      // 3. Call Claude API directly
+      const claudeResponse = await this.callClaudeAPI(claudePrompt);
       
-      // 4. Call Claude API directly
-      const claudeResponse = await this.callClaudeDirectly(claudePrompt);
+      // 4. Extract code blocks from the response
+      const result = this.processClaudeResponse(claudeResponse, componentType);
       
       // 5. Format the response
       return {
@@ -126,23 +109,22 @@ export class UICodeGenerator {
         prompt: userPrompt,
         result: {
           code: {
-            frontend: claudeResponse.code || null,
-            backend: claudeResponse.backendCode || null
+            frontend: result.frontendCode || null,
+            backend: result.backendCode || null
           },
-          explanation: claudeResponse.explanation || 'Generated with Claude'
+          explanation: result.explanation || 'Generated with Claude'
         },
         metadata: {
           componentType: componentType,
           designSystem: designSystem,
-          timestamp: new Date().toISOString(),
-          usedFallback: true
+          timestamp: new Date().toISOString()
         }
       };
     } catch (error: any) {
-      this.log('Fallback generation failed:', error.message);
+      this.log('Code generation failed:', error.message);
       return {
         success: false,
-        error: `Fallback generation failed: ${error.message}`,
+        error: `Code generation failed: ${error.message}`,
         prompt: userPrompt
       };
     }
@@ -201,85 +183,74 @@ export class UICodeGenerator {
   }
 
   /**
-   * Fetch example code snippets for a given design system
+   * Check if this is a full stack request
    */
-  private async fetchDesignSystemExamples(designSystem: string): Promise<string[]> {
-    // This would ideally fetch real examples from a repository or documentation
-    // For now, we'll return some basic examples based on the design system
+  private isFullStackRequest(prompt: string): boolean {
+    const promptLower = prompt.toLowerCase();
     
-    // Sample examples for shadcn/ui
-    const shadcnExamples = [
-      `import { Button } from "@/components/ui/button"
-export function ButtonDemo() {
-  return (
-    <Button variant="outline">Button</Button>
-  )
-}`,
-      `import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-export function CardDemo() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Card Title</CardTitle>
-        <CardDescription>Card Description</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p>Card Content</p>
-      </CardContent>
-      <CardFooter>
-        <p>Card Footer</p>
-      </CardFooter>
-    </Card>
-  )
-}`,
-      `import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-export function InputDemo() {
-  return (
-    <div className="grid w-full max-w-sm items-center gap-1.5">
-      <Label htmlFor="email">Email</Label>
-      <Input type="email" id="email" placeholder="Email" />
-    </div>
-  )
-}`
-    ];
-    
-    // Return examples based on design system
-    switch (designSystem.toLowerCase()) {
-      case 'shadcn/ui':
-        return shadcnExamples;
-      default:
-        return shadcnExamples; // Default to shadcn/ui examples
-    }
+    return promptLower.includes("full stack") || 
+           promptLower.includes("fullstack") || 
+           promptLower.includes("full-stack") ||
+           promptLower.includes("backend") ||
+           promptLower.includes("database") ||
+           promptLower.includes("api");
   }
 
   /**
-   * Create a prompt for Claude fallback generation
+   * Extract style preferences from prompt
    */
-  private createClaudeFallbackPrompt(userPrompt: string, designSystem: string, componentType: string, exampleSnippets: string[]): string {
+  private extractStyles(prompt: string): string[] {
+    const promptLower = prompt.toLowerCase();
+    const styles = [];
+    
+    if (promptLower.includes("white") || promptLower.includes("light")) styles.push("white");
+    if (promptLower.includes("dark") || promptLower.includes("black")) styles.push("dark");
+    if (promptLower.includes("beautiful") || promptLower.includes("elegant")) styles.push("beautiful");
+    if (promptLower.includes("minimal") || promptLower.includes("simple")) styles.push("minimal");
+    
+    // Default to beautiful if no style specified
+    if (styles.length === 0) styles.push("beautiful");
+    
+    return styles;
+  }
+
+  /**
+   * Create a prompt for Claude code generation
+   */
+  private createClaudePrompt(originalPrompt: string, componentType: string, designSystem: string, styles: string[], isFullStack: boolean): string {
+    // Determine style preferences
+    const isWhite = styles.includes('white');
+    const isDark = styles.includes('dark');
+    const isBeautiful = styles.includes('beautiful');
+    const isMinimal = styles.includes('minimal');
+    
+    // Build the style instructions
+    let styleInstructions = [];
+    if (isWhite) styleInstructions.push("Use a clean white theme with light backgrounds");
+    if (isDark) styleInstructions.push("Use a dark theme with dark backgrounds and appropriate contrast");
+    if (isBeautiful) styleInstructions.push("Make the component beautiful with elegant styling and subtle animations");
+    if (isMinimal) styleInstructions.push("Keep the component minimal and clean, focusing on essential elements");
+    
+    // Default to white and beautiful if no styles specified
+    if (styleInstructions.length === 0) {
+      styleInstructions.push("Use a clean white theme with light backgrounds");
+      styleInstructions.push("Make the component beautiful with elegant styling and subtle animations");
+    }
+    
     return `
 You are an expert UI developer specializing in creating beautiful React applications.
 
 # TASK
-I need you to create a ${componentType} based on my requirements. I could not find an exact match, so please create it from scratch.
+I need you to create a ${componentType} based on my requirements.
 
 # USER REQUIREMENTS
-"${userPrompt}"
+"${originalPrompt}"
 
 # DESIGN SYSTEM
 You should use ${designSystem} for this component.
 
-# EXAMPLES
-Here are some examples of ${designSystem} components:
-
-${exampleSnippets.map((snippet, index) => `Example ${index + 1}:\n\`\`\`jsx\n${snippet}\n\`\`\``).join('\n\n')}
+# STYLE REQUIREMENTS
+${styleInstructions.join("\n")}
 
 # TECHNICAL REQUIREMENTS
 - Create a React component that fulfills the user's requirements
@@ -288,6 +259,7 @@ ${exampleSnippets.map((snippet, index) => `Example ${index + 1}:\n\`\`\`jsx\n${s
 - Make the component fully responsive and accessible
 - Ensure the code is clean, well-organized, and follows best practices
 - Add appropriate TypeScript types and comments
+${isFullStack ? "- Add a simple backend API endpoint code that would support this component" : ""}
 
 # INSTRUCTIONS
 1. Create a component that fulfills the user requirements
@@ -303,97 +275,86 @@ Provide the code in the following format:
 // Frontend code here...
 \`\`\`
 
-If backend code is needed, include it after the frontend code:
-
-\`\`\`javascript
-// Backend code here (if needed)...
-\`\`\`
+${isFullStack ? "Then provide the backend code (if required):\n\n```javascript\n// Backend code here (if needed)...\n```" : ""}
 
 Finally, provide a brief explanation of the component and how to use it.
 `;
   }
 
   /**
-   * Call Claude API directly with a prompt
+   * Call Claude API
    */
-  private async callClaudeDirectly(prompt: string): Promise<any> {
+  private async callClaudeAPI(prompt: string) {
     try {
-      // Use the existing customizer to call Claude
-      // But create a minimal design result to pass to the customizer
-      const minimalDesignResult: DesignCodeResult = {
-        success: true,
-        requirements: {
-          originalPrompt: prompt,
-          componentType: this.extractComponentType(prompt),
-          framework: 'react',
-          designSystem: this.extractDesignSystemPreference(prompt),
-          styles: ['beautiful'],
-          isFullStack: prompt.toLowerCase().includes('backend') || prompt.toLowerCase().includes('api'),
+      const response = await fetch(this.claudeEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.claudeApiKey || '',
+          'anthropic-version': '2023-06-01'
         },
-        code: "// Placeholder code - Claude will replace this",
-        metadata: {
-          query: prompt,
-          designSystem: this.extractDesignSystemPreference(prompt),
-        }
-      };
+        body: JSON.stringify({
+          model: this.model,
+          messages: [
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          max_tokens: 4000
+        })
+      });
       
-      // Call Claude through the customizer
-      const claudeResponse = await this.customizer.customizeCode(minimalDesignResult);
-      
-      if (!claudeResponse || !claudeResponse.success) {
-        throw new Error(claudeResponse?.error || 'Failed to generate code with Claude');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Claude API error (${response.status}): ${errorText}`);
       }
+      
+      return await response.json();
+    } catch (error: any) {
+      this.log('Error calling Claude API:', error);
+      throw new Error(`Failed to call Claude API: ${error.message}`);
+    }
+  }
+
+  /**
+   * Process Claude API response
+   */
+  private processClaudeResponse(response: any, componentType: string) {
+    try {
+      // Extract content from Claude response
+      const content = response.content?.[0]?.text || "";
+      
+      // Extract code blocks from the response
+      const codeBlockRegex = /```(?:jsx|js|javascript|typescript|tsx|ts)([\s\S]*?)```/g;
+      const matches = [...content.matchAll(codeBlockRegex)];
+      
+      if (matches.length === 0) {
+        throw new Error("No code blocks found in Claude's response");
+      }
+      
+      // Extract frontend code (first code block)
+      const frontendCode = matches[0][1].trim();
+      
+      // Extract backend code if present (second code block)
+      let backendCode = null;
+      if (matches.length > 1) {
+        backendCode = matches[1][1].trim();
+      }
+      
+      // Extract explanation (text after the last code block)
+      const lastCodeBlockEnd = matches[matches.length - 1].index! + matches[matches.length - 1][0].length;
+      const explanation = content.substring(lastCodeBlockEnd).trim();
       
       return {
-        code: claudeResponse.customizedCode?.frontend,
-        backendCode: claudeResponse.customizedCode?.backend,
-        explanation: claudeResponse.explanation
+        frontendCode,
+        backendCode,
+        explanation
       };
     } catch (error: any) {
-      this.log('Error calling Claude directly:', error);
-      throw error;
+      this.log('Error processing Claude response:', error);
+      throw new Error(`Failed to process Claude's response: ${error.message}`);
     }
-  }
-  
-  /**
-   * Save generation to history for potential reuse
-   */
-  private saveToHistory(prompt: string, scrapedDesign: DesignCodeResult, customizedCode: any): void {
-    // Keep history limited to last 10 items
-    if (this.generationHistory.length >= 10) {
-      this.generationHistory.shift();
-    }
-    
-    this.generationHistory.push({
-      timestamp: new Date().toISOString(),
-      prompt,
-      componentType: scrapedDesign.metadata?.componentType,
-      designSystem: scrapedDesign.metadata?.designSystem,
-      success: customizedCode.success
-    });
-  }
-  
-  /**
-   * Format the final result for the client
-   */
-  private formatResult(prompt: string, scrapedDesign: DesignCodeResult, customizedCode: any): GenerationResult {
-    return {
-      success: true,
-      prompt,
-      result: {
-        code: {
-          frontend: customizedCode.customizedCode?.frontend || null,
-          backend: customizedCode.customizedCode?.backend || null
-        },
-        explanation: customizedCode.explanation || ''
-      },
-      metadata: {
-        componentType: scrapedDesign.metadata?.componentType,
-        designSystem: scrapedDesign.metadata?.designSystem,
-        sourceUrl: scrapedDesign.metadata?.query,
-        timestamp: new Date().toISOString()
-      }
-    };
   }
   
   /**

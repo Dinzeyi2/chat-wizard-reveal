@@ -12,7 +12,7 @@ serve(async (req) => {
   try {
     const { message, projectId, lastModification } = await req.json()
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
-    const claudeApiKey = Deno.env.get('CLAUDE_API_KEY')
+    const claudeApiKey = Deno.env.get('ANTHROPIC_API_KEY')
 
     if (!openAIApiKey) {
       console.error('OpenAI API key is not configured')
@@ -62,13 +62,16 @@ serve(async (req) => {
     if (isCodeGenerationRequest && !isModificationRequest) {
       console.log("Detected code generation request. Using direct Claude implementation");
       
-      // Check if Claude API key is available
+      // Check if Claude API key is available - MUST be available
       if (!claudeApiKey) {
         console.error('Claude API key is not configured');
-        
-        // Use OpenAI as fallback for code generation
-        console.log("Using OpenAI as fallback for code generation");
-        return await handleCodeGenerationWithOpenAI(message, openAIApiKey, corsHeaders);
+        return new Response(JSON.stringify({ 
+          error: 'Missing API key',
+          response: 'I need a Claude API key to generate code. Please configure it in your Supabase project settings.'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       try {
@@ -104,7 +107,9 @@ serve(async (req) => {
         });
         
         if (!claudeResponse.ok) {
-          throw new Error(`Claude API error: ${claudeResponse.status}`);
+          const errorData = await claudeResponse.text();
+          console.error(`Claude API error: ${claudeResponse.status}`, errorData);
+          throw new Error(`Claude API error: ${claudeResponse.status} - ${errorData}`);
         }
         
         const claudeResult = await claudeResponse.json();
@@ -148,9 +153,12 @@ ${explanation}`;
       } catch (codeGenError) {
         console.error("Error in direct code generation:", codeGenError);
         
-        // Try using OpenAI as a fallback
-        console.log("Attempting fallback with OpenAI for code generation");
-        return await handleCodeGenerationWithOpenAI(message, openAIApiKey, corsHeaders);
+        // Report the actual error to the user
+        return new Response(JSON.stringify({ 
+          response: `I encountered an error while generating code: ${codeGenError.message}. Please try again with a different request or check that your Claude API key is correctly configured.`
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
     }
     
@@ -271,56 +279,6 @@ ${explanation}`;
     })
   }
 })
-
-// Helper function to generate code with OpenAI as a fallback
-async function handleCodeGenerationWithOpenAI(message, openAIApiKey, corsHeaders) {
-  try {
-    console.log("Generating code with OpenAI");
-    
-    // Create a system prompt for code generation
-    const systemPrompt = `You are an expert React developer using TypeScript and shadcn/ui. 
-    The user is asking you to create a UI component. 
-    Generate ONLY the complete code for the component, including all necessary imports.
-    Use Tailwind CSS for styling and shadcn/ui components where appropriate.
-    Format your response in markdown, with the code inside a code block using the appropriate language tag.
-    Include a brief explanation of how to use the component after the code block.`;
-    
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: message }
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
-
-    return new Response(JSON.stringify({ response: aiResponse }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    console.error("Error in OpenAI fallback:", error);
-    
-    // Last resort fallback - return a simple error message
-    return new Response(JSON.stringify({ 
-      response: `I'm sorry, but I encountered an error while generating code: ${error.message}. Please try again with a simpler request or check that your API keys are configured correctly.`
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-}
 
 // Helper functions for detecting code request types
 function extractComponentType(prompt: string): string {
@@ -450,4 +408,3 @@ ${isFullStack ? "Then provide the backend code (if required):\n\n```javascript\n
 Finally, provide a brief explanation of the component and how to use it.
 `;
 }
-
