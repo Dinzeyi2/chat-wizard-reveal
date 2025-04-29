@@ -1,4 +1,3 @@
-
 /**
  * Enhanced UI Design Scraper using Perplexity AI
  * This tool uses Perplexity AI to find and extract UI component code from design systems
@@ -39,6 +38,11 @@ export class EnhancedPerplexityUIScraper {
   private generalLibraries: DesignSource[] = [];
   private reactLibraries: DesignSource[] = [];
   private tailwindLibraries: DesignSource[] = [];
+  private vueLibraries: DesignSource[] = [];
+  private otherFrameworkLibraries: DesignSource[] = [];
+  private frameworkAgnosticLibraries: DesignSource[] = [];
+  private designSystems: DesignSource[] = [];
+  private componentLibraries: DesignSource[] = [];
   private designSources: DesignSource[] = [];
   
   constructor(apiKey: string) {
@@ -69,22 +73,106 @@ export class EnhancedPerplexityUIScraper {
       { name: "react-suite", url: "https://rsuitejs.com", priority: 7 },
       { name: "mantine", url: "https://mantine.dev", priority: 8 },
       { name: "primereact", url: "https://primereact.org", priority: 7 },
-      { name: "react-bootstrap", url: "https://react-bootstrap.github.io", priority: 8 }
+      { name: "react-bootstrap", url: "https://react-bootstrap.github.io", priority: 8 },
+      { name: "react-spectrum", url: "https://react-spectrum.adobe.com", priority: 7 },
+      { name: "blueprintjs", url: "https://blueprintjs.com", priority: 7 },
+      { name: "rebass", url: "https://rebassjs.org", priority: 6 },
+      { name: "evergreen", url: "https://evergreen.segment.com", priority: 7 },
+      { name: "grommet", url: "https://v2.grommet.io", priority: 6 },
+      { name: "semantic-ui-react", url: "https://react.semantic-ui.com", priority: 7 },
+      { name: "fluent-ui", url: "https://developer.microsoft.com/en-us/fluentui", priority: 7 },
+      { name: "rsuite", url: "https://rsuitejs.com", priority: 6 }
     ];
     
     // Tailwind CSS-focused libraries
     this.tailwindLibraries = [
       { name: "tailwind-ui", url: "https://tailwindui.com", priority: 10 },
+      { name: "tailwind-components", url: "https://tailwindcomponents.com", priority: 8 },
+      { name: "tailwind-toolbox", url: "https://tailwindtoolbox.com", priority: 7 },
+      { name: "tailblocks", url: "https://tailblocks.cc", priority: 7 },
       { name: "hyperui", url: "https://hyperui.dev", priority: 8 },
       { name: "flowbite", url: "https://flowbite.com", priority: 8 },
-      { name: "daisyui", url: "https://daisyui.com", priority: 8 }
+      { name: "daisyui", url: "https://daisyui.com", priority: 8 },
+      { name: "meraki-ui", url: "https://merakiui.com", priority: 7 },
+      { name: "kometa-ui", url: "https://kitwind.io/products/kometa", priority: 7 },
+      { name: "wicked-blocks", url: "https://wickedblocks.dev", priority: 7 },
+      { name: "treact", url: "https://treact.owaiskhan.me", priority: 6 },
+      { name: "lofi-ui", url: "https://lofiui.co", priority: 7 },
+      { name: "tailwind-elements", url: "https://tailwind-elements.com", priority: 7 },
+      { name: "kitwind", url: "https://kitwind.io", priority: 7 },
+      { name: "tailwind-awesome", url: "https://tailwindawesome.com", priority: 6 }
+    ];
+    
+    // Vue-focused libraries
+    this.vueLibraries = [
+      { name: "vuetify", url: "https://vuetifyjs.com", priority: 8 },
+      { name: "quasar", url: "https://quasar.dev", priority: 8 },
+      { name: "element-plus", url: "https://element-plus.org", priority: 7 },
+      { name: "primevue", url: "https://primevue.org", priority: 7 },
+      { name: "vue-tailwind", url: "https://vue-tailwind.com", priority: 7 },
+      { name: "vant-ui", url: "https://vant-ui.github.io/vant", priority: 6 },
+      { name: "buefy", url: "https://buefy.org", priority: 6 }
+    ];
+    
+    // Svelte and Angular libraries
+    this.otherFrameworkLibraries = [
+      { name: "svelte-material-ui", url: "https://sveltematerialui.com", priority: 6 },
+      { name: "sveltestrap", url: "https://sveltestrap.js.org", priority: 6 },
+      { name: "sveltekit-ui", url: "https://github.com/huntabyte/shadcn-svelte", priority: 6 },
+      { name: "angular-material", url: "https://material.angular.io", priority: 7 },
+      { name: "ng-zorro", url: "https://ng.ant.design", priority: 6 },
+      { name: "primeng", url: "https://primeng.org", priority: 6 }
+    ];
+    
+    // Framework-agnostic libraries
+    this.frameworkAgnosticLibraries = [
+      { name: "bootstrap", url: "https://getbootstrap.com", priority: 8 },
+      { name: "bulma", url: "https://bulma.io", priority: 7 },
+      { name: "foundation", url: "https://get.foundation", priority: 7 },
+      { name: "spectre", url: "https://picturepan2.github.io/spectre", priority: 6 },
+      { name: "milligram", url: "https://milligram.io", priority: 6 },
+      { name: "uikit", url: "https://getuikit.com", priority: 7 }
+    ];
+    
+    // Design systems
+    this.designSystems = [
+      { name: "atlassian-design", url: "https://atlassian.design", priority: 7 },
+      { name: "carbon-design", url: "https://carbondesignsystem.com", priority: 8 },
+      { name: "lightning-design", url: "https://www.lightningdesignsystem.com", priority: 7 },
+      { name: "polaris", url: "https://polaris.shopify.com", priority: 7 },
+      { name: "base-web", url: "https://baseweb.design", priority: 6 },
+      { name: "material-design", url: "https://material.io", priority: 8 },
+      { name: "clarity-design", url: "https://clarity.design", priority: 7 },
+      { name: "elastic-ui", url: "https://elastic.github.io/eui", priority: 6 }
+    ];
+    
+    // Component libraries and block collections
+    this.componentLibraries = [
+      { name: "uiverse", url: "https://uiverse.io", priority: 7 },
+      { name: "copyui", url: "https://copyui.com", priority: 7 },
+      { name: "blocks-ui", url: "https://blocks-ui.com", priority: 6 },
+      { name: "framer-components", url: "https://framer.com/features/components", priority: 6 },
+      { name: "ui-bakery", url: "https://ui.bakery.io", priority: 6 },
+      { name: "shuffle", url: "https://shuffle.dev", priority: 7 },
+      { name: "ui-deck", url: "https://uideck.com", priority: 6 },
+      { name: "cruip", url: "https://cruip.com", priority: 6 },
+      { name: "devdojo", url: "https://devdojo.com/components", priority: 6 },
+      { name: "frontendor", url: "https://frontendor.com", priority: 6 },
+      { name: "little-ui", url: "https://littleui.dev", priority: 6 },
+      { name: "heroicons", url: "https://heroicons.com", priority: 6 },
+      { name: "lucide-icons", url: "https://lucide.dev", priority: 6 }
     ];
     
     // Combine all libraries into a flat array
     this.designSources = [
       ...this.generalLibraries,
       ...this.reactLibraries,
-      ...this.tailwindLibraries
+      ...this.tailwindLibraries,
+      ...this.vueLibraries,
+      ...this.otherFrameworkLibraries,
+      ...this.frameworkAgnosticLibraries,
+      ...this.designSystems,
+      ...this.componentLibraries
     ];
   }
   
@@ -132,33 +220,85 @@ export class EnhancedPerplexityUIScraper {
     
     // Component types to look for
     const componentTypes = [
-      { name: "dashboard", keywords: ["dashboard", "admin panel", "analytics dashboard"] },
-      { name: "form", keywords: ["form", "input form", "contact form", "sign-up form"] },
-      { name: "table", keywords: ["table", "data table", "data grid", "spreadsheet"] },
-      { name: "card", keywords: ["card", "product card", "pricing card", "info card"] },
-      { name: "navbar", keywords: ["navbar", "navigation", "header", "menu", "nav"] },
-      { name: "modal", keywords: ["modal", "dialog", "popup", "overlay", "modal dialog"] }
+      { name: "dashboard", keywords: ["dashboard", "admin panel", "analytics dashboard", "stats dashboard", "admin dashboard"] },
+      { name: "form", keywords: ["form", "input form", "contact form", "sign-up form", "login form", "registration form", "survey form"] },
+      { name: "table", keywords: ["table", "data table", "data grid", "spreadsheet", "datatable", "data display"] },
+      { name: "card", keywords: ["card", "product card", "pricing card", "info card", "profile card", "card component"] },
+      { name: "navbar", keywords: ["navbar", "navigation", "header", "menu", "nav", "navigation bar", "top bar"] },
+      { name: "modal", keywords: ["modal", "dialog", "popup", "overlay", "modal dialog", "lightbox"] },
+      { name: "button", keywords: ["button", "button group", "action button", "cta button", "button component"] },
+      { name: "sidebar", keywords: ["sidebar", "side navigation", "side menu", "drawer", "offcanvas"] },
+      { name: "tab", keywords: ["tab", "tabs", "tab panel", "tabbed interface", "tab navigation"] },
+      { name: "dropdown", keywords: ["dropdown", "select", "combobox", "dropdown menu", "select menu"] },
+      { name: "slider", keywords: ["slider", "range slider", "carousel", "image slider", "slideshow"] },
+      { name: "toggle", keywords: ["toggle", "switch", "checkbox", "radio", "radio button"] },
+      { name: "pagination", keywords: ["pagination", "page navigation", "pager"] },
+      { name: "alert", keywords: ["alert", "notification", "toast", "banner", "message"] },
+      { name: "avatar", keywords: ["avatar", "profile picture", "user icon"] },
+      { name: "badge", keywords: ["badge", "tag", "label", "pill", "status indicator"] },
+      { name: "breadcrumb", keywords: ["breadcrumb", "breadcrumb navigation", "path navigation"] },
+      { name: "chart", keywords: ["chart", "graph", "data visualization", "plot", "diagram"] },
+      { name: "footer", keywords: ["footer", "page footer", "site footer"] },
+      { name: "hero", keywords: ["hero", "hero section", "banner", "jumbotron"] },
+      { name: "accordion", keywords: ["accordion", "collapse", "expandable", "disclosure"] },
+      { name: "toast", keywords: ["toast", "toast notification", "snackbar"] },
+      { name: "tooltip", keywords: ["tooltip", "popover", "hover information"] },
+      { name: "calendar", keywords: ["calendar", "date picker", "datepicker", "date selector"] },
+      { name: "list", keywords: ["list", "list group", "item list", "list component"] }
     ];
     
     // Frameworks to look for
     const frameworks = [
       { name: "react", keywords: ["react", "reactjs", "react.js", "react component"] },
+      { name: "vue", keywords: ["vue", "vuejs", "vue.js", "vue component"] },
+      { name: "angular", keywords: ["angular", "angularjs", "angular component"] },
+      { name: "svelte", keywords: ["svelte", "sveltekit", "svelte component"] },
       { name: "tailwind", keywords: ["tailwind", "tailwindcss", "tailwind css"] }
     ];
     
     // Design systems to look for
     const designSystems = [
+      // General & Multi-Framework
       { name: "shadcn/ui", keywords: ["shadcn", "shadcn/ui", "shadcn ui"] },
+      { name: "preline-ui", keywords: ["preline", "preline ui", "preline-ui"] },
+      { name: "magic-ui", keywords: ["magic ui", "magic-ui", "magicui"] },
+      { name: "accenticity-ui", keywords: ["accenticity", "accenticity ui", "accenticity-ui"] },
+      { name: "eldora-ui", keywords: ["eldora", "eldora ui", "eldora-ui"] },
+      
+      // React-Focused
       { name: "material-ui", keywords: ["mui", "material ui", "material-ui"] },
-      { name: "tailwind-ui", keywords: ["tailwind ui", "tailwindui"] }
+      { name: "chakra-ui", keywords: ["chakra", "chakra ui", "chakra-ui"] },
+      { name: "ant-design", keywords: ["ant design", "antd", "ant-design"] },
+      { name: "mantine", keywords: ["mantine", "mantine ui"] },
+      
+      // Tailwind-Focused
+      { name: "tailwind-ui", keywords: ["tailwind ui", "tailwindui"] },
+      { name: "daisy-ui", keywords: ["daisy ui", "daisyui", "daisy-ui"] },
+      { name: "flowbite", keywords: ["flowbite", "flowbite ui", "flowbite-ui"] },
+      
+      // Other popular libraries
+      { name: "bootstrap", keywords: ["bootstrap", "react bootstrap", "bootstrap 5"] },
+      { name: "bulma", keywords: ["bulma", "bulma css", "bulma.io"] },
+      { name: "primereact", keywords: ["prime react", "primereact"] },
+      { name: "vuetify", keywords: ["vuetify", "vuetify.js"] }
     ];
     
     // Style preferences to look for
     const stylePreferences = [
-      { name: "white", keywords: ["white", "light", "bright", "clean", "clear"] },
-      { name: "dark", keywords: ["dark", "black", "night mode", "dark mode"] },
-      { name: "beautiful", keywords: ["beautiful", "pretty", "elegant", "attractive"] },
-      { name: "minimal", keywords: ["minimal", "minimalist", "simple", "clean"] }
+      { name: "white", keywords: ["white", "light", "bright", "clean", "clear", "minimal white"] },
+      { name: "dark", keywords: ["dark", "black", "night mode", "dark mode", "dark theme"] },
+      { name: "beautiful", keywords: ["beautiful", "pretty", "elegant", "attractive", "stunning", "gorgeous"] },
+      { name: "minimal", keywords: ["minimal", "minimalist", "simple", "clean", "sleek"] },
+      { name: "colorful", keywords: ["colorful", "vibrant", "multicolor", "rainbow", "vivid"] },
+      { name: "professional", keywords: ["professional", "business", "corporate", "enterprise"] },
+      { name: "modern", keywords: ["modern", "contemporary", "trendy", "fresh"] },
+      { name: "glassmorphism", keywords: ["glass", "glassmorphism", "frosted glass", "glass effect"] },
+      { name: "neumorphism", keywords: ["neumorphism", "soft ui", "neumorphic"] },
+      { name: "flat", keywords: ["flat", "flat design", "flat ui"] },
+      { name: "gradient", keywords: ["gradient", "gradients", "gradient background"] },
+      { name: "rounded", keywords: ["rounded", "rounded corners", "curved", "soft edges"] },
+      { name: "shadow", keywords: ["shadow", "shadows", "drop shadow", "box-shadow"] },
+      { name: "animated", keywords: ["animated", "animation", "animations", "motion", "transitions"] }
     ];
     
     // Find the best matching component type
@@ -183,7 +323,10 @@ export class EnhancedPerplexityUIScraper {
       styles,
       isFullStack: promptLower.includes("full stack") || 
                    promptLower.includes("fullstack") || 
-                   promptLower.includes("full-stack")
+                   promptLower.includes("full-stack") ||
+                   promptLower.includes("backend") ||
+                   promptLower.includes("back end") ||
+                   promptLower.includes("back-end")
     };
   }
   
@@ -221,7 +364,15 @@ export class EnhancedPerplexityUIScraper {
     // Base query elements
     const styleTerms = styles.join(" ");
     
-    // Create design system-specific queries if one was specified
+    // Step 1: Create framework-specific queries if a framework was specified
+    if (framework) {
+      queries.push(
+        `${framework} ${componentType} component code example${designSystem ? ' ' + designSystem : ''}${styleTerms ? ' ' + styleTerms : ''}`,
+        `${framework} ${componentType} implementation${designSystem ? ' ' + designSystem : ''}${styleTerms ? ' ' + styleTerms : ''}`
+      );
+    }
+    
+    // Step 2: Create design system-specific queries if one was specified
     if (designSystem) {
       // Find the source URL for the requested design system
       const designSource = this.designSources.find(source => 
@@ -232,34 +383,54 @@ export class EnhancedPerplexityUIScraper {
         // Create specific queries for this design system
         queries.push(
           `${designSource.url} ${componentType} component code example${styleTerms ? ' ' + styleTerms : ''}`,
-          `${designSystem} ${componentType} react component code${styleTerms ? ' ' + styleTerms : ''}`
+          `${designSystem} ${componentType} react component code${styleTerms ? ' ' + styleTerms : ''}`,
+          `${designSystem} ${componentType} implementation code${styleTerms ? ' ' + styleTerms : ''}`
         );
       }
     }
     
-    // Add framework-specific queries
-    if (framework) {
+    // Step 3: Add general high-quality design system queries
+    const targetLibraries = framework === 'react' ? this.reactLibraries :
+                           framework === 'vue' ? this.vueLibraries :
+                           framework === 'tailwind' ? this.tailwindLibraries :
+                           this.generalLibraries;
+    
+    // Get top design sources based on priority
+    const topSources = targetLibraries
+      .sort((a, b) => b.priority - a.priority)
+      .slice(0, 5);
+    
+    // Add queries for top design systems
+    for (const source of topSources) {
       queries.push(
-        `${framework} ${componentType} component code example${designSystem ? ' ' + designSystem : ''}${styleTerms ? ' ' + styleTerms : ''}`,
-        `${framework} ${componentType} implementation${designSystem ? ' ' + designSystem : ''}${styleTerms ? ' ' + styleTerms : ''}`
+        `${source.name} ${componentType} component code example${styleTerms ? ' ' + styleTerms : ''}`,
+        `${source.url} ${componentType} code example${styleTerms ? ' ' + styleTerms : ''}`
       );
     }
     
-    // Add general queries
+    // Step 4: Add generic queries that might find good examples
     queries.push(
       `best ${componentType} component designs with code${framework ? ' ' + framework : ''}${styleTerms ? ' ' + styleTerms : ''}`,
-      `${componentType} component code example${framework ? ' ' + framework : ''}${styleTerms ? ' ' + styleTerms : ''}`
+      `${componentType} component code example${framework ? ' ' + framework : ''}${styleTerms ? ' ' + styleTerms : ''}`,
+      `react ${componentType} component implementation${styleTerms ? ' ' + styleTerms : ''}`
+    );
+    
+    // Step 5: Add some repository/specific site queries
+    queries.push(
+      `github.com ${componentType} component${framework ? ' ' + framework : ''}${styleTerms ? ' ' + styleTerms : ''}`,
+      `codepen.io ${componentType} component${framework ? ' ' + framework : ''}${styleTerms ? ' ' + styleTerms : ''}`,
+      `uiverse.io ${componentType} component${styleTerms ? ' ' + styleTerms : ''}`
     );
     
     // Remove duplicates and return
-    return [...new Set(queries)].slice(0, 3); // Limit to top 3 queries
+    return [...new Set(queries)].slice(0, 3);
   }
   
   /**
    * Execute searches using Perplexity AI
    */
   private async executePerplexitySearches(queries: string[]): Promise<any[]> {
-    const results = [];
+    const results: any[] = [];
     
     for (const query of queries) {
       try {
@@ -275,7 +446,7 @@ export class EnhancedPerplexityUIScraper {
             result: searchResult
           });
         }
-      } catch (error) {
+      } catch (error: any) {
         console.warn(`Error executing search for query "${query}":`, error);
         // Continue with other queries even if one fails
       }
@@ -343,7 +514,7 @@ export class EnhancedPerplexityUIScraper {
       }
       
       return await response.json();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error calling Perplexity API:", error);
       throw new Error(`Failed to search with Perplexity: ${error}`);
     }
