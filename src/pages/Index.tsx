@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import { ArtifactProvider, ArtifactLayout } from "@/components/artifact/ArtifactSystem";
+import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -284,10 +285,7 @@ If you were trying to generate an app, this might be due to limits with our AI m
           <div className="flex-1 flex flex-col h-full overflow-hidden">
             <div className="h-14 border-b flex items-center px-4 justify-between">
               <div className="flex items-center">
-                <h1 className="text-lg font-medium text-gray-700">iblue</h1>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
+                <HamburgerMenuButton />
               </div>
               <div className="flex items-center text-sm text-gray-600">
                 <span className="mr-2">Saved memory full</span>
