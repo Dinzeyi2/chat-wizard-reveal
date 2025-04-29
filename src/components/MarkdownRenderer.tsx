@@ -11,19 +11,33 @@ interface MarkdownRendererProps {
 }
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message }) => {
-  // More robust detection for app generation content - check for JSON structure
+  // More robust detection for app generation content
   const isAppGeneration = React.useMemo(() => {
-    // First check for JSON block markers
-    if (content.includes("```json") && content.includes("```")) {
-      // Then check for key app generation indicators
-      return content.includes("projectName") && 
-             content.includes("files") && 
-             content.includes("description");
-    }
-    return false;
+    // Comprehensive check for app generation markers
+    const hasJsonBlocks = content.includes("```json") && content.includes("```");
+    const appKeywords = ["projectName", "files", "description"];
+    const keywordsPresent = appKeywords.filter(keyword => content.includes(keyword)).length;
+    
+    // Enhanced detection logic that's more lenient but still accurate
+    const hasDefinitiveJsonStructure = content.includes('"files":') && content.includes('"path":') && content.includes('"content":');
+    const hasCombinationIndicators = content.includes("generated") && content.includes("application") && content.includes("files");
+
+    console.info("App generation detection:", { 
+      hasJsonStructure: hasDefinitiveJsonStructure, 
+      hasJsonBlocks, 
+      keywordCount: keywordsPresent,
+      hasDefinitiveJsonStructure,
+      hasCombinationIndicators,
+      hasHighKeywordDensity: keywordsPresent >= 2,
+      isAppGen: (hasJsonBlocks && keywordsPresent >= 2) || hasDefinitiveJsonStructure || hasCombinationIndicators
+    });
+    
+    // Return true if multiple indicators are present
+    return (hasJsonBlocks && keywordsPresent >= 2) || hasDefinitiveJsonStructure || hasCombinationIndicators;
   }, [content]);
   
   if (message && isAppGeneration) {
+    console.info("Rendering AppGeneratorDisplay");
     return (
       <ArtifactProvider>
         <AppGeneratorDisplay message={message} />
