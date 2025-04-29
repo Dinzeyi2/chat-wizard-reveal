@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from "react";
 import { Message } from "@/types/chat";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Download, FileCode, ChevronRight, ChevronDown, ShoppingBag, Code, SquareDashed } from "lucide-react";
+import { Download, FileCode, ChevronRight, ChevronDown, ShoppingBag, Code, SquareDashed, History } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Accordion, 
@@ -13,6 +14,8 @@ import {
 } from "@/components/ui/accordion";
 import { useArtifact } from "./artifact/ArtifactSystem";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface GeneratedFile {
   path: string;
@@ -26,6 +29,7 @@ interface GeneratedApp {
   explanation?: string;
   technologies?: string[];
   projectId?: string;
+  version?: number;
 }
 
 interface AppGeneratorDisplayProps {
@@ -37,6 +41,10 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
   const [isOpen, setIsOpen] = useState(false);
   const { openArtifact } = useArtifact();
   const [appData, setAppData] = useState<GeneratedApp | null>(null);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [versionHistory, setVersionHistory] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const { toast } = useToast();
   
   useEffect(() => {
     const extractAppData = (): GeneratedApp | null => {
@@ -77,7 +85,8 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
                 description: jsonData.description || "Generated application files",
                 files: jsonData.files,
                 technologies: jsonData.technologies || [],
-                projectId: propProjectId || jsonData.projectId || null
+                projectId: propProjectId || jsonData.projectId || null,
+                version: jsonData.version || 1
               };
             }
           } catch (e) {
@@ -94,6 +103,100 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
     
     setAppData(extractAppData());
   }, [message, propProjectId]);
+  
+  useEffect(() => {
+    // Load version history when project ID is available and when showVersionHistory becomes true
+    if (showVersionHistory && (appData?.projectId || propProjectId)) {
+      fetchVersionHistory();
+    }
+  }, [showVersionHistory, appData?.projectId, propProjectId]);
+
+  // Function to fetch version history from Supabase
+  const fetchVersionHistory = async () => {
+    try {
+      setIsLoadingHistory(true);
+      const projectId = appData?.projectId || propProjectId;
+      
+      if (!projectId) {
+        console.error("No project ID available to fetch history");
+        return;
+      }
+      
+      // Fetch all versions of this project
+      const { data: versions, error } = await supabase
+        .from('app_projects')
+        .select('*')
+        .eq('id', projectId)
+        .order('version', { ascending: false });
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Also fetch versions where this project is a parent
+      const { data: childVersions, error: childError } = await supabase
+        .from('app_projects')
+        .select('*')
+        .eq('parent_id', projectId)
+        .order('version', { ascending: false });
+      
+      if (childError) {
+        throw childError;
+      }
+      
+      // Combine and sort all versions
+      const allVersions = [...(versions || []), ...(childVersions || [])];
+      allVersions.sort((a, b) => b.version - a.version);
+      
+      setVersionHistory(allVersions);
+    } catch (error) {
+      console.error("Error fetching version history:", error);
+      toast({
+        title: "Error fetching version history",
+        description: "Could not load project versions",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  // Function to handle restoring a specific version
+  const handleRestoreVersion = async (versionData: any) => {
+    try {
+      toast({
+        title: "Restoring version...",
+        description: `Restoring to version ${versionData.version}`,
+      });
+      
+      const { data, error } = await supabase.functions.invoke('restore-version', {
+        body: { 
+          projectId: versionData.id,
+        }
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Version restored",
+        description: `Successfully restored to version ${versionData.version}`,
+      });
+      
+      // Ask the user to submit a new message to see the restored version
+      toast({
+        title: "Ask the assistant",
+        description: "Send a message to see your restored application",
+      });
+      
+    } catch (error) {
+      console.error("Error restoring version:", error);
+      toast({
+        title: "Error restoring version",
+        description: "Could not restore to selected version",
+        variant: "destructive",
+      });
+    }
+  };
   
   // Improved and simplified function to extract code blocks from message content
   const extractCodeBlocks = () => {
@@ -413,7 +516,61 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
           ? "The changes you requested have been applied to your existing application."
           : appData.description}
         </p>
+        
+        {appData.version && (
+          <div className="flex items-center gap-2 mt-2">
+            <Badge variant="outline" className="text-xs font-normal">
+              Version {appData.version}
+            </Badge>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 px-2 text-xs"
+              onClick={() => setShowVersionHistory(!showVersionHistory)}
+            >
+              <History className="h-3 w-3 mr-1" />
+              {showVersionHistory ? "Hide History" : "Version History"}
+            </Button>
+          </div>
+        )}
       </div>
+      
+      {showVersionHistory && (
+        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+          <h4 className="font-medium mb-2">Version History</h4>
+          {isLoadingHistory ? (
+            <p className="text-sm text-gray-500">Loading version history...</p>
+          ) : versionHistory.length === 0 ? (
+            <p className="text-sm text-gray-500">No version history available</p>
+          ) : (
+            <ScrollArea className="h-[200px]">
+              <div className="space-y-2">
+                {versionHistory.map((version, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 border-b border-gray-100 last:border-0">
+                    <div>
+                      <p className="text-sm font-medium">Version {version.version}</p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(version.created_at).toLocaleDateString()} {new Date(version.created_at).toLocaleTimeString()}
+                      </p>
+                      {version.modification_prompt && (
+                        <p className="text-xs text-gray-600 mt-1 italic">"{version.modification_prompt.substring(0, 50)}..."</p>
+                      )}
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-7"
+                      onClick={() => handleRestoreVersion(version)}
+                    >
+                      Restore
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </div>
+      )}
       
       <div className="bg-white border border-gray-200 rounded-full shadow-sm p-4 flex items-center justify-between">
         <div className="flex items-center">
