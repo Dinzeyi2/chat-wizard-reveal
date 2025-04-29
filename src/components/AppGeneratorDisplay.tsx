@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/accordion";
 import { useArtifact } from "./artifact/ArtifactSystem";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 interface GeneratedFile {
   path: string;
@@ -36,14 +37,21 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   const [isOpen, setIsOpen] = useState(false);
   const { openArtifact } = useArtifact();
   const [appData, setAppData] = useState<GeneratedApp | null>(null);
+  const { toast } = useToast();
   
   useEffect(() => {
     // Extract and parse app data when the component mounts or message changes
     const extractAppData = (): GeneratedApp | null => {
       try {
         // Enhanced JSON extraction with multiple regex patterns for robustness
-        const jsonRegex = /```json([\s\S]*?)```/;
-        const appDataMatch = message.content.match(jsonRegex);
+        let jsonRegex = /```json([\s\S]*?)```/;
+        let appDataMatch = message.content.match(jsonRegex);
+        
+        if (!appDataMatch) {
+          // Try alternative pattern without json tag
+          jsonRegex = /```([\s\S]*?)```/;
+          appDataMatch = message.content.match(jsonRegex);
+        }
         
         if (appDataMatch && appDataMatch[1]) {
           const jsonText = appDataMatch[1].trim();
@@ -52,17 +60,31 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
           try {
             const jsonData = JSON.parse(jsonText);
             
-            // Validate that this is actually app data with required fields
-            if (jsonData && 
-                typeof jsonData.projectName === 'string' && 
-                typeof jsonData.description === 'string' && 
-                Array.isArray(jsonData.files)) {
-              console.log("Successfully parsed app data with", jsonData.files.length, "files");
-              return jsonData;
-            } else {
-              console.error("Invalid JSON structure:", jsonData);
-              return null;
+            // More permissive validation
+            if (jsonData) {
+              // Check if it has project name or equivalent
+              const projectName = jsonData.projectName || jsonData.name || "Generated App";
+              
+              // Check for description
+              const description = jsonData.description || "Generated application";
+              
+              // Check for files array
+              const files = jsonData.files || [];
+              
+              if (files.length > 0) {
+                console.log("Successfully parsed app data with", files.length, "files");
+                return {
+                  projectName: projectName,
+                  description: description,
+                  files: files,
+                  technologies: jsonData.technologies || [],
+                  explanation: jsonData.explanation || ""
+                };
+              }
             }
+            
+            console.error("Invalid JSON structure:", jsonData);
+            return null;
           } catch (parseError) {
             console.error("JSON parse error:", parseError);
             return null;
@@ -101,6 +123,11 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
     
     if (!appData || !appData.files || appData.files.length === 0) {
       console.error("Cannot open artifact: No files available");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No files available to view"
+      });
       return;
     }
     
@@ -112,7 +139,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
       content: file.content
     }));
 
-    console.log(`Opening artifact with files: ${artifactFiles.length}`);
+    console.log(`Opening artifact with ${artifactFiles.length} files`);
     
     try {
       openArtifact({
@@ -121,8 +148,19 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
         description: appData.description,
         files: artifactFiles
       });
+      
+      // Visual feedback
+      toast({
+        title: "Code Viewer",
+        description: `Opened ${artifactFiles.length} files for ${appData.projectName}`
+      });
     } catch (error) {
       console.error("Error opening artifact:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to open code: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
     }
   };
 
@@ -221,18 +259,16 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
         <p className="text-gray-600">{appData.description}</p>
       </div>
       
-      <div 
-        className="bg-white border border-gray-200 rounded-full shadow-sm p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+      <Button
+        className="w-full bg-blue-600 hover:bg-blue-700 flex items-center justify-between py-6"
         onClick={handleViewFullProject}
-        role="button"
-        aria-label="View code"
       >
         <div className="flex items-center">
-          <SquareDashed className="mr-3 h-5 w-5 text-gray-500" />
+          <Code className="mr-3 h-5 w-5" />
           <span className="font-medium text-lg">View code</span>
         </div>
-        <ChevronRight className="h-5 w-5 text-gray-400" />
-      </div>
+        <ChevronRight className="h-5 w-5" />
+      </Button>
       
       <div className="space-y-4">
         <h4 className="font-semibold">This application includes:</h4>
@@ -242,7 +278,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
               <span className="font-medium">{appData.files.length} files</span> organized in a structured project
             </li>
           )}
-          {appData.technologies && (
+          {appData.technologies && appData.technologies.length > 0 && (
             <li>
               <span className="font-medium">Technologies used:</span> {appData.technologies.join(', ')}
             </li>

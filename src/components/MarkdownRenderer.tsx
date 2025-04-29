@@ -11,32 +11,39 @@ interface MarkdownRendererProps {
 }
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message }) => {
-  // More robust detection for app generation content - check for JSON structure
+  // Much more reliable app generation detection
   const isAppGeneration = React.useMemo(() => {
-    // First check for JSON block markers
-    if (content.includes("```json") && content.includes("```")) {
-      try {
-        // Extract JSON content
-        const jsonRegex = /```json([\s\S]*?)```/;
-        const jsonMatch = content.match(jsonRegex);
-        
-        if (jsonMatch && jsonMatch[1]) {
-          const jsonText = jsonMatch[1].trim();
-          // Try to parse it
-          const jsonData = JSON.parse(jsonText);
-          
-          // Then check for key app generation indicators
-          return jsonData && 
-                 typeof jsonData.projectName === 'string' && 
-                 typeof jsonData.description === 'string' && 
-                 Array.isArray(jsonData.files);
-        }
-      } catch (error) {
-        console.error("Error parsing JSON in markdown:", error);
-        return false;
-      }
-    }
-    return false;
+    // Check for app generation indicators
+    const appKeywords = [
+      "full-stack application", 
+      "generated a", 
+      "generated an app",
+      "app generation", 
+      "created an application",
+      "built an application"
+    ];
+    
+    const hasAppKeywords = appKeywords.some(keyword => 
+      content.toLowerCase().includes(keyword.toLowerCase())
+    );
+    
+    // Look for JSON structure - more permissive pattern matching
+    const hasJsonBlock = content.includes("```json") && content.includes("```");
+    
+    // Check for project structure indicators
+    const hasFiles = content.includes('"files":') || content.includes('"path":');
+    
+    // Combined check - either clear keywords or JSON with files
+    const isAppGen = (hasAppKeywords && hasJsonBlock) || (hasJsonBlock && hasFiles);
+    
+    console.log("App generation detection:", { 
+      hasAppKeywords, 
+      hasJsonBlock, 
+      hasFiles, 
+      isAppGen 
+    });
+    
+    return isAppGen;
   }, [content]);
   
   if (message && isAppGeneration) {
