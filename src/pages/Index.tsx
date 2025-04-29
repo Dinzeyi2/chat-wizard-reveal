@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -7,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
-import { ArtifactProvider } from "@/components/artifact/ArtifactSystem";
+import { ArtifactProvider, ArtifactLayout } from "@/components/artifact/ArtifactSystem";
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
