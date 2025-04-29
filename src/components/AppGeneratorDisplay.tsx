@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Message } from "@/types/chat";
 import { Button } from "@/components/ui/button";
@@ -86,118 +85,94 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
     setAppData(extractAppData());
   }, [message]);
   
-  const createFallbackArtifact = () => {
-    // Create a more robust fallback artifact that will always work
-    // Extract any code blocks from the message to create files
+  const extractCodeBlocks = () => {
+    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)\n```/g;
+    const codeFiles = [];
+    let match;
+    let index = 0;
     
-    const extractCodeBlocks = () => {
-      const codeBlockRegex = /```(\w+)?\n([\s\S]*?)\n```/g;
-      const codeFiles = [];
-      let match;
-      let index = 0;
+    while ((match = codeBlockRegex.exec(message.content)) !== null) {
+      const language = match[1] || 'plaintext';
+      const content = match[2].trim();
       
-      while ((match = codeBlockRegex.exec(message.content)) !== null) {
-        const language = match[1] || 'plaintext';
-        const content = match[2].trim();
-        
-        // Skip if it's JSON we already tried to parse
-        if (language.toLowerCase() === 'json' && content.includes('"files"') && content.includes('"projectName"')) {
-          continue;
-        }
-        
-        codeFiles.push({
-          id: `file-${index++}`,
-          name: `file-${index}.${getExtensionFromLanguage(language)}`,
-          path: `file-${index}.${getExtensionFromLanguage(language)}`,
-          language: language,
-          content: content
-        });
+      // Skip if it's JSON we already tried to parse
+      if (language.toLowerCase() === 'json' && content.includes('"files"') && content.includes('"projectName"')) {
+        continue;
       }
       
-      // If no code blocks found, create a single file with the message content
-      if (codeFiles.length === 0) {
-        codeFiles.push({
-          id: "raw-content",
-          name: "content.md",
-          path: "content.md",
-          language: "markdown",
-          content: message.content
-        });
-      }
-      
-      return codeFiles;
+      codeFiles.push({
+        id: `file-${index++}`,
+        name: `file-${index}.${getExtensionFromLanguage(language)}`,
+        path: `file-${index}.${getExtensionFromLanguage(language)}`,
+        language: language,
+        content: content
+      });
+    }
+    
+    // If no code blocks found, create a single file with the message content
+    if (codeFiles.length === 0) {
+      codeFiles.push({
+        id: "raw-content",
+        name: "content.md",
+        path: "content.md",
+        language: "markdown",
+        content: message.content
+      });
+    }
+    
+    return codeFiles;
+  };
+  
+  const getExtensionFromLanguage = (lang: string) => {
+    const langMap: Record<string, string> = {
+      'javascript': 'js',
+      'typescript': 'ts',
+      'jsx': 'jsx',
+      'tsx': 'tsx',
+      'html': 'html',
+      'css': 'css',
+      'json': 'json',
+      'markdown': 'md',
+      'plaintext': 'txt'
     };
     
-    const getExtensionFromLanguage = (lang: string) => {
-      const langMap: Record<string, string> = {
-        'javascript': 'js',
-        'typescript': 'ts',
-        'jsx': 'jsx',
-        'tsx': 'tsx',
-        'html': 'html',
-        'css': 'css',
-        'json': 'json',
-        'markdown': 'md',
-        'plaintext': 'txt'
-      };
-      
-      return langMap[lang.toLowerCase()] || 'txt';
-    };
-    
-    const projectTitle = message.content.split('\n')[0].replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 30) || "Generated Application";
-    
-    return {
-      id: `artifact-${Date.now()}`,
-      title: projectTitle,
-      description: "Application content extracted from message",
-      files: extractCodeBlocks()
-    };
+    return langMap[lang.toLowerCase()] || 'txt';
   };
 
-  // FIXED: This function now always opens an artifact viewer regardless of data format
   const handleViewFullProject = () => {
-    try {
-      console.log("Opening artifact viewer...");
-      
-      // First attempt - use the parsed app data if available
-      if (appData && appData.files && appData.files.length > 0) {
-        console.log("Using parsed app data for artifact");
-        const artifactFiles = appData.files.map((file, index) => ({
+    console.log("Opening artifact viewer - simplified approach");
+    
+    // Create a guaranteed artifact that will always work
+    const artifactId = `artifact-${Date.now()}`;
+    const projectTitle = appData?.projectName || "Generated Application";
+    
+    // Create files array - either from parsed appData or directly from message content
+    const files = appData?.files?.length > 0 
+      ? appData.files.map((file, index) => ({
           id: `file-${index}`,
-          name: file.path.split('/').pop() || file.path,
+          name: file.path.split('/').pop() || `file-${index}`,
           path: file.path,
           language: getLanguageFromPath(file.path),
           content: file.content
-        }));
-
-        openArtifact({
-          id: `artifact-${Date.now()}`,
-          title: appData.projectName,
-          description: appData.description,
-          files: artifactFiles
-        });
-      } else {
-        // Fallback - extract code blocks directly from the message
-        console.log("Using fallback artifact creation");
-        openArtifact(createFallbackArtifact());
-      }
-    } catch (error) {
-      console.error("Error opening artifact, using ultimate fallback:", error);
-      // Ultimate fallback - always open something even if all else fails
-      const simpleArtifact = {
-        id: `artifact-emergency-${Date.now()}`,
-        title: "Generated Code",
-        description: "Code extracted from message",
-        files: [{
-          id: "content-file",
-          name: "content.md",
-          path: "content.md",
-          language: "markdown",
-          content: message.content
-        }]
-      };
-      openArtifact(simpleArtifact);
-    }
+        }))
+      : extractCodeBlocks();
+        
+    // Always create a valid artifact
+    const artifact = {
+      id: artifactId,
+      title: projectTitle,
+      description: appData?.description || "Generated code",
+      files: files.length > 0 ? files : [{
+        id: "content-file",
+        name: "content.md",
+        path: "content.md",
+        language: "markdown",
+        content: message.content
+      }]
+    };
+    
+    // Open the artifact
+    openArtifact(artifact);
   };
 
   const handleDownload = () => {
