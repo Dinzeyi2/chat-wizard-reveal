@@ -12,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
+import { UICodeGenerator } from "@/utils/UICodeGenerator";
 
 export function UiScraperDemo() {
   // State for API key and prompt
@@ -22,6 +23,9 @@ export function UiScraperDemo() {
   
   // State for demo mode (using Supabase Edge Functions instead of direct API calls)
   const [demoMode, setDemoMode] = useState(true);
+  
+  // State for UI Code Generator
+  const [generationResult, setGenerationResult] = useState<any>(null);
   
   // Use the UI scraper hook
   const { 
@@ -82,6 +86,7 @@ export function UiScraperDemo() {
           // Set the active tab to "customized" to show the customized design if successful
           if (customizedData && customizedData.success) {
             setActiveTab("customized");
+            setGenerationResult(customizedData);
             
             toast({
               title: "Design Customized",
@@ -100,16 +105,39 @@ export function UiScraperDemo() {
           return;
         }
         
-        // Find design code with Perplexity
-        const designResult = await findDesignCode(prompt, perplexityApiKey);
+        if (!claudeApiKey) {
+          toast({
+            title: "API Key Required",
+            description: "Please enter your Claude API key for customization",
+            variant: "destructive"
+          });
+          return;
+        }
         
-        // Set the active tab to "original" to show the found design
-        setActiveTab("original");
+        // Use the integrated UICodeGenerator
+        const generator = new UICodeGenerator({
+          perplexityApiKey,
+          claudeApiKey,
+          debug: true
+        });
         
-        // If Claude API key is provided, also customize the design
-        if (designResult && designResult.success && claudeApiKey) {
-          await customizeDesignCode(designResult, claudeApiKey);
+        toast({
+          title: "Generating UI Code",
+          description: "Searching and customizing design...",
+        });
+        
+        const result = await generator.generateCode(prompt);
+        
+        if (result.success) {
+          setGenerationResult(result);
           setActiveTab("customized");
+          
+          toast({
+            title: "Code Generation Complete",
+            description: `Created ${result.metadata?.componentType || 'component'} code`,
+          });
+        } else {
+          throw new Error(result.error || "Failed to generate code");
         }
       }
     } catch (err: any) {
@@ -168,7 +196,7 @@ export function UiScraperDemo() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="claudeApiKey">Claude API Key (Optional)</Label>
+                  <Label htmlFor="claudeApiKey">Claude API Key</Label>
                   <Input
                     id="claudeApiKey"
                     type="password"
@@ -212,7 +240,7 @@ export function UiScraperDemo() {
                   ) : (
                     <>
                       <Search className="mr-2 h-4 w-4" />
-                      Find Design
+                      Generate UI Code
                     </>
                   )}
                 </Button>
@@ -222,18 +250,20 @@ export function UiScraperDemo() {
         </CardContent>
       </Card>
 
-      {(result?.success || customizedResult?.success) && (
+      {((result?.success || customizedResult?.success) || generationResult?.success) && (
         <Card>
           <CardHeader>
             <CardTitle>Design Results</CardTitle>
             <CardDescription>
-              {result?.requirements?.componentType ? (
+              {generationResult?.metadata?.componentType ? (
+                <>Generated {generationResult.metadata.componentType} component</>
+              ) : result?.requirements?.componentType ? (
                 <>Found {result.requirements.componentType} component</>
               ) : (
                 <>Found component code</>
               )}
-              {result?.requirements?.designSystem && (
-                <> using {result.requirements.designSystem}</>
+              {(result?.requirements?.designSystem || generationResult?.metadata?.designSystem) && (
+                <> using {result?.requirements?.designSystem || generationResult?.metadata?.designSystem}</>
               )}
             </CardDescription>
           </CardHeader>
@@ -244,7 +274,7 @@ export function UiScraperDemo() {
                   <Code className="mr-2 h-4 w-4" />
                   Original
                 </TabsTrigger>
-                <TabsTrigger value="customized" disabled={!customizedResult?.success}>
+                <TabsTrigger value="customized" disabled={!(customizedResult?.success || generationResult?.success)}>
                   <Sparkles className="mr-2 h-4 w-4" />
                   Customized
                 </TabsTrigger>
@@ -263,28 +293,28 @@ export function UiScraperDemo() {
               </TabsContent>
               
               <TabsContent value="customized">
-                {customizedResult?.success ? (
+                {(customizedResult?.success || generationResult?.success) ? (
                   <div className="space-y-4">
                     <div>
                       <h3 className="text-lg font-medium">Frontend Code</h3>
                       <ScrollArea className="h-[300px] w-full rounded-md">
-                        {formatCode(customizedResult.customizedCode?.frontend)}
+                        {formatCode(generationResult?.result?.code?.frontend || customizedResult?.customizedCode?.frontend)}
                       </ScrollArea>
                     </div>
                     
-                    {customizedResult.customizedCode?.backend && (
+                    {(generationResult?.result?.code?.backend || customizedResult?.customizedCode?.backend) && (
                       <div>
                         <h3 className="text-lg font-medium">Backend Code</h3>
                         <ScrollArea className="h-[200px] w-full rounded-md">
-                          {formatCode(customizedResult.customizedCode.backend)}
+                          {formatCode(generationResult?.result?.code?.backend || customizedResult?.customizedCode?.backend)}
                         </ScrollArea>
                       </div>
                     )}
                     
-                    {customizedResult.explanation && (
+                    {(generationResult?.result?.explanation || customizedResult?.explanation) && (
                       <div className="mt-4 p-4 bg-gray-50 rounded-md">
                         <h3 className="text-lg font-medium mb-2">Explanation</h3>
-                        <p className="text-gray-700">{customizedResult.explanation}</p>
+                        <p className="text-gray-700">{generationResult?.result?.explanation || customizedResult?.explanation}</p>
                       </div>
                     )}
                   </div>
@@ -306,7 +336,7 @@ export function UiScraperDemo() {
               // Copy code to clipboard
               const codeToCopy = activeTab === 'original' 
                 ? result?.code 
-                : customizedResult?.customizedCode?.frontend;
+                : (generationResult?.result?.code?.frontend || customizedResult?.customizedCode?.frontend);
               
               if (codeToCopy) {
                 navigator.clipboard.writeText(codeToCopy);
