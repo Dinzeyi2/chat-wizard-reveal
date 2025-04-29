@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -101,7 +100,7 @@ export function UiScraperDemo() {
         }
         
         // Find design code with Perplexity
-        const designResult = await findDesignCode(prompt, { perplexity: perplexityApiKey });
+        const designResult = await findDesignCode(prompt, perplexityApiKey);
         
         // Set the active tab to "original" to show the found design
         setActiveTab("original");
