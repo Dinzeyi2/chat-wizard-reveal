@@ -9,7 +9,6 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ChatHistory from "./pages/ChatHistory";
 import "./components/artifact/ArtifactSystem.css";
-import SignUpForm from './components/SignUpForm';
 
 const App = () => {
   // Create a client
@@ -24,7 +23,6 @@ const App = () => {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/history" element={<ChatHistory />} />
-            <Route path="/signup" element={<SignUpForm />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
