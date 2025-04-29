@@ -4,7 +4,32 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Link, useNavigate } from "react-router-dom";
-import { PlusIcon, Search, ArrowLeft } from "lucide-react";
+import { PlusIcon, Search, ArrowLeft, MoreVertical } from "lucide-react";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "@/hooks/use-toast";
 
 interface ChatHistoryItem {
   id: string;
@@ -17,6 +42,11 @@ const ChatHistory = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatHistoryItem[]>([]);
   const navigate = useNavigate();
+  
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedChat, setSelectedChat] = useState<ChatHistoryItem | null>(null);
+  const [newTitle, setNewTitle] = useState("");
   
   // Load chat history from localStorage when component mounts
   useEffect(() => {
@@ -48,6 +78,47 @@ const ChatHistory = () => {
   const handleNewChat = () => {
     // Navigate to the home page without any chat ID parameter to start fresh
     navigate('/');
+  };
+  
+  const openRenameDialog = (chat: ChatHistoryItem) => {
+    setSelectedChat(chat);
+    setNewTitle(chat.title);
+    setIsRenameDialogOpen(true);
+  };
+  
+  const openDeleteDialog = (chat: ChatHistoryItem) => {
+    setSelectedChat(chat);
+    setIsDeleteDialogOpen(true);
+  };
+  
+  const handleRename = () => {
+    if (selectedChat && newTitle.trim()) {
+      const updatedHistory = chatHistory.map(chat => 
+        chat.id === selectedChat.id ? { ...chat, title: newTitle.trim() } : chat
+      );
+      
+      setChatHistory(updatedHistory);
+      localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
+      setIsRenameDialogOpen(false);
+      toast({
+        title: "Chat renamed",
+        description: "Chat title has been updated successfully.",
+      });
+    }
+  };
+  
+  const handleDelete = () => {
+    if (selectedChat) {
+      const updatedHistory = chatHistory.filter(chat => chat.id !== selectedChat.id);
+      
+      setChatHistory(updatedHistory);
+      localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
+      setIsDeleteDialogOpen(false);
+      toast({
+        title: "Chat deleted",
+        description: "Chat has been deleted successfully.",
+      });
+    }
   };
 
   // Mock data for chat history
@@ -130,16 +201,93 @@ const ChatHistory = () => {
       
       <div className="space-y-4">
         {filteredChats.map(chat => (
-          <Card 
-            key={chat.id} 
-            className="cursor-pointer hover:bg-gray-50 p-4 transition-colors"
-            onClick={() => handleChatSelection(chat.id)}
-          >
-            <h2 className="font-medium text-gray-800">{chat.title}</h2>
-            <p className="text-sm text-gray-500">{chat.lastMessage}</p>
-          </Card>
+          <ContextMenu key={chat.id}>
+            <ContextMenuTrigger>
+              <Card 
+                className="cursor-pointer hover:bg-gray-50 p-4 transition-colors relative"
+                onClick={() => handleChatSelection(chat.id)}
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h2 className="font-medium text-gray-800">{chat.title}</h2>
+                    <p className="text-sm text-gray-500">{chat.lastMessage}</p>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 rounded-full"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // We don't need to do anything here as the context menu will handle this
+                    }}
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </div>
+              </Card>
+            </ContextMenuTrigger>
+            <ContextMenuContent className="min-w-[160px]">
+              <ContextMenuItem onClick={() => openRenameDialog(chat)}>
+                Rename
+              </ContextMenuItem>
+              <ContextMenuItem 
+                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                onClick={() => openDeleteDialog(chat)}
+              >
+                Delete
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
         ))}
       </div>
+      
+      {/* Rename Dialog */}
+      <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename chat</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this chat conversation.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="Chat title"
+            className="mt-2"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRenameDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRename}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this chat
+              and remove all associated conversation data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
