@@ -78,20 +78,33 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   };
   
   const handleViewFullProject = () => {
-    const artifactFiles = appData.files.map((file, index) => ({
-      id: `file-${index}`,
-      name: file.path.split('/').pop() || file.path,
-      path: file.path,
-      language: getLanguageFromPath(file.path),
-      content: file.content
-    }));
+    console.log("Opening artifact...");
+    
+    if (!appData || !appData.files || appData.files.length === 0) {
+      console.error("No files to display in artifact");
+      return;
+    }
+    
+    try {
+      const artifactFiles = appData.files.map((file, index) => ({
+        id: `file-${index}`,
+        name: file.path.split('/').pop() || file.path,
+        path: file.path,
+        language: getLanguageFromPath(file.path),
+        content: file.content
+      }));
 
-    openArtifact({
-      id: `artifact-${Date.now()}`,
-      title: appData.projectName,
-      description: appData.description,
-      files: artifactFiles
-    });
+      console.log("Opening artifact with files:", artifactFiles.length);
+      
+      openArtifact({
+        id: `artifact-${Date.now()}`,
+        title: appData.projectName,
+        description: appData.description,
+        files: artifactFiles
+      });
+    } catch (error) {
+      console.error("Error opening artifact:", error);
+    }
   };
 
   const handleDownload = () => {
