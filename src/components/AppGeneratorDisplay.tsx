@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from "react";
 import { Message } from "@/types/chat";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Download, FileCode, ChevronRight, ChevronDown, ShoppingBag, Code, SquareDashed } from "lucide-react";
+import { Download, FileCode, ChevronRight, ChevronDown, ShoppingBag, Code, SquareDashed, Eye } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Accordion, 
@@ -40,47 +39,80 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   const { toast } = useToast();
   
   useEffect(() => {
-    // Extract and parse app data when the component mounts or message changes
     const extractAppData = (): GeneratedApp | null => {
       try {
-        // Enhanced JSON extraction with multiple regex patterns for robustness
-        let jsonRegex = /```json([\s\S]*?)```/;
-        let appDataMatch = message.content.match(jsonRegex);
+        let jsonMatch = null;
+        let jsonText = "";
         
-        if (!appDataMatch) {
-          // Try alternative pattern without json tag
-          jsonRegex = /```([\s\S]*?)```/;
-          appDataMatch = message.content.match(jsonRegex);
+        const jsonPattern1 = /```json([\s\S]*?)```/;
+        jsonMatch = message.content.match(jsonPattern1);
+        
+        if (!jsonMatch) {
+          const jsonPattern2 = /```([\s\S]*?)```/;
+          jsonMatch = message.content.match(jsonPattern2);
         }
         
-        if (appDataMatch && appDataMatch[1]) {
-          const jsonText = appDataMatch[1].trim();
-          console.log("Found JSON text:", jsonText.substring(0, 100) + "...");
+        if (!jsonMatch) {
+          const jsonPattern3 = /\{[\s\S]*?"files"[\s\S]*?\}/;
+          jsonMatch = message.content.match(jsonPattern3);
+        }
+        
+        if (jsonMatch && jsonMatch[1]) {
+          jsonText = jsonMatch[1].trim();
+        } else if (jsonMatch) {
+          jsonText = jsonMatch[0].trim();
+        } else {
+          const startIndex = message.content.indexOf('{');
+          const endIndex = message.content.lastIndexOf('}');
           
+          if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+            jsonText = message.content.substring(startIndex, endIndex + 1);
+          }
+        }
+        
+        console.log("Extracted JSON text:", jsonText.substring(0, 100) + (jsonText.length > 100 ? "..." : ""));
+        
+        if (jsonText) {
           try {
             const jsonData = JSON.parse(jsonText);
             
-            // More permissive validation
             if (jsonData) {
-              // Check if it has project name or equivalent
               const projectName = jsonData.projectName || jsonData.name || "Generated App";
-              
-              // Check for description
               const description = jsonData.description || "Generated application";
               
-              // Check for files array
-              const files = jsonData.files || [];
-              
-              if (files.length > 0) {
-                console.log("Successfully parsed app data with", files.length, "files");
-                return {
-                  projectName: projectName,
-                  description: description,
-                  files: files,
-                  technologies: jsonData.technologies || [],
-                  explanation: jsonData.explanation || ""
-                };
+              let files = [];
+              if (Array.isArray(jsonData.files)) {
+                files = jsonData.files;
+              } else if (jsonData.fileStructure) {
+                const fileStructure = jsonData.fileStructure;
+                files = [];
+                Object.keys(fileStructure).forEach(category => {
+                  if (Array.isArray(fileStructure[category])) {
+                    fileStructure[category].forEach((path: string) => {
+                      files.push({ path, content: "// Content not available" });
+                    });
+                  }
+                });
               }
+              
+              if (files.length === 0) {
+                console.warn("No files found in JSON data, using empty structure");
+                files = [
+                  { 
+                    path: "src/App.jsx", 
+                    content: "// This is a placeholder file. The actual content couldn't be extracted." 
+                  }
+                ];
+              }
+              
+              console.log("Successfully parsed app data with", files.length, "files");
+              return {
+                projectName,
+                description,
+                files,
+                technologies: jsonData.technologies || [],
+                explanation: jsonData.explanation || ""
+              };
             }
             
             console.error("Invalid JSON structure:", jsonData);
@@ -99,13 +131,33 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
     
     const data = extractAppData();
     setAppData(data);
-    console.log("App data extracted:", data ? "success" : "failed");
+    console.log("App data extraction result:", data ? "success" : "failed");
   }, [message]);
   
-  // If data couldn't be parsed, return the raw message
   if (!appData) {
-    console.error("Could not parse app data from message");
-    return <div className="whitespace-pre-wrap">{message.content}</div>;
+    console.error("Could not parse app data from message, falling back to simple display");
+    return (
+      <div className="my-6">
+        <h3 className="text-xl font-semibold mb-4">Generated Application</h3>
+        <Button
+          className="w-full bg-blue-600 hover:bg-blue-700 flex items-center justify-between py-6 mb-4"
+          onClick={() => {
+            toast({
+              title: "Error",
+              description: "Unable to parse application data. Please try generating the app again.",
+              variant: "destructive"
+            });
+          }}
+        >
+          <div className="flex items-center">
+            <Code className="mr-3 h-5 w-5" />
+            <span className="font-medium text-lg">View code</span>
+          </div>
+          <ChevronRight className="h-5 w-5" />
+        </Button>
+        <div className="whitespace-pre-wrap">{message.content}</div>
+      </div>
+    );
   }
 
   const appIcon = () => {
@@ -131,17 +183,22 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
       return;
     }
     
-    const artifactFiles = appData.files.map((file, index) => ({
-      id: `file-${index}`,
-      name: file.path.split('/').pop() || file.path,
-      path: file.path,
-      language: getLanguageFromPath(file.path),
-      content: file.content
-    }));
-
-    console.log(`Opening artifact with ${artifactFiles.length} files`);
-    
     try {
+      const artifactFiles = appData.files.map((file, index) => {
+        const path = file.path || `file-${index}.txt`;
+        const content = file.content || "// Content not available";
+        
+        return {
+          id: `file-${index}`,
+          name: path.split('/').pop() || `file-${index}`,
+          path: path,
+          language: getLanguageFromPath(path),
+          content: content
+        };
+      });
+
+      console.log(`Opening artifact with ${artifactFiles.length} files`);
+      
       openArtifact({
         id: `artifact-${Date.now()}`,
         title: appData.projectName,
@@ -149,7 +206,6 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
         files: artifactFiles
       });
       
-      // Visual feedback
       toast({
         title: "Code Viewer",
         description: `Opened ${artifactFiles.length} files for ${appData.projectName}`
@@ -264,6 +320,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
         onClick={handleViewFullProject}
       >
         <div className="flex items-center">
+          <Eye className="mr-2 h-5 w-5" />
           <Code className="mr-3 h-5 w-5" />
           <span className="font-medium text-lg">View code</span>
         </div>
