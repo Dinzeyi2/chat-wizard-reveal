@@ -11,62 +11,19 @@ interface MarkdownRendererProps {
 }
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message }) => {
-  // More reliable app generation detection with broader patterns
+  // More robust detection for app generation content - check for JSON structure
   const isAppGeneration = React.useMemo(() => {
-    // Skip detection if no content or message
-    if (!content || !message) return false;
-    
-    // Direct indicators - any of these strongly suggests app generation
-    const hasJsonStructure = content.includes('"files":') || 
-                             content.includes('"projectName":') || 
-                             (content.includes('"path":') && content.includes('"content":'));
-    
-    // Check for JSON blocks - common in app generation
-    const hasJsonBlocks = content.includes("```json") || 
-                          (content.includes("```") && hasJsonStructure);
-    
-    // Check for app-related phrases and keywords
-    const appKeywordPhrases = [
-      "generated", "created", "built", "developed",
-      "full-stack", "application", "app", "website", "web app", 
-      "project", "codebase", "code structure"
-    ];
-    
-    // Count how many app-related keywords appear in the content
-    const keywordCount = appKeywordPhrases.filter(keyword => 
-      content.toLowerCase().includes(keyword.toLowerCase())
-    ).length;
-    
-    // Strong detection logic:
-    // 1. Clear JSON structure with files/paths is definitely app generation
-    const hasDefinitiveJsonStructure = hasJsonStructure && 
-                                      (content.includes('"files":') || 
-                                       (content.includes('"path":') && content.includes('"content":')));
-    
-    // 2. JSON blocks with app-related keywords
-    const hasCombinationIndicators = hasJsonBlocks && keywordCount >= 2;
-    
-    // 3. High density of app-generation keywords
-    const hasHighKeywordDensity = keywordCount >= 4;
-    
-    // Log information for debugging
-    const isAppGen = hasDefinitiveJsonStructure || hasCombinationIndicators || hasHighKeywordDensity;
-    
-    console.log("App generation detection:", { 
-      hasJsonStructure, 
-      hasJsonBlocks, 
-      keywordCount,
-      hasDefinitiveJsonStructure,
-      hasCombinationIndicators,
-      hasHighKeywordDensity,
-      isAppGen 
-    });
-    
-    return isAppGen;
-  }, [content, message]);
+    // First check for JSON block markers
+    if (content.includes("```json") && content.includes("```")) {
+      // Then check for key app generation indicators
+      return content.includes("projectName") && 
+             content.includes("files") && 
+             content.includes("description");
+    }
+    return false;
+  }, [content]);
   
   if (message && isAppGeneration) {
-    console.log("Rendering AppGeneratorDisplay");
     return (
       <ArtifactProvider>
         <AppGeneratorDisplay message={message} />
