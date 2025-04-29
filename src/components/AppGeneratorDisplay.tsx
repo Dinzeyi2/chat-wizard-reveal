@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Message } from "@/types/chat";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   useEffect(() => {
     const extractAppData = (): GeneratedApp | null => {
       try {
+        // Primary extraction method: Try to find JSON data
         const jsonRegex = /```json([\s\S]*?)```/;
         const appDataMatch = message.content.match(jsonRegex);
         
@@ -53,6 +55,27 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
             return jsonData;
           }
         }
+        
+        // Fallback method: try to find any JSON in the content
+        const anyJsonRegex = /{[\s\S]*?"files"[\s\S]*?}/;
+        const anyJsonMatch = message.content.match(anyJsonRegex);
+        
+        if (anyJsonMatch) {
+          try {
+            const jsonData = JSON.parse(anyJsonMatch[0]);
+            if (jsonData && Array.isArray(jsonData.files)) {
+              return {
+                projectName: jsonData.projectName || "Generated Application",
+                description: jsonData.description || "Generated application files",
+                files: jsonData.files,
+                technologies: jsonData.technologies || []
+              };
+            }
+          } catch (e) {
+            console.log("Failed to parse JSON in fallback method:", e);
+          }
+        }
+        
         return null;
       } catch (error) {
         console.error("Failed to parse app data:", error);
@@ -64,43 +87,100 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   }, [message]);
   
   const createFallbackArtifact = () => {
+    // Create a more robust fallback artifact that will always work
+    // Extract any code blocks from the message to create files
+    
+    const extractCodeBlocks = () => {
+      const codeBlockRegex = /```(\w+)?\n([\s\S]*?)\n```/g;
+      const codeFiles = [];
+      let match;
+      let index = 0;
+      
+      while ((match = codeBlockRegex.exec(message.content)) !== null) {
+        const language = match[1] || 'plaintext';
+        const content = match[2].trim();
+        
+        // Skip if it's JSON we already tried to parse
+        if (language.toLowerCase() === 'json' && content.includes('"files"') && content.includes('"projectName"')) {
+          continue;
+        }
+        
+        codeFiles.push({
+          id: `file-${index++}`,
+          name: `file-${index}.${getExtensionFromLanguage(language)}`,
+          path: `file-${index}.${getExtensionFromLanguage(language)}`,
+          language: language,
+          content: content
+        });
+      }
+      
+      // If no code blocks found, create a single file with the message content
+      if (codeFiles.length === 0) {
+        codeFiles.push({
+          id: "raw-content",
+          name: "content.md",
+          path: "content.md",
+          language: "markdown",
+          content: message.content
+        });
+      }
+      
+      return codeFiles;
+    };
+    
+    const getExtensionFromLanguage = (lang: string) => {
+      const langMap: Record<string, string> = {
+        'javascript': 'js',
+        'typescript': 'ts',
+        'jsx': 'jsx',
+        'tsx': 'tsx',
+        'html': 'html',
+        'css': 'css',
+        'json': 'json',
+        'markdown': 'md',
+        'plaintext': 'txt'
+      };
+      
+      return langMap[lang.toLowerCase()] || 'txt';
+    };
+    
+    const projectTitle = message.content.split('\n')[0].replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 30) || "Generated Application";
+    
     return {
       id: `artifact-${Date.now()}`,
-      title: "Generated Application",
-      description: "Application content could not be fully parsed",
-      files: [{
-        id: "raw-content",
-        name: "content.md",
-        path: "content.md",
-        language: "markdown",
-        content: message.content
-      }]
+      title: projectTitle,
+      description: "Application content extracted from message",
+      files: extractCodeBlocks()
     };
   };
 
   const handleViewFullProject = () => {
-    if (!appData || !appData.files || appData.files.length === 0) {
-      openArtifact(createFallbackArtifact());
-      return;
-    }
-
+    // Always open an artifact viewer, regardless of whether we could parse JSON
     try {
-      const artifactFiles = appData.files.map((file, index) => ({
-        id: `file-${index}`,
-        name: file.path.split('/').pop() || file.path,
-        path: file.path,
-        language: getLanguageFromPath(file.path),
-        content: file.content
-      }));
+      if (appData && appData.files && appData.files.length > 0) {
+        // Happy path: We have valid app data
+        const artifactFiles = appData.files.map((file, index) => ({
+          id: `file-${index}`,
+          name: file.path.split('/').pop() || file.path,
+          path: file.path,
+          language: getLanguageFromPath(file.path),
+          content: file.content
+        }));
 
-      openArtifact({
-        id: `artifact-${Date.now()}`,
-        title: appData.projectName,
-        description: appData.description,
-        files: artifactFiles
-      });
+        openArtifact({
+          id: `artifact-${Date.now()}`,
+          title: appData.projectName,
+          description: appData.description,
+          files: artifactFiles
+        });
+      } else {
+        // Fallback path: Use our robust fallback mechanism
+        console.log("Using fallback artifact creation");
+        openArtifact(createFallbackArtifact());
+      }
     } catch (error) {
       console.error("Error opening artifact:", error);
+      // Final fallback: Always open something
       openArtifact(createFallbackArtifact());
     }
   };

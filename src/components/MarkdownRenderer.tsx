@@ -15,21 +15,26 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
   const isAppGeneration = React.useMemo(() => {
     // Method 1: Check for JSON structure with app generation indicators
     if (content.includes("```json") && content.includes("```")) {
-      return content.includes("projectName") && 
-             (content.includes("files") || content.includes("fileStructure"));
+      return content.includes("projectName") || 
+             content.includes("files") || 
+             content.includes("fileStructure");
     }
     
     // Method 2: Check for specific phrases that indicate app generation
-    if (content.includes("I've generated a full-stack application") ||
+    if (content.includes("I've generated") ||
         content.includes("Here's what I created") || 
-        content.includes("I've built an application")) {
+        content.includes("I've built") ||
+        content.includes("I've created") ||
+        content.includes("generated app") ||
+        content.includes("generated application")) {
       return true;
     }
     
     // Method 3: Check for code files mentions
-    const mentionsMultipleFiles = content.includes("package.json") && 
-      (content.includes("src/") || content.includes("public/") || 
-      content.includes("components/"));
+    const mentionsMultipleFiles = content.includes("package.json") || 
+      content.includes("src/") || 
+      content.includes("public/") || 
+      content.includes("components/");
       
     return mentionsMultipleFiles;
   }, [content]);
