@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { corsHeaders } from "../_shared/cors.ts"
@@ -11,11 +12,171 @@ serve(async (req) => {
   try {
     const { message, projectId, lastModification } = await req.json()
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
+    const claudeApiKey = Deno.env.get('CLAUDE_API_KEY')
 
     if (!openAIApiKey) {
       throw new Error('OpenAI API key is not configured')
     }
 
+    // Check if this looks like a code generation request
+    if (message.toLowerCase().includes('create') || 
+        message.toLowerCase().includes('generate') || 
+        message.toLowerCase().includes('make') ||
+        message.toLowerCase().includes('build')) {
+      
+      const codeGenKeywords = [
+        'component', 'form', 'button', 'card', 'navbar', 'dashboard',
+        'ui', 'interface', 'page', 'screen', 'modal', 'dialog',
+        'shadcn', 'tailwind', 'react'
+      ];
+      
+      // Check if any code generation keyword is present
+      const isCodeGenRequest = codeGenKeywords.some(keyword => 
+        message.toLowerCase().includes(keyword)
+      );
+      
+      if (isCodeGenRequest) {
+        console.log("Detected code generation request:", message);
+        
+        try {
+          let generatedCode = null;
+          let explanation = "";
+          
+          // Try using Claude if available
+          if (claudeApiKey) {
+            try {
+              console.log("Generating code with Claude...");
+              
+              // Call Claude API for code generation
+              const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-api-key": claudeApiKey,
+                  "anthropic-version": "2023-06-01"
+                },
+                body: JSON.stringify({
+                  model: "claude-3-5-sonnet-20240620",
+                  messages: [
+                    {
+                      role: "user",
+                      content: `
+You are an expert UI developer specializing in creating beautiful React applications.
+
+# TASK
+I need you to create a new UI component based on specific requirements.
+
+# USER REQUIREMENTS
+"${message}"
+
+# STYLE REQUIREMENTS
+- Use a clean white theme with light backgrounds
+- Make the component beautiful with elegant styling and subtle animations
+- Use shadcn/ui components and Tailwind CSS
+
+# TECHNICAL REQUIREMENTS
+- Create a fully functional React component
+- Make the component fully responsive
+- Ensure the code is clean, well-organized, and follows best practices
+- Use TypeScript for type safety
+
+# INSTRUCTIONS
+1. Create a new component based on the requirements
+2. Make it responsive and accessible
+3. Implement all functionality described in the requirements
+4. Return the complete, new component code
+
+# EXPECTED RESPONSE FORMAT
+Provide the new code in the following format:
+
+\`\`\`jsx
+// Frontend code here...
+\`\`\`
+
+Finally, provide a brief explanation of the component you created.
+`
+                    }
+                  ],
+                  max_tokens: 4000
+                })
+              });
+              
+              if (claudeResponse.ok) {
+                const claudeData = await claudeResponse.json();
+                const content = claudeData.content?.[0]?.text || "";
+                
+                // Extract code and explanation
+                const codeMatch = content.match(/```(?:jsx|js|tsx|ts)([\s\S]*?)```/);
+                if (codeMatch) {
+                  generatedCode = codeMatch[1].trim();
+                  
+                  // Extract explanation (text after the code block)
+                  const codeEnd = content.indexOf("```", content.indexOf("```") + 3) + 3;
+                  explanation = content.substring(codeEnd).trim();
+                } else {
+                  throw new Error("No code found in Claude's response");
+                }
+              } else {
+                throw new Error(`Error from Claude API: ${claudeResponse.status}`);
+              }
+            } catch (claudeError) {
+              console.error("Claude code generation failed:", claudeError);
+              throw claudeError;
+            }
+          } else {
+            // Fallback to OpenAI for code generation if Claude is not available
+            const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${openAIApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [
+                  { 
+                    role: 'system', 
+                    content: 'You are an expert React developer who specializes in creating UI components using shadcn/ui and Tailwind CSS. Create beautiful, responsive components with clean code.'
+                  },
+                  { role: 'user', content: message }
+                ],
+              }),
+            });
+
+            const data = await openAIResponse.json();
+            generatedCode = data.choices[0].message.content;
+            explanation = "Generated with OpenAI";
+          }
+          
+          if (generatedCode) {
+            let aiResponse = "I've created the UI component you requested:\n\n";
+            
+            // Check if the code is wrapped in a code block
+            if (!generatedCode.includes("```")) {
+              aiResponse += "```jsx\n" + generatedCode + "\n```\n\n";
+            } else {
+              aiResponse += generatedCode + "\n\n";
+            }
+            
+            aiResponse += explanation;
+            
+            return new Response(JSON.stringify({ response: aiResponse }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+        } catch (codeGenError) {
+          console.error("Error in code generation:", codeGenError);
+          
+          // Return a friendly error message
+          return new Response(JSON.stringify({ 
+            response: `I encountered an error while trying to generate code: ${codeGenError.message}. Please try a simpler request or try again later.`
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+    }
+    
     // Check if this is a modification request for an app
     if (projectId && message.toLowerCase().includes('change') || 
         message.toLowerCase().includes('modify') || 

@@ -29,23 +29,49 @@ serve(async (req) => {
     const perplexityApiKey = Deno.env.get("PERPLEXITY_API_KEY");
     const claudeApiKey = Deno.env.get("CLAUDE_API_KEY");
 
-    if (!perplexityApiKey) {
+    if (!perplexityApiKey && action === "find") {
       return new Response(JSON.stringify({ error: "Perplexity API key not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
-    if (action === "customize" && !claudeApiKey) {
+    if (!claudeApiKey && action === "customize") {
       return new Response(JSON.stringify({ error: "Claude API key not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
+    // Direct Claude fallback if Perplexity is not available
+    if (action === "find" && !perplexityApiKey && claudeApiKey) {
+      // Call Claude API as a fallback
+      const claudeResponse = await callClaudeAPI({
+        success: true,
+        requirements: {
+          originalPrompt: prompt,
+          componentType: "component",
+          framework: "react",
+          designSystem: "shadcn/ui",
+          styles: ["beautiful"],
+          isFullStack: false,
+        },
+        code: "// Claude will generate code based on the prompt",
+        metadata: {
+          query: prompt,
+          designSystem: "shadcn/ui",
+        }
+      }, claudeApiKey);
+      
+      return new Response(JSON.stringify(claudeResponse), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
     if (action === "find") {
       // Call Perplexity API to find design code
-      const response = await callPerplexityAPI(prompt, perplexityApiKey);
+      const response = await callPerplexityAPI(prompt, perplexityApiKey!);
       
       return new Response(JSON.stringify(response), {
         status: 200,
@@ -149,7 +175,8 @@ async function callPerplexityAPI(prompt: string, apiKey: string) {
       code,
       metadata: {
         designSystem,
-        componentType: requirements.componentType
+        componentType: requirements.componentType,
+        query: topQuery
       }
     };
   } catch (error: any) {
@@ -297,7 +324,7 @@ function generateSearchQueries(requirements: any) {
   const { componentType, framework, designSystem, styles } = requirements;
   
   // Base query elements
-  const styleTerms = styles.join(" ");
+  const styleTerms = styles.length > 0 ? styles.join(" ") : "";
   
   // Create specific queries
   if (framework && designSystem) {
@@ -348,12 +375,14 @@ function createPromptForClaude(designData: any) {
 You are an expert UI developer specializing in creating beautiful React applications.
 
 # TASK
-I need you to customize and enhance the provided ${componentType} component code based on specific requirements.
+I need you to ${code ? 'customize and enhance' : 'create'} ${code ? 'the provided' : 'a new'} ${componentType} component code based on specific requirements.
 
+${code ? `
 # ORIGINAL CODE
 \`\`\`jsx
 ${code}
 \`\`\`
+` : ''}
 
 # USER REQUIREMENTS
 "${originalPrompt}"
@@ -362,20 +391,20 @@ ${code}
 ${styleInstructions.join("\n")}
 
 # TECHNICAL REQUIREMENTS
-- Maintain the same general component structure
+- ${code ? 'Maintain the same general component structure' : 'Create a new component structure'}
 - Make the component fully responsive
 - Ensure the code is clean, well-organized, and follows best practices
 ${isFullStack ? "- Add a simple backend API endpoint code that would support this component" : ""}
 
 # INSTRUCTIONS
-1. Customize the existing code to match the style requirements
+1. ${code ? 'Customize the existing code to match the style requirements' : 'Create a new component based on the requirements'}
 2. Enhance the component with better organization, responsiveness, and interactivity
-3. Do not remove existing functionality, only enhance and style it
-4. Return the complete, customized component code
-${isFullStack ? "5. Include a separate code block with a simple backend implementation" : ""}
+3. ${code ? 'Do not remove existing functionality, only enhance and style it' : 'Implement all functionality described in the requirements'}
+4. Return the complete, ${code ? 'customized' : 'new'} component code
+${isFullStack ? `5. Include a separate code block with a simple backend implementation` : ""}
 
 # EXPECTED RESPONSE FORMAT
-Provide the customized code in the following format:
+Provide the ${code ? 'customized' : 'new'} code in the following format:
 
 \`\`\`jsx
 // Frontend code here...
@@ -383,7 +412,7 @@ Provide the customized code in the following format:
 
 ${isFullStack ? "Then provide the backend code (if required):\n\n```javascript\n// Backend code here...\n```" : ""}
 
-Finally, provide a brief explanation of the changes you made.
+Finally, provide a brief explanation of the ${code ? 'changes you made' : 'component you created'}.
 `;
 }
 

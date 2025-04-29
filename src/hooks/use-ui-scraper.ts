@@ -3,6 +3,7 @@ import { useState } from "react";
 import { EnhancedPerplexityUIScraper, DesignCodeResult } from "@/utils/EnhancedPerplexityUIScraper";
 import { ClaudeCodeCustomizer } from "@/utils/ClaudeCodeCustomizer";
 import { useToast } from "@/hooks/use-toast";
+import { UICodeGenerator, GenerationResult } from "@/utils/UICodeGenerator";
 
 interface UseUiScraperOptions {
   onSuccess?: (data: DesignCodeResult) => void;
@@ -26,7 +27,15 @@ export const useUiScraper = (apiKeyOrOptions?: string | UseUiScraperOptions, opt
   const [error, setError] = useState<Error | null>(null);
   const [result, setResult] = useState<DesignCodeResult | null>(null);
   const [customizedResult, setCustomizedResult] = useState<any | null>(null);
+  const [generatedCode, setGeneratedCode] = useState<any | null>(null);
   const { toast } = useToast();
+
+  // Initialize the UI Code Generator
+  const codeGenerator = new UICodeGenerator({
+    perplexityApiKey,
+    claudeApiKey,
+    debug: true
+  });
 
   const findDesignCode = async (prompt: string, apiKey?: string) => {
     const perplexityKey = apiKey || perplexityApiKey;
@@ -134,12 +143,47 @@ export const useUiScraper = (apiKeyOrOptions?: string | UseUiScraperOptions, opt
     }
   };
 
+  const generateCodeFromPrompt = async (prompt: string, claudeKey?: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const result = await codeGenerator.generateCode(prompt);
+      setGeneratedCode(result);
+      
+      if (result.success) {
+        toast({
+          title: "Code Generated",
+          description: `Generated code for ${result.metadata?.componentType || 'component'}`
+        });
+        return result;
+      } else {
+        throw new Error(result.error || "Failed to generate code");
+      }
+    } catch (err: any) {
+      const error = err instanceof Error ? err : new Error(err?.message || "Unknown error");
+      setError(error);
+      uiScraperOptions.onError?.(error);
+      
+      toast({
+        title: "Error Generating Code",
+        description: error.message,
+        variant: "destructive"
+      });
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     findDesignCode,
     customizeDesignCode,
+    generateCodeFromPrompt,
     isLoading,
     error,
     result,
-    customizedResult
+    customizedResult,
+    generatedCode
   };
 };
