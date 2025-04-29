@@ -55,8 +55,12 @@ serve(async (req) => {
       console.log("Detected code generation request. Using Perplexity+Claude system");
       
       try {
-        // Call the design-code function
-        const designResponse = await fetch(`${req.url.replace('/chat', '/design-code')}`, {
+        // Fix URL construction: Get the base URL from the request
+        const url = new URL(req.url);
+        const baseUrl = `${url.protocol}//${url.host}`;
+        
+        // Call the design-code function with explicit URL
+        const designResponse = await fetch(`${baseUrl}/design-code`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -70,6 +74,7 @@ serve(async (req) => {
         
         if (!designResponse.ok) {
           const errorText = await designResponse.text();
+          console.error(`Design code error: Status ${designResponse.status}, Body: ${errorText}`);
           throw new Error(`Error finding design code: ${designResponse.status} - ${errorText}`);
         }
         
@@ -79,7 +84,7 @@ serve(async (req) => {
         if (designResult.success) {
           // If Perplexity found a design, customize it with Claude
           console.log("Design code found. Customizing with Claude.");
-          const customizeResponse = await fetch(`${req.url.replace('/chat', '/design-code')}`, {
+          const customizeResponse = await fetch(`${baseUrl}/design-code`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -121,7 +126,7 @@ ${explanation}`;
           console.log("Design search failed. Using Claude fallback.");
           
           // Call the design-code function with fallback mode
-          const fallbackResponse = await fetch(`${req.url.replace('/chat', '/design-code')}`, {
+          const fallbackResponse = await fetch(`${baseUrl}/design-code`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
