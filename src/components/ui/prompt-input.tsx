@@ -70,27 +70,25 @@ function PromptInput({
   }
 
   return (
-    <TooltipProvider>
-      <PromptInputContext.Provider
-        value={{
-          isLoading,
-          value: value ?? internalValue,
-          setValue: onValueChange ?? handleChange,
-          maxHeight,
-          onSubmit,
-        }}
+    <PromptInputContext.Provider
+      value={{
+        isLoading,
+        value: value ?? internalValue,
+        setValue: onValueChange ?? handleChange,
+        maxHeight,
+        onSubmit,
+      }}
+    >
+      <div
+        className={cn(
+          "border-input bg-background rounded-3xl border p-2 shadow-xs",
+          className
+        )}
       >
-        <div
-          className={cn(
-            "border-input bg-background rounded-3xl border p-2 shadow-xs",
-            className
-          )}
-        >
-          {children}
-        </div>
-      </PromptInputContext.Provider>
-    </TooltipProvider>
-  )
+        {children}
+      </div>
+    </PromptInputContext.Provider>
+  );
 }
 
 export type PromptInputTextareaProps = {
@@ -173,14 +171,16 @@ function PromptInputAction({
   const { disabled } = usePromptInput()
 
   return (
-    <Tooltip {...props}>
-      <TooltipTrigger asChild disabled={disabled}>
-        {children}
-      </TooltipTrigger>
-      <TooltipContent side={side} className={className}>
-        {tooltip}
-      </TooltipContent>
-    </Tooltip>
+    <TooltipProvider>
+      <Tooltip {...props}>
+        <TooltipTrigger asChild disabled={disabled}>
+          {children}
+        </TooltipTrigger>
+        <TooltipContent side={side} className={className}>
+          {tooltip}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
 
@@ -190,4 +190,3 @@ export {
   PromptInputActions,
   PromptInputAction,
 }
-
