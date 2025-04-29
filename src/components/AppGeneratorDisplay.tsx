@@ -154,11 +154,14 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
     };
   };
 
+  // FIXED: This function now always opens an artifact viewer regardless of data format
   const handleViewFullProject = () => {
-    // Always open an artifact viewer, regardless of whether we could parse JSON
     try {
+      console.log("Opening artifact viewer...");
+      
+      // First attempt - use the parsed app data if available
       if (appData && appData.files && appData.files.length > 0) {
-        // Happy path: We have valid app data
+        console.log("Using parsed app data for artifact");
         const artifactFiles = appData.files.map((file, index) => ({
           id: `file-${index}`,
           name: file.path.split('/').pop() || file.path,
@@ -174,14 +177,26 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
           files: artifactFiles
         });
       } else {
-        // Fallback path: Use our robust fallback mechanism
+        // Fallback - extract code blocks directly from the message
         console.log("Using fallback artifact creation");
         openArtifact(createFallbackArtifact());
       }
     } catch (error) {
-      console.error("Error opening artifact:", error);
-      // Final fallback: Always open something
-      openArtifact(createFallbackArtifact());
+      console.error("Error opening artifact, using ultimate fallback:", error);
+      // Ultimate fallback - always open something even if all else fails
+      const simpleArtifact = {
+        id: `artifact-emergency-${Date.now()}`,
+        title: "Generated Code",
+        description: "Code extracted from message",
+        files: [{
+          id: "content-file",
+          name: "content.md",
+          path: "content.md",
+          language: "markdown",
+          content: message.content
+        }]
+      };
+      openArtifact(simpleArtifact);
     }
   };
 

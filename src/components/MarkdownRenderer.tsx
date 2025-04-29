@@ -26,7 +26,10 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
         content.includes("I've built") ||
         content.includes("I've created") ||
         content.includes("generated app") ||
-        content.includes("generated application")) {
+        content.includes("generated application") ||
+        content.includes("full-stack application") ||
+        content.includes("created a web app") ||
+        content.includes("built an app")) {
       return true;
     }
     
@@ -34,8 +37,15 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
     const mentionsMultipleFiles = content.includes("package.json") || 
       content.includes("src/") || 
       content.includes("public/") || 
-      content.includes("components/");
+      content.includes("components/") ||
+      content.includes("pages/");
       
+    // Method 4: Check for multiple code blocks which might indicate an app
+    const codeBlockCount = (content.match(/```/g) || []).length / 2;
+    if (codeBlockCount >= 3) {
+      return true;
+    }
+    
     return mentionsMultipleFiles;
   }, [content]);
   
