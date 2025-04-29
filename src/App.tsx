@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useState } from "react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import ChatHistory from "./pages/ChatHistory";
 import "./components/artifact/ArtifactSystem.css";
 
 const App = () => {
@@ -21,6 +22,7 @@ const App = () => {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/history" element={<ChatHistory />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

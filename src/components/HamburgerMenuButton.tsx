@@ -1,16 +1,23 @@
 
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export function HamburgerMenuButton() {
   const [open, setOpen] = useState<boolean>(false);
+  const navigate = useNavigate();
+
+  const handleClick = () => {
+    setOpen((prevState) => !prevState);
+    navigate('/history');
+  };
 
   return (
     <Button
       className="group"
       variant="outline"
       size="icon"
-      onClick={() => setOpen((prevState) => !prevState)}
+      onClick={handleClick}
       aria-expanded={open}
       aria-label={open ? "Close menu" : "Open menu"}
     >
