@@ -37,9 +37,8 @@ export class ClaudeCodeCustomizer {
   
   /**
    * Customize component code based on user requirements
-   * @param scrapedDesign - Design data from the UI scraper
-   * @param requirements - User requirements
-   * @returns Customized code
+   * @param {Object} scrapedDesign - Design data from the UI scraper
+   * @returns {Promise<Object>} - Customized code
    */
   async customizeCode(scrapedDesign: DesignCodeResult) {
     try {

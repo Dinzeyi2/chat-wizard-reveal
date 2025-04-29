@@ -9,7 +9,19 @@ interface UseUiScraperOptions {
   onError?: (error: Error) => void;
 }
 
-export const useUiScraper = (perplexityApiKey?: string, options?: UseUiScraperOptions, claudeApiKey?: string) => {
+export const useUiScraper = (apiKeyOrOptions?: string | UseUiScraperOptions, options?: UseUiScraperOptions) => {
+  // Extract API key and options
+  let perplexityApiKey: string | undefined;
+  let claudeApiKey: string | undefined;
+  let uiScraperOptions: UseUiScraperOptions = {};
+  
+  if (typeof apiKeyOrOptions === 'string') {
+    perplexityApiKey = apiKeyOrOptions;
+    uiScraperOptions = options || {};
+  } else if (apiKeyOrOptions && typeof apiKeyOrOptions === 'object') {
+    uiScraperOptions = apiKeyOrOptions;
+  }
+  
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [result, setResult] = useState<DesignCodeResult | null>(null);
@@ -22,7 +34,7 @@ export const useUiScraper = (perplexityApiKey?: string, options?: UseUiScraperOp
     if (!perplexityKey) {
       const error = new Error("Perplexity API key is required");
       setError(error);
-      options?.onError?.(error);
+      uiScraperOptions.onError?.(error);
       toast({
         title: "API Key Missing",
         description: "Please provide a Perplexity API key in the settings",
@@ -41,7 +53,7 @@ export const useUiScraper = (perplexityApiKey?: string, options?: UseUiScraperOp
       setResult(result);
       
       if (result.success) {
-        options?.onSuccess?.(result);
+        uiScraperOptions.onSuccess?.(result);
         toast({
           title: "UI Design Found",
           description: `Found design code for ${result.requirements?.componentType || 'component'}`
@@ -53,7 +65,7 @@ export const useUiScraper = (perplexityApiKey?: string, options?: UseUiScraperOp
     } catch (err: any) {
       const error = err instanceof Error ? err : new Error(err?.message || "Unknown error");
       setError(error);
-      options?.onError?.(error);
+      uiScraperOptions.onError?.(error);
       
       toast({
         title: "Error Finding Design",
@@ -72,7 +84,7 @@ export const useUiScraper = (perplexityApiKey?: string, options?: UseUiScraperOp
     if (!claudeKey) {
       const error = new Error("Claude API key is required");
       setError(error);
-      options?.onError?.(error);
+      uiScraperOptions.onError?.(error);
       toast({
         title: "API Key Missing",
         description: "Please provide a Claude API key in the settings",
@@ -84,7 +96,7 @@ export const useUiScraper = (perplexityApiKey?: string, options?: UseUiScraperOp
     if (!design || !design.success) {
       const error = new Error("Valid design code is required for customization");
       setError(error);
-      options?.onError?.(error);
+      uiScraperOptions.onError?.(error);
       return null;
     }
     
@@ -109,7 +121,7 @@ export const useUiScraper = (perplexityApiKey?: string, options?: UseUiScraperOp
     } catch (err: any) {
       const error = err instanceof Error ? err : new Error(err?.message || "Unknown error");
       setError(error);
-      options?.onError?.(error);
+      uiScraperOptions.onError?.(error);
       
       toast({
         title: "Error Customizing Design",
