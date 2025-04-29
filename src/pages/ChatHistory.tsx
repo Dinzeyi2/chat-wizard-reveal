@@ -4,7 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Link, useNavigate } from "react-router-dom";
-import { PlusIcon, Search, ArrowLeft, Edit, Trash2 } from "lucide-react";
+import { PlusIcon, Search, ArrowLeft, MoreVertical } from "lucide-react";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import {
   Dialog,
   DialogContent,
@@ -23,12 +29,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
 
 interface ChatHistoryItem {
@@ -80,15 +80,13 @@ const ChatHistory = () => {
     navigate('/');
   };
   
-  const openRenameDialog = (chat: ChatHistoryItem, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent navigating to the chat
+  const openRenameDialog = (chat: ChatHistoryItem) => {
     setSelectedChat(chat);
     setNewTitle(chat.title);
     setIsRenameDialogOpen(true);
   };
   
-  const openDeleteDialog = (chat: ChatHistoryItem, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent navigating to the chat
+  const openDeleteDialog = (chat: ChatHistoryItem) => {
     setSelectedChat(chat);
     setIsDeleteDialogOpen(true);
   };
@@ -203,48 +201,43 @@ const ChatHistory = () => {
       
       <div className="space-y-4">
         {filteredChats.map(chat => (
-          <Card 
-            key={chat.id}
-            className="cursor-pointer hover:bg-gray-50 p-4 transition-colors relative"
-            onClick={() => handleChatSelection(chat.id)}
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <h2 className="font-medium text-gray-800">{chat.title}</h2>
-                <p className="text-sm text-gray-500">{chat.lastMessage}</p>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+          <ContextMenu key={chat.id}>
+            <ContextMenuTrigger>
+              <Card 
+                className="cursor-pointer hover:bg-gray-50 p-4 transition-colors relative"
+                onClick={() => handleChatSelection(chat.id)}
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h2 className="font-medium text-gray-800">{chat.title}</h2>
+                    <p className="text-sm text-gray-500">{chat.lastMessage}</p>
+                  </div>
                   <Button 
                     variant="ghost" 
                     size="icon" 
                     className="h-8 w-8 rounded-full"
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // We don't need to do anything here as the context menu will handle this
+                    }}
                   >
-                    <span className="sr-only">Open menu</span>
-                    <svg width="15" height="3" viewBox="0 0 15 3" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-gray-600">
-                      <path d="M2.5 2.5C3.32843 2.5 4 1.82843 4 1C4 0.171573 3.32843 -0.5 2.5 -0.5C1.67157 -0.5 1 0.171573 1 1C1 1.82843 1.67157 2.5 2.5 2.5Z" fill="currentColor"/>
-                      <path d="M7.5 2.5C8.32843 2.5 9 1.82843 9 1C9 0.171573 8.32843 -0.5 7.5 -0.5C6.67157 -0.5 6 0.171573 6 1C6 1.82843 6.67157 2.5 7.5 2.5Z" fill="currentColor"/>
-                      <path d="M14 1C14 1.82843 13.3284 2.5 12.5 2.5C11.6716 2.5 11 1.82843 11 1C11 0.171573 11.6716 -0.5 12.5 -0.5C13.3284 -0.5 14 0.171573 14 1Z" fill="currentColor"/>
-                    </svg>
+                    <MoreVertical className="h-4 w-4" />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={(e) => openRenameDialog(chat, e)}>
-                    <Edit className="mr-2 h-4 w-4" />
-                    Rename
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                    onClick={(e) => openDeleteDialog(chat, e)}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </Card>
+                </div>
+              </Card>
+            </ContextMenuTrigger>
+            <ContextMenuContent className="min-w-[160px]">
+              <ContextMenuItem onClick={() => openRenameDialog(chat)}>
+                Rename
+              </ContextMenuItem>
+              <ContextMenuItem 
+                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                onClick={() => openDeleteDialog(chat)}
+              >
+                Delete
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
         ))}
       </div>
       
