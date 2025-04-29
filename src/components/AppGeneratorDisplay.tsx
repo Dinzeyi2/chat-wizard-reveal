@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Message } from "@/types/chat";
 import { Button } from "@/components/ui/button";
@@ -629,41 +628,34 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
         </div>
       )}
       
-      {isModification ? (
-        <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
-          <p className="text-blue-800 font-medium">Your app has been successfully updated!</p>
-          <p className="text-blue-600 text-sm mt-1">Click the "View updated code" button to see your modified code.</p>
-        </div>
-      ) : (
-        <Accordion type="single" collapsible className="w-full">
-          <AccordionItem value="explanation">
-            <AccordionTrigger className="px-5 py-3 hover:bg-gray-50">Application Details</AccordionTrigger>
-            <AccordionContent className="px-5 pb-4">
-              <div className="text-sm space-y-2">
-                {appData?.explanation ? (
-                  formatExplanationText(appData.explanation)
-                ) : (
-                  <div className="space-y-4">
-                    <p><strong>Architecture Overview:</strong> This {appData?.projectName || "generated"} application follows a modern web architecture with a clean separation of concerns.</p>
-                    
-                    <p><strong>Frontend:</strong> The UI is built with React components organized in a logical hierarchy, with pages for different views and reusable components for common elements.</p>
-                    
-                    <p><strong>Data Management:</strong> The application handles data through state management and API calls to backend services.</p>
-                    
-                    <h4 className="text-md font-semibold mt-4">Key Technical Features:</h4>
-                    <ul className="list-disc pl-5 space-y-1">
-                      <li>React components for UI building blocks</li>
-                      <li>State management for application data</li>
-                      <li>API integration for data fetching</li>
-                      <li>Responsive design for all device sizes</li>
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      )}
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="explanation">
+          <AccordionTrigger className="px-5 py-3 hover:bg-gray-50">Application Details</AccordionTrigger>
+          <AccordionContent className="px-5 pb-4">
+            <div className="text-sm space-y-2">
+              {appData?.explanation ? (
+                formatExplanationText(appData.explanation)
+              ) : (
+                <div className="space-y-4">
+                  <p><strong>Architecture Overview:</strong> This {appData?.projectName || "generated"} application follows a modern web architecture with a clean separation of concerns.</p>
+                  
+                  <p><strong>Frontend:</strong> The UI is built with React components organized in a logical hierarchy, with pages for different views and reusable components for common elements.</p>
+                  
+                  <p><strong>Data Management:</strong> The application handles data through state management and API calls to backend services.</p>
+                  
+                  <h4 className="text-md font-semibold mt-4">Key Technical Features:</h4>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>React components for UI building blocks</li>
+                    <li>State management for application data</li>
+                    <li>API integration for data fetching</li>
+                    <li>Responsive design for all device sizes</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 };
