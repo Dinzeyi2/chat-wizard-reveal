@@ -185,7 +185,7 @@ If you were trying to generate an app, this might be due to limits with our AI m
           timestamp: new Date()
         };
         
-        // Use the local processingMessage variable from this closure's scope
+        // Reference to processingMessage is valid here since it's defined above in this scope
         setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
         setMessages(prev => [...prev, errorMessage]);
       } finally {
@@ -194,6 +194,17 @@ If you were trying to generate an app, this might be due to limits with our AI m
       }
     } else {
       setLoading(true);
+      
+      // Define processingMessage in this scope too
+      const processingMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant", 
+        content: "Processing your request...",
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, processingMessage]);
+      
       try {
         const { data, error } = await supabase.functions.invoke('chat', {
           body: { message: content }
@@ -208,6 +219,7 @@ If you were trying to generate an app, this might be due to limits with our AI m
           timestamp: new Date()
         };
         
+        setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
         setMessages(prev => [...prev, aiMessage]);
       } catch (error) {
         console.error('Error calling function:', error);
