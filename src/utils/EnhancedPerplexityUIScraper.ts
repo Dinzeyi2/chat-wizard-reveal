@@ -1,6 +1,6 @@
 /**
  * Enhanced UI Design Scraper using Perplexity AI
- * This tool uses Perplexity AI to find and extract UI component code from design systems
+ * This tool uses Perplexity AI to find and extract UI component code from a comprehensive list of design systems
  */
 
 // Design source interface
@@ -22,38 +22,52 @@ export interface DesignRequirements {
 
 export interface DesignCodeResult {
   success: boolean;
-  requirements?: DesignRequirements;
+  requirements?: {
+    originalPrompt: string;
+    componentType: string;
+    framework: string | null;
+    designSystem: string | null;
+    styles: string[];
+    isFullStack: boolean;
+  };
   code?: string | null;
-  metadata?: any | null;
+  metadata?: any;
   error?: string | null;
 }
 
 export class EnhancedPerplexityUIScraper {
-  private apiKey: string;
-  private perplexityEndpoint = "https://api.perplexity.ai/chat/completions";
-  private maxRequestsPerMinute = 5;
-  private requestTimestamps: number[] = [];
-  
-  // Design source collections
-  private generalLibraries: DesignSource[] = [];
-  private reactLibraries: DesignSource[] = [];
-  private tailwindLibraries: DesignSource[] = [];
-  private vueLibraries: DesignSource[] = [];
-  private otherFrameworkLibraries: DesignSource[] = [];
-  private frameworkAgnosticLibraries: DesignSource[] = [];
-  private designSystems: DesignSource[] = [];
-  private componentLibraries: DesignSource[] = [];
-  private designSources: DesignSource[] = [];
-  
   constructor(apiKey: string) {
     this.apiKey = apiKey;
+    
+    // API endpoints
+    this.perplexityEndpoint = "https://api.perplexity.ai/chat/completions";
+    
+    // Rate limiting parameters
+    this.maxRequestsPerMinute = 5;
+    this.requestTimestamps = [];
+    
+    // Initialize design sources with categories
     this.initializeDesignSources();
   }
   
+  private apiKey: string;
+  private perplexityEndpoint: string;
+  private maxRequestsPerMinute: number;
+  private requestTimestamps: number[];
+  private designSources: Array<{ name: string, url: string, priority: number }>;
+  private generalLibraries: Array<{ name: string, url: string, priority: number }>;
+  private reactLibraries: Array<{ name: string, url: string, priority: number }>;
+  private tailwindLibraries: Array<{ name: string, url: string, priority: number }>;
+  private vueLibraries: Array<{ name: string, url: string, priority: number }>;
+  private otherFrameworkLibraries: Array<{ name: string, url: string, priority: number }>;
+  private frameworkAgnosticLibraries: Array<{ name: string, url: string, priority: number }>;
+  private designSystems: Array<{ name: string, url: string, priority: number }>;
+  private componentLibraries: Array<{ name: string, url: string, priority: number }>;
+
   /**
    * Initialize all design sources with categorization
    */
-  private initializeDesignSources() {
+  initializeDesignSources() {
     // General & Multi-Framework UI libraries
     this.generalLibraries = [
       { name: "shadcn/ui", url: "https://ui.shadcn.com", priority: 10 },
@@ -179,7 +193,7 @@ export class EnhancedPerplexityUIScraper {
   /**
    * Process a user prompt to extract UI design code
    * @param userPrompt - User's design request
-   * @returns Promise<DesignCodeResult> - Found UI design code and metadata
+   * @returns Found UI design code and metadata
    */
   async findDesignCode(userPrompt: string): Promise<DesignCodeResult> {
     try {
@@ -214,8 +228,10 @@ export class EnhancedPerplexityUIScraper {
   
   /**
    * Parse a user prompt to identify design requirements
+   * @param prompt - User prompt
+   * @returns Structured requirements
    */
-  private parseUserPrompt(prompt: string): DesignRequirements {
+  parseUserPrompt(prompt: string) {
     const promptLower = prompt.toLowerCase();
     
     // Component types to look for
@@ -332,8 +348,11 @@ export class EnhancedPerplexityUIScraper {
   
   /**
    * Find the best matching category from a list
+   * @param text - Text to search in
+   * @param categories - Categories with keywords
+   * @returns Best matching category name or null
    */
-  private findBestMatch(text: string, categories: {name: string, keywords: string[]}[]): string | null {
+  findBestMatch(text: string, categories: { name: string; keywords: string[] }[]) {
     let bestMatch = null;
     let bestScore = 0;
     
@@ -356,9 +375,11 @@ export class EnhancedPerplexityUIScraper {
   
   /**
    * Generate search queries based on requirements
+   * @param requirements - Parsed requirements
+   * @returns Search queries
    */
-  private generateSearchQueries(requirements: DesignRequirements): string[] {
-    const queries: string[] = [];
+  generateSearchQueries(requirements: any) {
+    const queries = [];
     const { componentType, framework, designSystem, styles } = requirements;
     
     // Base query elements
@@ -423,16 +444,21 @@ export class EnhancedPerplexityUIScraper {
     );
     
     // Remove duplicates and return
-    return [...new Set(queries)].slice(0, 3);
+    return [...new Set(queries)];
   }
   
   /**
    * Execute searches using Perplexity AI
+   * @param queries - Search queries
+   * @returns Search results
    */
-  private async executePerplexitySearches(queries: string[]): Promise<any[]> {
-    const results: any[] = [];
+  async executePerplexitySearches(queries: string[]) {
+    const results = [];
     
-    for (const query of queries) {
+    // Only use the top 3 queries to avoid excessive API calls
+    const topQueries = queries.slice(0, 3);
+    
+    for (const query of topQueries) {
       try {
         // Respect rate limits
         await this.respectRateLimits();
@@ -447,7 +473,7 @@ export class EnhancedPerplexityUIScraper {
           });
         }
       } catch (error: any) {
-        console.warn(`Error executing search for query "${query}":`, error);
+        console.warn(`Error executing search for query "${query}":`, error.message);
         // Continue with other queries even if one fails
       }
     }
@@ -456,35 +482,36 @@ export class EnhancedPerplexityUIScraper {
   }
   
   /**
-   * Respect rate limits by delaying if necessary
+   * Respect API rate limits
    */
-  private async respectRateLimits(): Promise<void> {
+  async respectRateLimits() {
     const now = Date.now();
     
     // Remove timestamps older than 1 minute
-    this.requestTimestamps = this.requestTimestamps.filter(
-      timestamp => now - timestamp < 60000
+    this.requestTimestamps = this.requestTimestamps.filter(timestamp => 
+      now - timestamp < 60000
     );
     
-    // Check if we've exceeded the rate limit
+    // If we've reached the limit, wait until we can make another request
     if (this.requestTimestamps.length >= this.maxRequestsPerMinute) {
-      // Calculate how long to wait
       const oldestTimestamp = this.requestTimestamps[0];
-      const timeToWait = 60000 - (now - oldestTimestamp) + 100; // Add 100ms buffer
+      const timeToWait = 60000 - (now - oldestTimestamp);
       
-      // Wait until we can make another request
-      await new Promise(resolve => setTimeout(resolve, timeToWait));
+      if (timeToWait > 0) {
+        await new Promise(resolve => setTimeout(resolve, timeToWait));
+      }
+      
+      // Remove the oldest timestamp
+      this.requestTimestamps.shift();
     }
   }
   
   /**
-   * Call Perplexity AI API
+   * Call Perplexity API
    */
-  private async callPerplexityAPI(query: string): Promise<any> {
+  async callPerplexityAPI(query: string) {
     try {
-      // Record this request for rate limiting
-      this.requestTimestamps.push(Date.now());
-      
+      // Real implementation
       const response = await fetch(this.perplexityEndpoint, {
         method: 'POST',
         headers: {
@@ -503,9 +530,11 @@ export class EnhancedPerplexityUIScraper {
               content: `Find the full implementation code for ${query}. Include all necessary imports and CSS. Return the complete code with any explanations of how it works. Focus on production-quality implementations from official documentation or high-quality examples.`
             }
           ],
+          max_tokens: 4000,
           temperature: 0.2,
           top_p: 0.9,
-          max_tokens: 4000
+          frequency_penalty: 1,
+          presence_penalty: 0
         })
       });
       
@@ -513,74 +542,58 @@ export class EnhancedPerplexityUIScraper {
         throw new Error(`Perplexity API error: ${response.status}`);
       }
       
+      // Record this request for rate limiting
+      this.requestTimestamps.push(Date.now());
+      
       return await response.json();
     } catch (error: any) {
       console.error("Error calling Perplexity API:", error);
-      throw new Error(`Failed to search with Perplexity: ${error}`);
+      throw new Error(`Failed to search with Perplexity: ${error.message}`);
     }
   }
   
   /**
    * Extract code from search results
    */
-  private async extractCodeFromResults(searchResults: any[], requirements: DesignRequirements): Promise<{code: string, metadata: any} | null> {
-    if (!searchResults || searchResults.length === 0) {
+  async extractCodeFromResults(searchResults: any[], requirements: any) {
+    if (searchResults.length === 0) {
       return null;
     }
     
-    // Extract code blocks from all results
-    let allCodeBlocks: string[] = [];
-    let bestCodeMetadata = null;
-    
-    for (const result of searchResults) {
+    // Process each result to extract code blocks
+    for (const searchResult of searchResults) {
       try {
-        if (result.result?.choices && result.result.choices[0]?.message?.content) {
-          const content = result.result.choices[0].message.content;
+        const content = searchResult.result.choices[0].message.content;
+        
+        // Extract code blocks
+        const codeBlockRegex = /```(?:jsx|js|javascript|tsx|ts|typescript|react)([\s\S]*?)```/;
+        const match = content.match(codeBlockRegex);
+        
+        if (match && match[1]) {
+          const code = match[1].trim();
           
-          // Extract code blocks
-          const codeBlockRegex = /```(?:jsx|tsx|js|ts|html|css|javascript|typescript)?([\s\S]+?)```/g;
-          let match;
+          // Determine component type and design system from the code
+          let designSystem = "unknown";
+          if (content.toLowerCase().includes("shadcn")) designSystem = "shadcn/ui";
+          else if (content.toLowerCase().includes("tailwind")) designSystem = "tailwindcss";
+          else if (content.toLowerCase().includes("material")) designSystem = "material-ui";
+          else if (content.toLowerCase().includes("chakra")) designSystem = "chakra-ui";
           
-          while ((match = codeBlockRegex.exec(content)) !== null) {
-            if (match[1]) {
-              allCodeBlocks.push(match[1].trim());
+          return {
+            code,
+            metadata: {
+              query: searchResult.query,
+              designSystem,
+              componentType: requirements.componentType
             }
-          }
-          
-          // If no code blocks found, try to extract code another way
-          if (allCodeBlocks.length === 0) {
-            // Look for indented code sections or other common formats
-            const alternativeCodeRegex = /<([\w\s]+)>([\s\S]+?)<\/\1>|import[\s\S]+?from/g;
-            while ((match = alternativeCodeRegex.exec(content)) !== null) {
-              if (match[0]) {
-                allCodeBlocks.push(match[0].trim());
-              }
-            }
-          }
-          
-          // Save metadata about this result
-          bestCodeMetadata = {
-            query: result.query,
-            sourceContent: content.substring(0, 200) + '...' // Just save a preview
           };
         }
       } catch (error) {
-        console.error("Error extracting code from result:", error);
-        // Continue with other results
+        console.warn("Error extracting code from search result:", error);
+        // Continue with other results if one fails
       }
     }
     
-    // If no code blocks found, return null
-    if (allCodeBlocks.length === 0) {
-      return null;
-    }
-    
-    // Find the longest code block (likely the most complete)
-    const bestCodeBlock = allCodeBlocks.sort((a, b) => b.length - a.length)[0];
-    
-    return {
-      code: bestCodeBlock,
-      metadata: bestCodeMetadata
-    };
+    return null;
   }
 }
