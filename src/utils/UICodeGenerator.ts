@@ -1,3 +1,4 @@
+
 /**
  * UI Code Generator - Main Integration
  * This module integrates the Perplexity AI Design Scraper with the Claude Code Customizer
@@ -39,6 +40,7 @@ interface GenerationResult {
     designSystem?: string;
     sourceUrl?: string;
     timestamp: string;
+    usedFallback?: boolean;
   };
   error?: string;
 }
@@ -79,13 +81,16 @@ export class UICodeGenerator {
       this.log('Searching for UI design with Perplexity AI...');
       const scrapedDesign = await this.scraper.findDesignCode(userPrompt);
       
-      if (!scrapedDesign || !scrapedDesign.success) {
-        throw new Error(scrapedDesign?.error || 'Failed to find UI design');
+      // 3. Check if Perplexity found design code successfully
+      if (!scrapedDesign || !scrapedDesign.success || !scrapedDesign.code) {
+        // Perplexity failed to find relevant design code, using Claude fallback
+        this.log('Perplexity search failed, using Claude fallback...');
+        return await this.claudeFallbackGeneration(userPrompt);
       }
       
       this.log('Design found:', scrapedDesign.metadata);
       
-      // 3. Customize the design with Claude
+      // 4. Customize the design with Claude
       this.log('Customizing code with Claude...');
       const customizedCode = await this.customizer.customizeCode(scrapedDesign);
       
@@ -95,20 +100,266 @@ export class UICodeGenerator {
       
       this.log('Code customization complete');
       
-      // 4. Save to history
+      // 5. Save to history
       this.saveToHistory(userPrompt, scrapedDesign, customizedCode);
       
-      // 5. Format and return the result
+      // 6. Format and return the result
       return this.formatResult(userPrompt, scrapedDesign, customizedCode);
       
     } catch (error: any) {
       this.log('Error generating code:', error.message);
       
+      // Try fallback if there was an error in the main flow
+      try {
+        this.log('Attempting Claude fallback after error...');
+        return await this.claudeFallbackGeneration(userPrompt);
+      } catch (fallbackError: any) {
+        // If fallback also fails, return the original error
+        return {
+          success: false,
+          error: error.message,
+          prompt: userPrompt
+        };
+      }
+    }
+  }
+
+  /**
+   * Fallback generation using Claude directly when Perplexity fails
+   * @param userPrompt - User's design request
+   * @returns Generated code and metadata
+   */
+  private async claudeFallbackGeneration(userPrompt: string): Promise<GenerationResult> {
+    try {
+      this.log('Using Claude fallback for direct code generation');
+      
+      // 1. Extract design system preferences from the prompt
+      const designSystem = this.extractDesignSystemPreference(userPrompt);
+      
+      // 2. Get example code snippets for the design system to provide context
+      const exampleSnippets = await this.fetchDesignSystemExamples(designSystem);
+      
+      // 3. Create a special prompt for Claude with example snippets
+      const claudePrompt = this.createClaudeFallbackPrompt(userPrompt, designSystem, exampleSnippets);
+      
+      // 4. Call Claude API directly
+      const claudeResponse = await this.callClaudeDirectly(claudePrompt);
+      
+      // 5. Format the response
+      return {
+        success: true,
+        prompt: userPrompt,
+        result: {
+          code: {
+            frontend: claudeResponse.code || null,
+            backend: claudeResponse.backendCode || null
+          },
+          explanation: claudeResponse.explanation || 'Generated with Claude'
+        },
+        metadata: {
+          componentType: this.extractComponentType(userPrompt),
+          designSystem: designSystem,
+          timestamp: new Date().toISOString(),
+          usedFallback: true
+        }
+      };
+    } catch (error: any) {
+      this.log('Fallback generation failed:', error.message);
       return {
         success: false,
-        error: error.message,
+        error: `Fallback generation failed: ${error.message}`,
         prompt: userPrompt
       };
+    }
+  }
+
+  /**
+   * Extract design system preference from prompt
+   */
+  private extractDesignSystemPreference(prompt: string): string {
+    const lowerPrompt = prompt.toLowerCase();
+    
+    // Check for common design systems
+    if (lowerPrompt.includes('shadcn') || lowerPrompt.includes('shadcn/ui')) {
+      return 'shadcn/ui';
+    } else if (lowerPrompt.includes('tailwind')) {
+      return 'tailwind';
+    } else if (lowerPrompt.includes('chakra')) {
+      return 'chakra-ui';
+    } else if (lowerPrompt.includes('material')) {
+      return 'material-ui';
+    } else if (lowerPrompt.includes('bootstrap')) {
+      return 'bootstrap';
+    }
+    
+    // Default to shadcn/ui
+    return 'shadcn/ui';
+  }
+
+  /**
+   * Extract component type from prompt
+   */
+  private extractComponentType(prompt: string): string {
+    const lowerPrompt = prompt.toLowerCase();
+    
+    // Check for common component types
+    if (lowerPrompt.includes('dashboard')) {
+      return 'dashboard';
+    } else if (lowerPrompt.includes('form') || lowerPrompt.includes('signup') || lowerPrompt.includes('sign up')) {
+      return 'form';
+    } else if (lowerPrompt.includes('table')) {
+      return 'table';
+    } else if (lowerPrompt.includes('card')) {
+      return 'card';
+    } else if (lowerPrompt.includes('navbar') || lowerPrompt.includes('navigation')) {
+      return 'navbar';
+    }
+    
+    // Default to component
+    return 'component';
+  }
+
+  /**
+   * Fetch example code snippets for a given design system
+   */
+  private async fetchDesignSystemExamples(designSystem: string): Promise<string[]> {
+    // This would ideally fetch real examples from a repository or documentation
+    // For now, we'll return some basic examples based on the design system
+    
+    // Sample examples for shadcn/ui
+    const shadcnExamples = [
+      `import { Button } from "@/components/ui/button"
+export function ButtonDemo() {
+  return (
+    <Button variant="outline">Button</Button>
+  )
+}`,
+      `import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+export function CardDemo() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Card Title</CardTitle>
+        <CardDescription>Card Description</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p>Card Content</p>
+      </CardContent>
+      <CardFooter>
+        <p>Card Footer</p>
+      </CardFooter>
+    </Card>
+  )
+}`
+    ];
+    
+    // Return examples based on design system
+    switch (designSystem.toLowerCase()) {
+      case 'shadcn/ui':
+        return shadcnExamples;
+      default:
+        return shadcnExamples; // Default to shadcn/ui examples
+    }
+  }
+
+  /**
+   * Create a prompt for Claude fallback generation
+   */
+  private createClaudeFallbackPrompt(userPrompt: string, designSystem: string, exampleSnippets: string[]): string {
+    return `
+You are an expert UI developer specializing in creating beautiful React applications.
+
+# TASK
+I need you to create a component based on my requirements. I could not find an exact match, so please create it from scratch.
+
+# USER REQUIREMENTS
+"${userPrompt}"
+
+# DESIGN SYSTEM
+You should use ${designSystem} for this component.
+
+# EXAMPLES
+Here are some examples of ${designSystem} components:
+
+${exampleSnippets.map((snippet, index) => `Example ${index + 1}:\n\`\`\`jsx\n${snippet}\n\`\`\``).join('\n\n')}
+
+# TECHNICAL REQUIREMENTS
+- Create a React component that fulfills the user's requirements
+- Use ${designSystem} components and styling
+- Make the component fully responsive
+- Ensure the code is clean, well-organized, and follows best practices
+- Add appropriate TypeScript types
+
+# INSTRUCTIONS
+1. Create a component that fulfills the user requirements
+2. Style it according to the ${designSystem} design system
+3. Make it responsive and accessible
+4. Add comments to explain any complex logic
+5. Include any necessary imports
+
+# EXPECTED RESPONSE FORMAT
+Provide the code in the following format:
+
+\`\`\`jsx
+// Frontend code here...
+\`\`\`
+
+If backend code is needed, include it after the frontend code:
+
+\`\`\`javascript
+// Backend code here (if needed)...
+\`\`\`
+
+Finally, provide a brief explanation of the component and how to use it.
+`;
+  }
+
+  /**
+   * Call Claude API directly with a prompt
+   */
+  private async callClaudeDirectly(prompt: string): Promise<any> {
+    try {
+      // Use the existing customizer to call Claude
+      // But create a minimal design result to pass to the customizer
+      const minimalDesignResult: DesignCodeResult = {
+        success: true,
+        requirements: {
+          originalPrompt: prompt,
+          componentType: this.extractComponentType(prompt),
+          framework: 'react',
+          designSystem: this.extractDesignSystemPreference(prompt),
+          styles: ['beautiful'],
+          isFullStack: prompt.toLowerCase().includes('backend') || prompt.toLowerCase().includes('api'),
+        },
+        code: "// Placeholder code - Claude will replace this",
+        metadata: {
+          query: prompt,
+          designSystem: this.extractDesignSystemPreference(prompt),
+        }
+      };
+      
+      // Call Claude through the customizer
+      const claudeResponse = await this.customizer.customizeCode(minimalDesignResult);
+      
+      if (!claudeResponse || !claudeResponse.success) {
+        throw new Error(claudeResponse?.error || 'Failed to generate code with Claude');
+      }
+      
+      return {
+        code: claudeResponse.customizedCode?.frontend,
+        backendCode: claudeResponse.customizedCode?.backend,
+        explanation: claudeResponse.explanation
+      };
+    } catch (error: any) {
+      this.log('Error calling Claude directly:', error);
+      throw error;
     }
   }
   
@@ -170,3 +421,4 @@ export class UICodeGenerator {
     return [...this.generationHistory];
   }
 }
+
