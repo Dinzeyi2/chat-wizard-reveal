@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Message } from "@/types/chat";
 import { Button } from "@/components/ui/button";
@@ -38,10 +37,8 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   const [appData, setAppData] = useState<GeneratedApp | null>(null);
   
   useEffect(() => {
-    // Extract and parse app data when the component mounts or message changes
     const extractAppData = (): GeneratedApp | null => {
       try {
-        // Enhanced JSON extraction with multiple regex patterns for robustness
         const jsonRegex = /```json([\s\S]*?)```/;
         const appDataMatch = message.content.match(jsonRegex);
         
@@ -49,7 +46,6 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
           const jsonText = appDataMatch[1].trim();
           const jsonData = JSON.parse(jsonText);
           
-          // Validate that this is actually app data with required fields
           if (jsonData && 
               typeof jsonData.projectName === 'string' && 
               typeof jsonData.description === 'string' && 
@@ -67,36 +63,46 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
     setAppData(extractAppData());
   }, [message]);
   
-  // If data couldn't be parsed, return the raw message
-  if (!appData) {
-    return <div className="whitespace-pre-wrap">{message.content}</div>;
-  }
-
-  const appIcon = () => {
-    if (appData.projectName.toLowerCase().includes("shopify") || 
-        appData.description.toLowerCase().includes("e-commerce") || 
-        appData.description.toLowerCase().includes("ecommerce") ||
-        appData.description.toLowerCase().includes("shop")) {
-      return <ShoppingBag className="h-5 w-5" />;
-    }
-    return <FileCode className="h-5 w-5" />;
-  };
-  
-  const handleViewFullProject = () => {
-    const artifactFiles = appData.files.map((file, index) => ({
-      id: `file-${index}`,
-      name: file.path.split('/').pop() || file.path,
-      path: file.path,
-      language: getLanguageFromPath(file.path),
-      content: file.content
-    }));
-
-    openArtifact({
+  const createFallbackArtifact = () => {
+    return {
       id: `artifact-${Date.now()}`,
-      title: appData.projectName,
-      description: appData.description,
-      files: artifactFiles
-    });
+      title: "Generated Application",
+      description: "Application content could not be fully parsed",
+      files: [{
+        id: "raw-content",
+        name: "content.md",
+        path: "content.md",
+        language: "markdown",
+        content: message.content
+      }]
+    };
+  };
+
+  const handleViewFullProject = () => {
+    if (!appData || !appData.files || appData.files.length === 0) {
+      openArtifact(createFallbackArtifact());
+      return;
+    }
+
+    try {
+      const artifactFiles = appData.files.map((file, index) => ({
+        id: `file-${index}`,
+        name: file.path.split('/').pop() || file.path,
+        path: file.path,
+        language: getLanguageFromPath(file.path),
+        content: file.content
+      }));
+
+      openArtifact({
+        id: `artifact-${Date.now()}`,
+        title: appData.projectName,
+        description: appData.description,
+        files: artifactFiles
+      });
+    } catch (error) {
+      console.error("Error opening artifact:", error);
+      openArtifact(createFallbackArtifact());
+    }
   };
 
   const handleDownload = () => {
@@ -190,8 +196,8 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   return (
     <div className="my-6 space-y-6">
       <div>
-        <h3 className="text-xl font-semibold mb-2">I've generated a full-stack application: {appData.projectName}</h3>
-        <p className="text-gray-600">{appData.description}</p>
+        <h3 className="text-xl font-semibold mb-2">I've generated a full-stack application: {appData?.projectName || "Application"}</h3>
+        <p className="text-gray-600">{appData?.description || "Generated application"}</p>
       </div>
       
       <div className="bg-white border border-gray-200 rounded-full shadow-sm p-4 flex items-center justify-between">
@@ -209,40 +215,42 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
         </Button>
       </div>
       
-      <div className="space-y-4">
-        <h4 className="font-semibold">This application includes:</h4>
-        <ol className="list-decimal pl-6 space-y-2">
-          {appData.files.length > 0 && (
+      {appData && (
+        <div className="space-y-4">
+          <h4 className="font-semibold">This application includes:</h4>
+          <ol className="list-decimal pl-6 space-y-2">
+            {appData.files.length > 0 && (
+              <li>
+                <span className="font-medium">{appData.files.length} files</span> organized in a structured project
+              </li>
+            )}
+            {appData.technologies && (
+              <li>
+                <span className="font-medium">Technologies used:</span> {appData.technologies.join(', ')}
+              </li>
+            )}
             <li>
-              <span className="font-medium">{appData.files.length} files</span> organized in a structured project
+              <span className="font-medium">Main features:</span>
+              <ul className="list-disc pl-6 pt-1">
+                {getMainFeatures().map((feature, index) => (
+                  <li key={index}>{feature}</li>
+                ))}
+              </ul>
             </li>
-          )}
-          {appData.technologies && (
-            <li>
-              <span className="font-medium">Technologies used:</span> {appData.technologies.join(', ')}
-            </li>
-          )}
-          <li>
-            <span className="font-medium">Main features:</span>
-            <ul className="list-disc pl-6 pt-1">
-              {getMainFeatures().map((feature, index) => (
-                <li key={index}>{feature}</li>
-              ))}
-            </ul>
-          </li>
-        </ol>
-      </div>
+          </ol>
+        </div>
+      )}
       
       <Accordion type="single" collapsible className="w-full">
         <AccordionItem value="explanation">
           <AccordionTrigger className="px-5 py-3 hover:bg-gray-50">Application Details</AccordionTrigger>
           <AccordionContent className="px-5 pb-4">
             <div className="text-sm space-y-2">
-              {appData.explanation ? (
+              {appData?.explanation ? (
                 <p>{appData.explanation}</p>
               ) : (
                 <>
-                  <p><strong>Architecture Overview:</strong> This {appData.projectName} application follows a modern web architecture with a clean separation of concerns.</p>
+                  <p><strong>Architecture Overview:</strong> This {appData?.projectName || "generated"} application follows a modern web architecture with a clean separation of concerns.</p>
                   
                   <p><strong>Frontend:</strong> The UI is built with React components organized in a logical hierarchy, with pages for different views and reusable components for common elements.</p>
                   
