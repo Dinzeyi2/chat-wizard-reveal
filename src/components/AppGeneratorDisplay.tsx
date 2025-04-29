@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Message } from "@/types/chat";
 import { Button } from "@/components/ui/button";
@@ -38,10 +37,8 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   const [appData, setAppData] = useState<GeneratedApp | null>(null);
   
   useEffect(() => {
-    // Extract and parse app data when the component mounts or message changes
     const extractAppData = (): GeneratedApp | null => {
       try {
-        // Enhanced JSON extraction with multiple regex patterns for robustness
         const jsonRegex = /```json([\s\S]*?)```/;
         const appDataMatch = message.content.match(jsonRegex);
         
@@ -49,7 +46,6 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
           const jsonText = appDataMatch[1].trim();
           const jsonData = JSON.parse(jsonText);
           
-          // Validate that this is actually app data with required fields
           if (jsonData && 
               typeof jsonData.projectName === 'string' && 
               typeof jsonData.description === 'string' && 
@@ -67,7 +63,6 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
     setAppData(extractAppData());
   }, [message]);
   
-  // If data couldn't be parsed, return the raw message
   if (!appData) {
     return <div className="whitespace-pre-wrap">{message.content}</div>;
   }
@@ -194,19 +189,15 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
         <p className="text-gray-600">{appData.description}</p>
       </div>
       
-      <div className="bg-white border border-gray-200 rounded-full shadow-sm p-4 flex items-center justify-between">
+      <div 
+        className="bg-white border border-gray-200 rounded-full shadow-sm p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+        onClick={handleViewFullProject}
+      >
         <div className="flex items-center">
           <SquareDashed className="mr-3 h-5 w-5 text-gray-500" />
           <span className="font-medium text-lg">View code</span>
         </div>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="hover:bg-transparent" 
-          onClick={handleViewFullProject}
-        >
-          <ChevronRight className="h-5 w-5 text-gray-400" />
-        </Button>
+        <ChevronRight className="h-5 w-5 text-gray-400" />
       </div>
       
       <div className="space-y-4">
