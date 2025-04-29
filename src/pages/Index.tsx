@@ -185,6 +185,7 @@ If you were trying to generate an app, this might be due to limits with our AI m
           timestamp: new Date()
         };
         
+        // Use the local processingMessage variable from this closure's scope
         setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
         setMessages(prev => [...prev, errorMessage]);
       } finally {
