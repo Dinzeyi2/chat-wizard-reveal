@@ -11,22 +11,19 @@ interface MarkdownRendererProps {
 }
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message }) => {
-  // More robust detection for app generation content - simplified and more reliable
+  // More robust detection for app generation content - check for JSON structure
   const isAppGeneration = React.useMemo(() => {
-    // Direct indicators of app generation
-    const hasJsonStructure = content.includes('"files":') && 
-      (content.includes('"path":') || content.includes('"content":'));
-    
-    // Look for common pattern combinations that indicate app generation
-    const hasProjectStructure = content.includes('"projectName":') || 
-      (content.includes('generated') && content.includes('application'));
-    
-    // If we have clear JSON structure or multiple indicators, consider it an app generation
-    return hasJsonStructure || hasProjectStructure;
+    // First check for JSON block markers
+    if (content.includes("```json") && content.includes("```")) {
+      // Then check for key app generation indicators
+      return content.includes("projectName") && 
+             content.includes("files") && 
+             content.includes("description");
+    }
+    return false;
   }, [content]);
   
   if (message && isAppGeneration) {
-    console.info("Rendering AppGeneratorDisplay");
     return (
       <ArtifactProvider>
         <AppGeneratorDisplay message={message} />
