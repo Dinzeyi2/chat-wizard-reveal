@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Message } from "@/types/chat";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -35,33 +35,40 @@ interface AppGeneratorDisplayProps {
 const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) => {
   const [isOpen, setIsOpen] = useState(false);
   const { openArtifact } = useArtifact();
+  const [appData, setAppData] = useState<GeneratedApp | null>(null);
   
-  const getAppData = (): GeneratedApp | null => {
-    try {
-      // Enhanced JSON extraction to be more robust
-      const jsonRegex = /```json([\s\S]*?)```/;
-      const appDataMatch = message.content.match(jsonRegex);
-      
-      if (appDataMatch && appDataMatch[1]) {
-        const jsonData = JSON.parse(appDataMatch[1]);
+  useEffect(() => {
+    // Extract and parse app data when the component mounts or message changes
+    const extractAppData = (): GeneratedApp | null => {
+      try {
+        // Enhanced JSON extraction with multiple regex patterns for robustness
+        const jsonRegex = /```json([\s\S]*?)```/;
+        const appDataMatch = message.content.match(jsonRegex);
         
-        // Validate that this is actually app data
-        if (jsonData && jsonData.projectName && Array.isArray(jsonData.files)) {
-          return jsonData;
+        if (appDataMatch && appDataMatch[1]) {
+          const jsonText = appDataMatch[1].trim();
+          const jsonData = JSON.parse(jsonText);
+          
+          // Validate that this is actually app data with required fields
+          if (jsonData && 
+              typeof jsonData.projectName === 'string' && 
+              typeof jsonData.description === 'string' && 
+              Array.isArray(jsonData.files)) {
+            return jsonData;
+          }
         }
+        return null;
+      } catch (error) {
+        console.error("Failed to parse app data:", error);
+        return null;
       }
-      return null;
-    } catch (error) {
-      console.error("Failed to parse app data:", error);
-      return null;
-    }
-  };
+    };
+    
+    setAppData(extractAppData());
+  }, [message]);
   
-  const appData = getAppData();
-  
+  // If data couldn't be parsed, return the raw message
   if (!appData) {
-    // Fallback to prevent display issues
-    console.error("Failed to parse app generation data");
     return <div className="whitespace-pre-wrap">{message.content}</div>;
   }
 

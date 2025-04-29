@@ -11,12 +11,17 @@ interface MarkdownRendererProps {
 }
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message }) => {
-  // Consistent detection for app generation content
-  const isAppGeneration = 
-    content.includes("```json") && 
-    (content.includes("projectName") || 
-     content.includes("files") ||
-     content.includes("description"));
+  // More robust detection for app generation content - check for JSON structure
+  const isAppGeneration = React.useMemo(() => {
+    // First check for JSON block markers
+    if (content.includes("```json") && content.includes("```")) {
+      // Then check for key app generation indicators
+      return content.includes("projectName") && 
+             content.includes("files") && 
+             content.includes("description");
+    }
+    return false;
+  }, [content]);
   
   if (message && isAppGeneration) {
     return (

@@ -3,6 +3,7 @@ import React from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { Avatar, AvatarFallback } from "./ui/avatar";
+import { ArtifactProvider } from "./artifact/ArtifactSystem";
 
 interface ChatWindowProps {
   messages: Message[];
@@ -23,7 +24,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, loading }) => {
           ) : (
             <div>
               <div className="ml-0 bg-white border border-gray-200 rounded-3xl px-6 py-4 max-w-3xl">
-                <MarkdownRenderer content={message.content} message={message} />
+                <ArtifactProvider>
+                  <MarkdownRenderer content={message.content} message={message} />
+                </ArtifactProvider>
               </div>
             </div>
           )}
