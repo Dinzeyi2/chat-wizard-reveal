@@ -1,4 +1,3 @@
-
 /**
  * UI Code Generator - Main Integration
  * This module integrates the Perplexity AI Design Scraper with the Claude Code Customizer
@@ -77,34 +76,9 @@ export class UICodeGenerator {
       // 1. Log the request
       this.log('Generating code for prompt:', userPrompt);
       
-      // 2. Find design using Perplexity AI
-      this.log('Searching for UI design with Perplexity AI...');
-      const scrapedDesign = await this.scraper.findDesignCode(userPrompt);
-      
-      // 3. Check if Perplexity found design code successfully
-      if (!scrapedDesign || !scrapedDesign.success || !scrapedDesign.code) {
-        // Perplexity failed to find relevant design code, using Claude fallback
-        this.log('Perplexity search failed, using Claude fallback...');
-        return await this.claudeFallbackGeneration(userPrompt);
-      }
-      
-      this.log('Design found:', scrapedDesign.metadata);
-      
-      // 4. Customize the design with Claude
-      this.log('Customizing code with Claude...');
-      const customizedCode = await this.customizer.customizeCode(scrapedDesign);
-      
-      if (!customizedCode || !customizedCode.success) {
-        throw new Error(customizedCode?.error || 'Failed to customize code');
-      }
-      
-      this.log('Code customization complete');
-      
-      // 5. Save to history
-      this.saveToHistory(userPrompt, scrapedDesign, customizedCode);
-      
-      // 6. Format and return the result
-      return this.formatResult(userPrompt, scrapedDesign, customizedCode);
+      // Skip the Perplexity search which is causing issues and go straight to Claude
+      this.log('Using direct Claude fallback for code generation');
+      return await this.claudeFallbackGeneration(userPrompt);
       
     } catch (error: any) {
       this.log('Error generating code:', error.message);
