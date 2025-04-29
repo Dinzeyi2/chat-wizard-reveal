@@ -52,7 +52,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
       "i've created", "i have created", 
       "i've built", "i have built", 
       "here's what i created", "here's what i built",
-      "here is what i created", "here is what i built"
+      "here is what i created", "here is what i built",
+      "i've updated your app", "your app has been updated",
+      "i've modified your app"
     ];
     
     const hasGenerationPhrase = generationPhrases.some(phrase => 
@@ -85,8 +87,16 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
     const codeBlockCount = (content.match(/```/g) || []).length;
     const hasMultipleCodeBlocks = codeBlockCount >= 4; // At least 2 blocks
     
+    // If this is a modification response with a projectId
+    const isModification = content.toLowerCase().includes('updated your app') || 
+                          (projectId !== null && (
+                            content.toLowerCase().includes('modified') || 
+                            content.toLowerCase().includes('updated')
+                          ));
+    
     // Be VERY lenient - if multiple conditions are met, treat it as app generation
-    return (hasJsonContent && (hasProjectName || hasFiles)) || 
+    return isModification || 
+           (hasJsonContent && (hasProjectName || hasFiles)) || 
            (hasGenerationPhrase && (hasAppKeyword || hasFileStructure)) ||
            (hasGenerationKeyword && hasAppKeyword && (hasFileStructure || hasMultipleCodeBlocks)) ||
            (projectId !== null); // If we detected a projectId, it's definitely app generation

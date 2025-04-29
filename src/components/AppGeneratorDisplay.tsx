@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Message } from "@/types/chat";
 import { Button } from "@/components/ui/button";
@@ -313,23 +312,27 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
   // Detect if this is a modified app or an original generation
   const isModification = message.content.toLowerCase().includes('modified') || 
                         message.content.toLowerCase().includes('updated') || 
-                        message.content.toLowerCase().includes('changed');
+                        message.content.toLowerCase().includes('changed') ||
+                        message.content.toLowerCase().includes("i've updated your app");
 
   return (
     <div className="my-6 space-y-6">
       <div>
         <h3 className="text-xl font-semibold mb-2">
           {isModification 
-            ? `I've updated the ${appData.projectName} application` 
+            ? `Your app has been updated with the requested changes` 
             : `I've generated a full-stack application: ${appData.projectName}`}
         </h3>
-        <p className="text-gray-600">{appData.description}</p>
+        <p className="text-gray-600">{isModification 
+          ? "The changes you requested have been applied to your existing application."
+          : appData.description}
+        </p>
       </div>
       
       <div className="bg-white border border-gray-200 rounded-full shadow-sm p-4 flex items-center justify-between">
         <div className="flex items-center">
           <SquareDashed className="mr-3 h-5 w-5 text-gray-500" />
-          <span className="font-medium text-lg">View code</span>
+          <span className="font-medium text-lg">{isModification ? "View updated code" : "View code"}</span>
         </div>
         <Button 
           variant="ghost" 
@@ -341,58 +344,67 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
         </Button>
       </div>
       
-      <div className="space-y-4">
-        <h4 className="font-semibold">This application includes:</h4>
-        <ol className="list-decimal pl-6 space-y-2">
-          {appData.files.length > 0 && (
+      {!isModification && (
+        <div className="space-y-4">
+          <h4 className="font-semibold">This application includes:</h4>
+          <ol className="list-decimal pl-6 space-y-2">
+            {appData.files.length > 0 && (
+              <li>
+                <span className="font-medium">{appData.files.length} files</span> organized in a structured project
+              </li>
+            )}
+            {appData.technologies && appData.technologies.length > 0 && (
+              <li>
+                <span className="font-medium">Technologies used:</span> {appData.technologies.join(', ')}
+              </li>
+            )}
             <li>
-              <span className="font-medium">{appData.files.length} files</span> organized in a structured project
+              <span className="font-medium">Main features:</span>
+              <ul className="list-disc pl-6 pt-1">
+                {getMainFeatures().map((feature, index) => (
+                  <li key={index}>{feature}</li>
+                ))}
+              </ul>
             </li>
-          )}
-          {appData.technologies && appData.technologies.length > 0 && (
-            <li>
-              <span className="font-medium">Technologies used:</span> {appData.technologies.join(', ')}
-            </li>
-          )}
-          <li>
-            <span className="font-medium">Main features:</span>
-            <ul className="list-disc pl-6 pt-1">
-              {getMainFeatures().map((feature, index) => (
-                <li key={index}>{feature}</li>
-              ))}
-            </ul>
-          </li>
-        </ol>
-      </div>
+          </ol>
+        </div>
+      )}
       
-      <Accordion type="single" collapsible className="w-full">
-        <AccordionItem value="explanation">
-          <AccordionTrigger className="px-5 py-3 hover:bg-gray-50">Application Details</AccordionTrigger>
-          <AccordionContent className="px-5 pb-4">
-            <div className="text-sm space-y-2">
-              {appData?.explanation ? (
-                <p>{appData.explanation}</p>
-              ) : (
-                <>
-                  <p><strong>Architecture Overview:</strong> This {appData?.projectName || "generated"} application follows a modern web architecture with a clean separation of concerns.</p>
-                  
-                  <p><strong>Frontend:</strong> The UI is built with React components organized in a logical hierarchy, with pages for different views and reusable components for common elements.</p>
-                  
-                  <p><strong>Data Management:</strong> The application handles data through state management and API calls to backend services.</p>
-                  
-                  <p><strong>Key Technical Features:</strong></p>
-                  <ul className="list-disc pl-5 space-y-1">
-                    <li>React components for UI building blocks</li>
-                    <li>State management for application data</li>
-                    <li>API integration for data fetching</li>
-                    <li>Responsive design for all device sizes</li>
-                  </ul>
-                </>
-              )}
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
+      {isModification ? (
+        <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
+          <p className="text-blue-800 font-medium">Your app has been successfully updated!</p>
+          <p className="text-blue-600 text-sm mt-1">Click the "View updated code" button to see your modified code.</p>
+        </div>
+      ) : (
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="explanation">
+            <AccordionTrigger className="px-5 py-3 hover:bg-gray-50">Application Details</AccordionTrigger>
+            <AccordionContent className="px-5 pb-4">
+              <div className="text-sm space-y-2">
+                {appData?.explanation ? (
+                  <p>{appData.explanation}</p>
+                ) : (
+                  <>
+                    <p><strong>Architecture Overview:</strong> This {appData?.projectName || "generated"} application follows a modern web architecture with a clean separation of concerns.</p>
+                    
+                    <p><strong>Frontend:</strong> The UI is built with React components organized in a logical hierarchy, with pages for different views and reusable components for common elements.</p>
+                    
+                    <p><strong>Data Management:</strong> The application handles data through state management and API calls to backend services.</p>
+                    
+                    <p><strong>Key Technical Features:</strong></p>
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>React components for UI building blocks</li>
+                      <li>State management for application data</li>
+                      <li>API integration for data fetching</li>
+                      <li>Responsive design for all device sizes</li>
+                    </ul>
+                  </>
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      )}
     </div>
   );
 };

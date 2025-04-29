@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { corsHeaders } from "../_shared/cors.ts"
@@ -66,8 +65,9 @@ serve(async (req) => {
               { 
                 role: 'user', 
                 content: `The user requested: "${message}". 
-                The AI made the following changes to their app: ${modifyResult.summary}.
-                Explain what was changed in a friendly, helpful way. Don't be too technical. 
+                The AI made the following changes to their existing app: ${modifyResult.summary}.
+                Explain what was modified in a friendly, helpful way. Start with "I've updated your app with the requested changes."
+                Don't be too technical. Make it clear that these changes were applied to their EXISTING app, not a new app.
                 Mention that they can view the updated code by clicking the "View code" button.` 
               }
             ],
@@ -80,13 +80,7 @@ serve(async (req) => {
 
         const summaryData = await summaryResponse.json();
         const aiResponse = summaryData.choices[0].message.content + 
-          `\n\nI've generated a full-stack application based on your modifications. Here's what I created:
-
-\`\`\`json
-${JSON.stringify(modifyResult.modifiedApp, null, 2)}
-\`\`\`
-
-You can explore the updated code using the "View code" button above.`;
+          `\n\nYour app has been updated with these modifications. You can explore the updated code using the "View code" button above.`;
 
         return new Response(JSON.stringify({ response: aiResponse, projectId: modifyResult.projectId }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
