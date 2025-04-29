@@ -9,6 +9,47 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      app_projects: {
+        Row: {
+          app_data: Json
+          created_at: string
+          id: string
+          modification_prompt: string | null
+          original_prompt: string | null
+          parent_id: string | null
+          user_id: string
+          version: number
+        }
+        Insert: {
+          app_data: Json
+          created_at?: string
+          id?: string
+          modification_prompt?: string | null
+          original_prompt?: string | null
+          parent_id?: string | null
+          user_id: string
+          version?: number
+        }
+        Update: {
+          app_data?: Json
+          created_at?: string
+          id?: string
+          modification_prompt?: string | null
+          original_prompt?: string | null
+          parent_id?: string | null
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_projects_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "app_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookmarks: {
         Row: {
           created_at: string
