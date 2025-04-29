@@ -72,6 +72,12 @@ const ChatHistory = () => {
     navigate(`/?chat=${chatId}`);
   };
 
+  // Function to handle creating a new chat
+  const handleNewChat = () => {
+    // Navigate to the home page without any chat ID parameter to start fresh
+    navigate('/');
+  };
+
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <div className="flex justify-between items-center mb-8">
@@ -83,12 +89,10 @@ const ChatHistory = () => {
           </Link>
           <h1 className="text-3xl font-medium text-gray-800">Your chat history</h1>
         </div>
-        <Link to="/">
-          <Button className="rounded-full">
-            <PlusIcon className="mr-2 h-4 w-4" />
-            New chat
-          </Button>
-        </Link>
+        <Button className="rounded-full" onClick={handleNewChat}>
+          <PlusIcon className="mr-2 h-4 w-4" />
+          New chat
+        </Button>
       </div>
       
       <div className="relative mb-6">
