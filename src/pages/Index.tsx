@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -9,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Loader2 } from "lucide-react";
 import { ArtifactProvider, ArtifactLayout } from "@/components/artifact/ArtifactSystem";
 import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
+import { useLocation } from "react-router-dom";
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -19,6 +21,94 @@ const Index = () => {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Parse chat ID from URL if present
+    const searchParams = new URLSearchParams(location.search);
+    const chatId = searchParams.get('chat');
+    
+    if (chatId) {
+      // Load the specific chat history
+      loadChatHistory(chatId);
+    }
+  }, [location]);
+
+  const loadChatHistory = async (chatId: string) => {
+    console.log(`Loading chat history for chat ID: ${chatId}`);
+    
+    // In a real application, here we would fetch the chat history from the backend
+    // For now, we'll simulate loading chat data with mock messages based on mock data
+    const mockChatHistory = chatHistory.find(chat => chat.id === chatId);
+    
+    if (mockChatHistory) {
+      // Simulate loading previous messages based on the chat title
+      const userMessage: Message = {
+        id: "user-" + Date.now().toString(),
+        role: "user",
+        content: mockChatHistory.title,
+        timestamp: new Date(Date.now() - 3600000) // 1 hour ago
+      };
+      
+      const assistantMessage: Message = {
+        id: "assistant-" + Date.now().toString(),
+        role: "assistant",
+        content: `This is a previous conversation about "${mockChatHistory.title}". I'm here to continue helping you with this topic.`,
+        timestamp: new Date(Date.now() - 3500000) // A bit less than 1 hour ago
+      };
+      
+      setMessages([userMessage, assistantMessage]);
+      
+      // If this chat had a project ID, we would restore it here
+      // setCurrentProjectId(mockProjectId);
+    }
+  };
+
+  // Mock chat history data (same as in ChatHistory.tsx)
+  const chatHistory = [
+    {
+      id: "1",
+      title: "Chatbot to Generate Full Stack Apps with Anthropic API",
+      lastMessage: "Last message 15 hours ago",
+      timestamp: "15 hours ago"
+    },
+    {
+      id: "2",
+      title: "Enhancing AI Responses with Deep Reasoning",
+      lastMessage: "Last message 16 hours ago",
+      timestamp: "16 hours ago"
+    },
+    {
+      id: "3",
+      title: "Enhancing AI Conversational Awareness",
+      lastMessage: "Last message 18 hours ago",
+      timestamp: "18 hours ago"
+    },
+    {
+      id: "4",
+      title: "Enabling User Customization of AI-Generated Web Apps",
+      lastMessage: "Last message 18 hours ago",
+      timestamp: "18 hours ago"
+    },
+    {
+      id: "5",
+      title: "Chatbot for Customizing AI-Generated Webapps",
+      lastMessage: "Last message 18 hours ago",
+      timestamp: "18 hours ago"
+    },
+    {
+      id: "6",
+      title: "AI-Powered Full Stack App Builder",
+      lastMessage: "Last message 1 day ago",
+      timestamp: "1 day ago"
+    },
+    {
+      id: "7",
+      title: "Intelligent Project Management System with Contextual AI",
+      lastMessage: "Last message 1 day ago",
+      timestamp: "1 day ago"
+    }
+  ];
 
   useEffect(() => {
     if (messagesEndRef.current) {

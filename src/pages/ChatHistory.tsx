@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { PlusIcon, Search, ArrowLeft } from "lucide-react";
 
 interface ChatHistoryItem {
@@ -15,6 +15,7 @@ interface ChatHistoryItem {
 
 const ChatHistory = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const navigate = useNavigate();
   
   // Mock data for chat history
   const chatHistory: ChatHistoryItem[] = [
@@ -66,6 +67,11 @@ const ChatHistory = () => {
     chat.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const handleChatSelection = (chatId: string) => {
+    // Here we navigate to the main chat page with the specific chat ID
+    navigate(`/?chat=${chatId}`);
+  };
+
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <div className="flex justify-between items-center mb-8">
@@ -105,6 +111,7 @@ const ChatHistory = () => {
           <Card 
             key={chat.id} 
             className="cursor-pointer hover:bg-gray-50 p-4 transition-colors"
+            onClick={() => handleChatSelection(chat.id)}
           >
             <h2 className="font-medium text-gray-800">{chat.title}</h2>
             <p className="text-sm text-gray-500">{chat.lastMessage}</p>
