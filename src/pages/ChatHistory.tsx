@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Link } from "react-router-dom";
-import { PlusIcon, Search } from "lucide-react";
+import { PlusIcon, Search, ArrowLeft } from "lucide-react";
 
 interface ChatHistoryItem {
   id: string;
@@ -69,7 +69,14 @@ const ChatHistory = () => {
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-medium text-gray-800">Your chat history</h1>
+        <div className="flex items-center gap-3">
+          <Link to="/">
+            <Button variant="outline" size="icon" className="rounded-full">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <h1 className="text-3xl font-medium text-gray-800">Your chat history</h1>
+        </div>
         <Link to="/">
           <Button className="rounded-full">
             <PlusIcon className="mr-2 h-4 w-4" />
