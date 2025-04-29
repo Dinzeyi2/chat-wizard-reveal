@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -123,7 +124,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           model: "claude-3-5-sonnet-20240620",
-          max_tokens: 3500, // Further reduced to ensure we stay well within limits
+          max_tokens: 3000, // Further reduced to ensure we stay well within limits
           temperature: 0.7,
           system: `You are an expert full stack developer specializing in modern web applications.
           When given a prompt for a web application, you will create a detailed architecture plan with:
@@ -133,9 +134,8 @@ serve(async (req) => {
           4. Component hierarchy
           5. Data models
           
-          IMPORTANT: Keep your response concise and within 3500 tokens.
-          
-          Format your response as JSON with the following structure:
+          IMPORTANT: Keep your response concise and within 3000 tokens.
+          Format your response as a valid, complete JSON object with the following structure only:
           {
             "projectName": "name-of-project",
             "description": "Brief description",
@@ -145,7 +145,10 @@ serve(async (req) => {
               "backend": ["file1", "file2"],
               "config": ["file1", "file2"]
             }
-          }`,
+          }
+          
+          Make sure the JSON is complete and valid, with no trailing commas or syntax errors.
+          Do not include any explanatory text outside the JSON object.`,
           messages: [
             {
               role: "user",
@@ -188,30 +191,38 @@ serve(async (req) => {
     let architecture;
     
     try {
-      architecture = JSON.parse(architectureContent);
+      // Improved JSON parsing with better error handling
+      // Try to clean the response before parsing if needed
+      let jsonToParse = architectureContent;
+      
+      // Remove any markdown code block markers if present
+      if (jsonToParse.includes("```json")) {
+        jsonToParse = jsonToParse.replace(/```json\n?|\n?```/g, "");
+      }
+      
+      // Clean the JSON string - remove any non-JSON content before or after
+      const jsonStart = jsonToParse.indexOf('{');
+      const jsonEnd = jsonToParse.lastIndexOf('}');
+      
+      if (jsonStart >= 0 && jsonEnd > jsonStart) {
+        jsonToParse = jsonToParse.substring(jsonStart, jsonEnd + 1);
+      }
+      
+      console.log("Cleaned JSON for parsing:", jsonToParse.substring(0, 100) + "...");
+      architecture = JSON.parse(jsonToParse);
+      console.log("Successfully parsed JSON");
     } catch (jsonError) {
       console.error("Failed to parse JSON response:", jsonError);
-      // Handle case where response isn't valid JSON
-      try {
-        const jsonStart = architectureContent.indexOf('{');
-        const jsonEnd = architectureContent.lastIndexOf('}');
-        if (jsonStart >= 0 && jsonEnd > jsonStart) {
-          const jsonPart = architectureContent.substring(jsonStart, jsonEnd + 1);
-          architecture = JSON.parse(jsonPart);
-          console.log("Successfully extracted JSON from response");
-        } else {
-          throw new Error("No valid JSON found in response");
-        }
-      } catch (extractError) {
-        console.error("Failed to extract JSON:", extractError);
-        return new Response(JSON.stringify({ 
-          error: "Failed to parse architecture data", 
-          content: architectureContent.substring(0, 500) // Include part of the content for debugging
-        }), {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        });
-      }
+      
+      // Return a more user-friendly error with instruction for retry
+      return new Response(JSON.stringify({ 
+        error: "Failed to generate application architecture. Please try again with a simpler prompt.",
+        technicalDetails: `JSON parse error: ${jsonError.message}`,
+        snippet: architectureContent.substring(0, 300) // Include part of the content for debugging
+      }), {
+        status: 400, // Changed from 502 to 400 to indicate a client-side retry might help
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
 
     // Generate files based on architecture
@@ -346,13 +357,13 @@ async function generateFileContent(filePath: string, architecture: any, original
       },
       body: JSON.stringify({
         model: "claude-3-5-sonnet-20240620",
-        max_tokens: 3500, // Further reduced to ensure we stay within the model's limits
+        max_tokens: 3000, // Further reduced to ensure we stay within the model's limits
         temperature: 0.7,
         system: `You are an expert developer specializing in creating high-quality code files.
         Generate ONLY the complete code for this specific file.
         Do not include explanations or comments outside the code.
         Make sure the code is production-ready, follows best practices, and implements modern patterns.
-        IMPORTANT: Keep your response within 3500 tokens.
+        IMPORTANT: Keep your response within 3000 tokens.
         If generating React components with shadcn/ui, use the proper import syntax and components.`,
         messages: [
           {
@@ -387,11 +398,19 @@ async function generateFileContent(filePath: string, architecture: any, original
     
     // Clean up the code (remove markdown code blocks if present)
     let cleanedContent = fileContent;
-    if (fileContent.startsWith("```") && fileContent.endsWith("```")) {
-      cleanedContent = fileContent
-        .replace(/^```(\w+)?/, "")
-        .replace(/```$/, "")
-        .trim();
+    if (fileContent.includes("```")) {
+      // More robust code block detection and removal
+      const codeBlockRegex = /```(?:\w+)?\n([\s\S]+?)\n```/;
+      const match = fileContent.match(codeBlockRegex);
+      if (match && match[1]) {
+        cleanedContent = match[1];
+      } else {
+        // Fallback if regex doesn't match but we still have code blocks
+        cleanedContent = fileContent
+          .replace(/^```(?:\w+)?/, "")
+          .replace(/```$/, "")
+          .trim();
+      }
     }
 
     return cleanedContent;
@@ -417,7 +436,7 @@ async function generatePackageJson(architecture: any): Promise<string> {
         system: `You are an expert in JavaScript/Node.js development.
         Generate a complete package.json file for a project with the following specifications.
         The package.json should include all necessary dependencies, scripts, and configuration.
-        Format your response as valid JSON only.`,
+        Format your response as valid JSON only, without any code blocks or explanatory text.`,
         messages: [
           {
             role: "user",
@@ -448,13 +467,21 @@ async function generatePackageJson(architecture: any): Promise<string> {
     
     // Clean up the JSON (remove markdown code blocks if present)
     let cleanedContent = packageContent;
-    if (packageContent.startsWith("```") && packageContent.endsWith("```")) {
-      cleanedContent = packageContent
-        .replace(/^```(\w+)?/, "")
-        .replace(/```$/, "")
-        .trim();
+    if (packageContent.includes("```")) {
+      const jsonBlockRegex = /```(?:json)?\n([\s\S]+?)\n```/;
+      const match = packageContent.match(jsonBlockRegex);
+      if (match && match[1]) {
+        cleanedContent = match[1];
+      } else {
+        cleanedContent = packageContent
+          .replace(/^```(?:json)?/, "")
+          .replace(/```$/, "")
+          .trim();
+      }
     }
 
+    // Validate that we have valid JSON
+    JSON.parse(cleanedContent); // This will throw if the JSON is invalid
     return cleanedContent;
   } catch (error) {
     console.error("Error generating package.json:", error);
