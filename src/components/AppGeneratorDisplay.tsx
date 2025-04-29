@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Message } from "@/types/chat";
 import { Button } from "@/components/ui/button";
@@ -77,8 +78,10 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
     return <FileCode className="h-5 w-5" />;
   };
   
-  const handleViewFullProject = () => {
-    console.log("Opening artifact...");
+  const handleViewFullProject = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("Opening artifact...", appData);
     
     if (!appData || !appData.files || appData.files.length === 0) {
       console.error("No files to display in artifact");
@@ -202,16 +205,17 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
         <p className="text-gray-600">{appData.description}</p>
       </div>
       
-      <div 
-        className="bg-white border border-gray-200 rounded-full shadow-sm p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+      <Button
         onClick={handleViewFullProject}
+        variant="outline"
+        className="w-full bg-white border border-gray-200 rounded-md shadow-sm p-4 flex items-center justify-between hover:bg-gray-50"
       >
         <div className="flex items-center">
           <SquareDashed className="mr-3 h-5 w-5 text-gray-500" />
           <span className="font-medium text-lg">View code</span>
         </div>
         <ChevronRight className="h-5 w-5 text-gray-400" />
-      </div>
+      </Button>
       
       <div className="space-y-4">
         <h4 className="font-semibold">This application includes:</h4>

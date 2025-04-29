@@ -14,10 +14,24 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
   const isAppGeneration = React.useMemo(() => {
     // First check for JSON block markers
     if (content.includes("```json") && content.includes("```")) {
-      // Then check for key app generation indicators
-      return content.includes("projectName") && 
-             content.includes("files") && 
-             content.includes("description");
+      try {
+        // Extract the JSON content
+        const jsonRegex = /```json([\s\S]*?)```/;
+        const match = content.match(jsonRegex);
+        
+        if (match && match[1]) {
+          const jsonData = JSON.parse(match[1].trim());
+          // Then check for key app generation indicators
+          return (
+            jsonData &&
+            typeof jsonData.projectName === 'string' && 
+            Array.isArray(jsonData.files) &&
+            typeof jsonData.description === 'string'
+          );
+        }
+      } catch (e) {
+        console.error("Failed to parse JSON in markdown:", e);
+      }
     }
     return false;
   }, [content]);
