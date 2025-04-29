@@ -139,7 +139,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
     return langMap[lang.toLowerCase()] || 'txt';
   };
 
-  // Process and format explanation text to remove markdown symbols
+  // Enhanced version of formatExplanationText to completely remove all markdown symbols
   const formatExplanationText = (text: string) => {
     if (!text) return null;
 
@@ -156,34 +156,66 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
           if (paragraph.trim().startsWith('## ')) {
             return <h4 key={idx} className="text-md font-semibold mt-3">{paragraph.replace(/^## /, '')}</h4>;
           }
+          if (paragraph.trim().startsWith('### ')) {
+            return <h5 key={idx} className="text-base font-semibold mt-2">{paragraph.replace(/^### /, '')}</h5>;
+          }
           
           // Check if paragraph is a list
           if (paragraph.includes('\n- ') || paragraph.includes('\n* ')) {
             const listItems = paragraph.split(/\n[-*] /).filter(Boolean);
             return (
               <div key={idx}>
-                {listItems[0].trim() && <p className="mb-2">{listItems[0]}</p>}
+                {listItems[0].trim() && <p className="mb-2">{listItems[0].trim()}</p>}
                 <ul className="list-disc pl-5 space-y-1">
-                  {listItems.slice(listItems[0].trim() ? 1 : 0).map((item, i) => (
-                    <li key={i}>{item}</li>
-                  ))}
+                  {listItems.slice(listItems[0].trim() ? 1 : 0).map((item, i) => {
+                    // Process nested formatting within list items (bold, italic)
+                    let formattedItem = item;
+                    
+                    // Handle bold in list items
+                    formattedItem = formattedItem.replace(/\*\*(.*?)\*\*|__(.*?)__/g, (_, p1, p2) => {
+                      return `<strong>${p1 || p2}</strong>`;
+                    });
+                    
+                    // Handle italic in list items
+                    formattedItem = formattedItem.replace(/\*(.*?)\*|_(.*?)_/g, (_, p1, p2) => {
+                      // Skip if this is part of a bold pattern we already replaced
+                      if (!p1 && !p2) return _;
+                      const content = p1 || p2;
+                      return `<em>${content}</em>`;
+                    });
+                    
+                    return <li key={i} dangerouslySetInnerHTML={{ __html: formattedItem }} />;
+                  })}
                 </ul>
               </div>
             );
           }
           
-          // Format bold and italic text
+          // Format text with common markdown patterns
           let formattedText = paragraph;
+          
           // Replace bold markdown (**text** or __text__)
-          formattedText = formattedText.replace(/\*\*(.*?)\*\*|__(.*?)__/g, (match, p1, p2) => {
+          formattedText = formattedText.replace(/\*\*(.*?)\*\*|__(.*?)__/g, (_, p1, p2) => {
             const content = p1 || p2;
             return `<strong>${content}</strong>`;
           });
           
           // Replace italic markdown (*text* or _text_)
-          formattedText = formattedText.replace(/\*(.*?)\*|_(.*?)_/g, (match, p1, p2) => {
+          formattedText = formattedText.replace(/\*(.*?)\*|_(.*?)_/g, (_, p1, p2) => {
+            // Skip if this is part of a bold pattern we already replaced
+            if (!p1 && !p2) return _;
             const content = p1 || p2;
             return `<em>${content}</em>`;
+          });
+          
+          // Replace code/inline code markdown (`text`)
+          formattedText = formattedText.replace(/`(.*?)`/g, (_, p1) => {
+            return `<code class="px-1 py-0.5 bg-gray-100 rounded text-sm font-mono">${p1}</code>`;
+          });
+          
+          // Replace links [text](url)
+          formattedText = formattedText.replace(/\[(.*?)\]\((.*?)\)/g, (_, text, url) => {
+            return `<a href="${url}" class="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">${text}</a>`;
           });
           
           // Use dangerouslySetInnerHTML to render the HTML tags
