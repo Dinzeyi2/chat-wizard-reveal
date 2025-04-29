@@ -47,14 +47,25 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
         
         if (appDataMatch && appDataMatch[1]) {
           const jsonText = appDataMatch[1].trim();
-          const jsonData = JSON.parse(jsonText);
+          console.log("Found JSON text:", jsonText.substring(0, 100) + "...");
           
-          // Validate that this is actually app data with required fields
-          if (jsonData && 
-              typeof jsonData.projectName === 'string' && 
-              typeof jsonData.description === 'string' && 
-              Array.isArray(jsonData.files)) {
-            return jsonData;
+          try {
+            const jsonData = JSON.parse(jsonText);
+            
+            // Validate that this is actually app data with required fields
+            if (jsonData && 
+                typeof jsonData.projectName === 'string' && 
+                typeof jsonData.description === 'string' && 
+                Array.isArray(jsonData.files)) {
+              console.log("Successfully parsed app data with", jsonData.files.length, "files");
+              return jsonData;
+            } else {
+              console.error("Invalid JSON structure:", jsonData);
+              return null;
+            }
+          } catch (parseError) {
+            console.error("JSON parse error:", parseError);
+            return null;
           }
         }
         return null;
@@ -64,11 +75,14 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
       }
     };
     
-    setAppData(extractAppData());
+    const data = extractAppData();
+    setAppData(data);
+    console.log("App data extracted:", data ? "success" : "failed");
   }, [message]);
   
   // If data couldn't be parsed, return the raw message
   if (!appData) {
+    console.error("Could not parse app data from message");
     return <div className="whitespace-pre-wrap">{message.content}</div>;
   }
 
@@ -83,6 +97,13 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   };
   
   const handleViewFullProject = () => {
+    console.log("handleViewFullProject called");
+    
+    if (!appData || !appData.files || appData.files.length === 0) {
+      console.error("Cannot open artifact: No files available");
+      return;
+    }
+    
     const artifactFiles = appData.files.map((file, index) => ({
       id: `file-${index}`,
       name: file.path.split('/').pop() || file.path,
@@ -91,12 +112,18 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
       content: file.content
     }));
 
-    openArtifact({
-      id: `artifact-${Date.now()}`,
-      title: appData.projectName,
-      description: appData.description,
-      files: artifactFiles
-    });
+    console.log(`Opening artifact with files: ${artifactFiles.length}`);
+    
+    try {
+      openArtifact({
+        id: `artifact-${Date.now()}`,
+        title: appData.projectName,
+        description: appData.description,
+        files: artifactFiles
+      });
+    } catch (error) {
+      console.error("Error opening artifact:", error);
+    }
   };
 
   const handleDownload = () => {
@@ -194,19 +221,17 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
         <p className="text-gray-600">{appData.description}</p>
       </div>
       
-      <div className="bg-white border border-gray-200 rounded-full shadow-sm p-4 flex items-center justify-between">
+      <div 
+        className="bg-white border border-gray-200 rounded-full shadow-sm p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+        onClick={handleViewFullProject}
+        role="button"
+        aria-label="View code"
+      >
         <div className="flex items-center">
           <SquareDashed className="mr-3 h-5 w-5 text-gray-500" />
           <span className="font-medium text-lg">View code</span>
         </div>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="hover:bg-transparent" 
-          onClick={handleViewFullProject}
-        >
-          <ChevronRight className="h-5 w-5 text-gray-400" />
-        </Button>
+        <ChevronRight className="h-5 w-5 text-gray-400" />
       </div>
       
       <div className="space-y-4">

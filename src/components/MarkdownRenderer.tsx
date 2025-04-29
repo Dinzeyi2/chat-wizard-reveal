@@ -15,15 +15,32 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
   const isAppGeneration = React.useMemo(() => {
     // First check for JSON block markers
     if (content.includes("```json") && content.includes("```")) {
-      // Then check for key app generation indicators
-      return content.includes("projectName") && 
-             content.includes("files") && 
-             content.includes("description");
+      try {
+        // Extract JSON content
+        const jsonRegex = /```json([\s\S]*?)```/;
+        const jsonMatch = content.match(jsonRegex);
+        
+        if (jsonMatch && jsonMatch[1]) {
+          const jsonText = jsonMatch[1].trim();
+          // Try to parse it
+          const jsonData = JSON.parse(jsonText);
+          
+          // Then check for key app generation indicators
+          return jsonData && 
+                 typeof jsonData.projectName === 'string' && 
+                 typeof jsonData.description === 'string' && 
+                 Array.isArray(jsonData.files);
+        }
+      } catch (error) {
+        console.error("Error parsing JSON in markdown:", error);
+        return false;
+      }
     }
     return false;
   }, [content]);
   
   if (message && isAppGeneration) {
+    console.log("Rendering AppGeneratorDisplay");
     return (
       <ArtifactProvider>
         <AppGeneratorDisplay message={message} />
