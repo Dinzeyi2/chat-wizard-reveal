@@ -139,6 +139,60 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
     return langMap[lang.toLowerCase()] || 'txt';
   };
 
+  // Process and format explanation text to remove markdown symbols
+  const formatExplanationText = (text: string) => {
+    if (!text) return null;
+
+    // Split the explanation into paragraphs
+    const paragraphs = text.split('\n\n');
+    
+    return (
+      <div className="space-y-4">
+        {paragraphs.map((paragraph, idx) => {
+          // Check if paragraph is a heading (starts with # or ##)
+          if (paragraph.trim().startsWith('# ')) {
+            return <h3 key={idx} className="text-lg font-bold mt-4">{paragraph.replace(/^# /, '')}</h3>;
+          } 
+          if (paragraph.trim().startsWith('## ')) {
+            return <h4 key={idx} className="text-md font-semibold mt-3">{paragraph.replace(/^## /, '')}</h4>;
+          }
+          
+          // Check if paragraph is a list
+          if (paragraph.includes('\n- ') || paragraph.includes('\n* ')) {
+            const listItems = paragraph.split(/\n[-*] /).filter(Boolean);
+            return (
+              <div key={idx}>
+                {listItems[0].trim() && <p className="mb-2">{listItems[0]}</p>}
+                <ul className="list-disc pl-5 space-y-1">
+                  {listItems.slice(listItems[0].trim() ? 1 : 0).map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            );
+          }
+          
+          // Format bold and italic text
+          let formattedText = paragraph;
+          // Replace bold markdown (**text** or __text__)
+          formattedText = formattedText.replace(/\*\*(.*?)\*\*|__(.*?)__/g, (match, p1, p2) => {
+            const content = p1 || p2;
+            return `<strong>${content}</strong>`;
+          });
+          
+          // Replace italic markdown (*text* or _text_)
+          formattedText = formattedText.replace(/\*(.*?)\*|_(.*?)_/g, (match, p1, p2) => {
+            const content = p1 || p2;
+            return `<em>${content}</em>`;
+          });
+          
+          // Use dangerouslySetInnerHTML to render the HTML tags
+          return <p key={idx} dangerouslySetInnerHTML={{ __html: formattedText }} />;
+        })}
+      </div>
+    );
+  };
+
   // Completely rewritten handleViewFullProject to be more robust
   const handleViewFullProject = () => {
     console.log("Opening artifact viewer with message content:", message.content.substring(0, 100) + "...");
@@ -382,23 +436,23 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
             <AccordionContent className="px-5 pb-4">
               <div className="text-sm space-y-2">
                 {appData?.explanation ? (
-                  <p>{appData.explanation}</p>
+                  formatExplanationText(appData.explanation)
                 ) : (
-                  <>
+                  <div className="space-y-4">
                     <p><strong>Architecture Overview:</strong> This {appData?.projectName || "generated"} application follows a modern web architecture with a clean separation of concerns.</p>
                     
                     <p><strong>Frontend:</strong> The UI is built with React components organized in a logical hierarchy, with pages for different views and reusable components for common elements.</p>
                     
                     <p><strong>Data Management:</strong> The application handles data through state management and API calls to backend services.</p>
                     
-                    <p><strong>Key Technical Features:</strong></p>
+                    <h4 className="text-md font-semibold mt-4">Key Technical Features:</h4>
                     <ul className="list-disc pl-5 space-y-1">
                       <li>React components for UI building blocks</li>
                       <li>State management for application data</li>
                       <li>API integration for data fetching</li>
                       <li>Responsive design for all device sizes</li>
                     </ul>
-                  </>
+                  </div>
                 )}
               </div>
             </AccordionContent>
