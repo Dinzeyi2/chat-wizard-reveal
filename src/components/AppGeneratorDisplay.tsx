@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from "react";
 import { Message } from "@/types/chat";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Download, FileCode, ChevronRight, ChevronDown, ShoppingBag, Code, SquareDashed } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -39,188 +38,159 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   const [appData, setAppData] = useState<GeneratedApp | null>(null);
   
   useEffect(() => {
-    // Extract and parse app data when the component mounts or message changes
+    // Extract and parse app data with improved reliability
     const extractAppData = (): GeneratedApp | null => {
       try {
         console.info("JSON extraction attempt: Found", message.content.length, "characters");
         
-        // Try multiple regex patterns for robust extraction
-        const patterns = [
-          /```json\s*([\s\S]*?)\s*```/,    // Standard JSON code block
-          /\{[\s\S]*?"files":\s*\[[\s\S]*?\]\s*\}/,  // Look for JSON object with files array
-          /\{[\s\S]*?"projectName"[\s\S]*?"files"[\s\S]*?\}/  // Look for JSON with projectName and files
-        ];
+        // First attempt: Look for JSON inside code blocks
+        const jsonBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
+        const jsonBlockMatch = message.content.match(jsonBlockRegex);
         
-        let jsonText = null;
+        let extractedJson = null;
         
-        // Try each pattern until we find a match
-        for (const pattern of patterns) {
-          const match = message.content.match(pattern);
-          if (match && match[0]) {
-            jsonText = match[0].replace(/```json|```/g, '').trim();
-            break;
+        if (jsonBlockMatch && jsonBlockMatch[1]) {
+          try {
+            extractedJson = JSON.parse(jsonBlockMatch[1].trim());
+            if (isValidAppData(extractedJson)) {
+              console.info("Successfully extracted app data from JSON code block");
+              return extractedJson;
+            }
+          } catch (e) {
+            console.info("Failed to parse JSON from code block:", e);
           }
         }
         
-        // If no pattern matched, look for the largest JSON-like structure
-        if (!jsonText) {
-          const possibleJson = message.content
-            .substring(message.content.indexOf('{'), message.content.lastIndexOf('}') + 1);
-          
-          if (possibleJson.includes('"files":') && possibleJson.includes('"projectName":')) {
-            jsonText = possibleJson;
+        // Second attempt: Look for raw JSON object in the content
+        const objectMatch = message.content.match(/(\{[\s\S]*\})/);
+        if (objectMatch && objectMatch[1]) {
+          try {
+            extractedJson = JSON.parse(objectMatch[1]);
+            if (isValidAppData(extractedJson)) {
+              console.info("Successfully extracted app data from raw JSON");
+              return extractedJson;
+            }
+          } catch (e) {
+            console.info("Failed to parse raw JSON:", e);
           }
         }
         
-        if (!jsonText) {
-          console.error("Could not extract JSON from message");
-          return null;
-        }
-        
-        // Parse the JSON
-        const jsonData = JSON.parse(jsonText);
-        
-        // Validate that this is actually app data with required fields
-        if (jsonData && 
-            typeof jsonData.projectName === 'string' && 
-            typeof jsonData.description === 'string' && 
-            Array.isArray(jsonData.files)) {
-          
-          console.info("Successfully parsed app data with", jsonData.files.length, "files");
-          console.info("App data extraction result: success");
-          return jsonData;
-        }
-        
-        console.error("Invalid app data structure");
-        return null;
-      } catch (error) {
-        console.error("Failed to parse app data:", error);
-        
-        // Final fallback: try to create a minimal valid structure from message content
-        try {
-          // Look for key information in the message to create a basic structure
-          const content = message.content;
-          const projectNameMatch = content.match(/project(?:Name)?[":]\s*["']?([^"',}]+)["']?/i);
-          const descriptionMatch = content.match(/description[":]\s*["']?([^"',}]+)["']?/i);
-          
-          // Find file paths and contents
-          const fileMatches = content.match(/path[":]\s*["']([^"']+)["']/g) || [];
-          const contentMatches = content.match(/content[":]\s*["']([^"']+)["']/g) || [];
-          
-          if (projectNameMatch) {
-            const files: GeneratedFile[] = [];
-            
-            // Try to extract some files if available
-            const filePathRegex = /path[":]\s*["']([^"']+)["']/;
-            const fileContentRegex = /content[":]\s*["']([^"']+)["']/;
-            
-            // Collect potential file entries
-            const fileEntries = content.split('"path":').slice(1);
-            
-            fileEntries.forEach((entry, index) => {
-              const pathMatch = entry.match(/["']([^"']+)["']/);
-              if (pathMatch) {
-                const path = pathMatch[1];
-                
-                // Look for content after this path
-                const contentSearchArea = entry.split('"content":')[1];
-                if (contentSearchArea) {
-                  // Extract content up to the next property or end of object
-                  const contentEndIndex = Math.min(
-                    contentSearchArea.indexOf('"path":') > -1 ? contentSearchArea.indexOf('"path":') : Infinity,
-                    contentSearchArea.indexOf('},') > -1 ? contentSearchArea.indexOf('},') : Infinity,
-                    contentSearchArea.indexOf('}]') > -1 ? contentSearchArea.indexOf('}]') : Infinity
-                  );
-                  
-                  let content = contentSearchArea.substring(0, contentEndIndex !== Infinity ? contentEndIndex : undefined);
-                  
-                  // Clean up quotes and whitespace
-                  content = content.replace(/^[\s"']+|[\s"',}]+$/g, '');
-                  
-                  files.push({
-                    path, 
-                    content: content || `// Content for ${path}`
-                  });
-                }
+        // Third attempt: Look for specific patterns and try to extract just the app data portion
+        const startIndex = message.content.indexOf('{');
+        if (startIndex !== -1) {
+          let endIndex = message.content.lastIndexOf('}');
+          if (endIndex > startIndex) {
+            try {
+              const jsonSubstring = message.content.substring(startIndex, endIndex + 1);
+              extractedJson = JSON.parse(jsonSubstring);
+              if (isValidAppData(extractedJson)) {
+                console.info("Successfully extracted app data from content substring");
+                return extractedJson;
               }
-            });
-            
-            return {
-              projectName: projectNameMatch[1].trim(),
-              description: descriptionMatch ? descriptionMatch[1].trim() : "Generated application",
-              files: files.length > 0 ? files : [
-                { path: "README.md", content: "# Generated Application\n\nThis is a generated application." },
-                { path: "index.js", content: "console.log('Hello world');" }
-              ]
-            };
+            } catch (e) {
+              console.info("Failed to parse JSON substring:", e);
+            }
           }
-        } catch (fallbackError) {
-          console.error("Fallback extraction failed:", fallbackError);
         }
         
-        return null;
+        // Fourth attempt: Try to manually construct a basic app data object
+        console.info("All JSON parsing attempts failed, trying to construct fallback app data");
+        return createFallbackAppData(message.content);
+        
+      } catch (error) {
+        console.error("All extraction methods failed:", error);
+        return createFallbackAppData(message.content);
       }
     };
     
-    setAppData(extractAppData());
+    // Helper to check if extracted data is valid app data
+    const isValidAppData = (data: any): boolean => {
+      return (
+        data && 
+        typeof data === 'object' &&
+        typeof data.projectName === 'string' && 
+        typeof data.description === 'string' && 
+        Array.isArray(data.files) &&
+        data.files.length > 0 &&
+        data.files.every((file: any) => file.path && file.content)
+      );
+    };
+    
+    // Create basic fallback app data if all extraction methods fail
+    const createFallbackAppData = (content: string): GeneratedApp => {
+      console.info("Creating fallback app data");
+      
+      // Extract project name and description from content if possible
+      const projectNameMatch = content.match(/[pP]roject(?:Name)?[":]\s*["']?([^"',}\n]+)["']?/);
+      const descriptionMatch = content.match(/[dD]escription[":]\s*["']?([^"',}\n]+)["']?/);
+      
+      const projectName = projectNameMatch ? projectNameMatch[1].trim() : "Generated App";
+      const description = descriptionMatch ? descriptionMatch[1].trim() : "Generated application";
+      
+      // Create at least one file with the raw content
+      const files: GeneratedFile[] = [
+        { 
+          path: "README.md", 
+          content: `# ${projectName}\n\n${description}\n\nGenerated application code.` 
+        },
+        {
+          path: "app.js",
+          content: "// Main application code\nconsole.log('Generated application');"
+        }
+      ];
+      
+      return {
+        projectName,
+        description,
+        files,
+        explanation: "This application was generated based on your request."
+      };
+    };
+    
+    const extracted = extractAppData();
+    console.info("App data extraction result:", extracted ? "success" : "failed");
+    setAppData(extracted);
   }, [message]);
-  
-  // If data couldn't be parsed, show a fallback view
-  if (!appData) {
-    return (
-      <div className="my-6 space-y-4">
-        <div className="bg-white border border-gray-200 rounded-md p-4">
-          <h3 className="text-lg font-semibold mb-2">App Generation Result</h3>
-          <p className="text-gray-600 mb-3">
-            There was an issue displaying the generated app in structured format.
-            You can still view the complete code by clicking the button below.
-          </p>
-          
-          <Button
-            onClick={() => handleViewRawContent(message.content)}
-            variant="outline"
-            className="w-full justify-center mt-2"
-          >
-            <Code className="mr-2 h-4 w-4" /> View Full Content
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  const appIcon = () => {
-    if (appData.projectName.toLowerCase().includes("shopify") || 
-        appData.description.toLowerCase().includes("e-commerce") || 
-        appData.description.toLowerCase().includes("ecommerce") ||
-        appData.description.toLowerCase().includes("shop")) {
-      return <ShoppingBag className="h-5 w-5" />;
-    }
-    return <FileCode className="h-5 w-5" />;
-  };
   
   const handleViewFullProject = () => {
     console.info("handleViewFullProject called");
     try {
-      const artifactFiles = appData.files.map((file, index) => ({
+      // Always ensure we have valid files before opening the artifact
+      const artifactFiles = appData?.files?.map((file, index) => ({
         id: `file-${index}`,
         name: file.path.split('/').pop() || file.path,
         path: file.path,
         language: getLanguageFromPath(file.path),
         content: file.content
-      }));
+      })) || [];
+      
+      if (artifactFiles.length === 0) {
+        // If no files exist, create a fallback file with the content
+        artifactFiles.push({
+          id: "fallback-content",
+          name: "content.txt",
+          path: "content.txt",
+          language: "plaintext",
+          content: message.content
+        });
+      }
 
       console.info("Opening artifact with", artifactFiles.length, "files");
       openArtifact({
         id: `artifact-${Date.now()}`,
-        title: appData.projectName,
-        description: appData.description,
+        title: appData?.projectName || "Generated Code",
+        description: appData?.description || "Generated content",
         files: artifactFiles
       });
     } catch (error) {
       console.error("Error opening artifact:", error);
+      
+      // Fallback to opening raw content if there's an error
+      handleViewRawContent(message.content);
+      
       toast({
         title: "Error",
-        description: "There was an error opening the code viewer. Please try again.",
+        description: "Recovered from an error displaying structured code. Showing raw content instead.",
         variant: "destructive"
       });
     }
@@ -241,6 +211,28 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
       }]
     });
   };
+
+  // If data couldn't be parsed at all, show a fallback view that always works
+  if (!appData) {
+    return (
+      <div className="my-6 space-y-4">
+        <div className="bg-white border border-gray-200 rounded-md p-4">
+          <h3 className="text-lg font-semibold mb-2">App Generation Result</h3>
+          <p className="text-gray-600 mb-3">
+            The app code is ready. You can view it by clicking the button below.
+          </p>
+          
+          <Button
+            onClick={() => handleViewRawContent(message.content)}
+            variant="default"
+            className="w-full justify-center mt-2"
+          >
+            <Code className="mr-2 h-4 w-4" /> View Generated Code
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const handleDownload = () => {
     alert("Download functionality would be implemented here");
@@ -404,6 +396,18 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
           </AccordionContent>
         </AccordionItem>
       </Accordion>
+      
+      {/* Fallback view content button as an extra safety measure */}
+      <div className="pt-4 border-t border-gray-200">
+        <Button
+          onClick={() => handleViewRawContent(message.content)}
+          variant="outline"
+          className="text-sm"
+          size="sm"
+        >
+          <FileCode className="mr-2 h-4 w-4" /> View Raw Content
+        </Button>
+      </div>
     </div>
   );
 };

@@ -11,29 +11,18 @@ interface MarkdownRendererProps {
 }
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message }) => {
-  // More robust detection for app generation content
+  // More robust detection for app generation content - simplified and more reliable
   const isAppGeneration = React.useMemo(() => {
-    // Comprehensive check for app generation markers
-    const hasJsonBlocks = content.includes("```json") && content.includes("```");
-    const appKeywords = ["projectName", "files", "description"];
-    const keywordsPresent = appKeywords.filter(keyword => content.includes(keyword)).length;
+    // Direct indicators of app generation
+    const hasJsonStructure = content.includes('"files":') && 
+      (content.includes('"path":') || content.includes('"content":'));
     
-    // Enhanced detection logic that's more lenient but still accurate
-    const hasDefinitiveJsonStructure = content.includes('"files":') && content.includes('"path":') && content.includes('"content":');
-    const hasCombinationIndicators = content.includes("generated") && content.includes("application") && content.includes("files");
-
-    console.info("App generation detection:", { 
-      hasJsonStructure: hasDefinitiveJsonStructure, 
-      hasJsonBlocks, 
-      keywordCount: keywordsPresent,
-      hasDefinitiveJsonStructure,
-      hasCombinationIndicators,
-      hasHighKeywordDensity: keywordsPresent >= 2,
-      isAppGen: (hasJsonBlocks && keywordsPresent >= 2) || hasDefinitiveJsonStructure || hasCombinationIndicators
-    });
+    // Look for common pattern combinations that indicate app generation
+    const hasProjectStructure = content.includes('"projectName":') || 
+      (content.includes('generated') && content.includes('application'));
     
-    // Return true if multiple indicators are present
-    return (hasJsonBlocks && keywordsPresent >= 2) || hasDefinitiveJsonStructure || hasCombinationIndicators;
+    // If we have clear JSON structure or multiple indicators, consider it an app generation
+    return hasJsonStructure || hasProjectStructure;
   }, [content]);
   
   if (message && isAppGeneration) {
