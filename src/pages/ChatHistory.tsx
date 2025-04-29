@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -15,10 +15,43 @@ interface ChatHistoryItem {
 
 const ChatHistory = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [chatHistory, setChatHistory] = useState<ChatHistoryItem[]>([]);
   const navigate = useNavigate();
   
+  // Load chat history from localStorage when component mounts
+  useEffect(() => {
+    const storedHistory = localStorage.getItem('chatHistory');
+    if (storedHistory) {
+      try {
+        setChatHistory(JSON.parse(storedHistory));
+      } catch (error) {
+        console.error("Error parsing chat history from localStorage:", error);
+        // Fall back to mock data if parsing fails
+        setChatHistory(mockChatHistory);
+      }
+    } else {
+      // Use mock data if nothing found in localStorage
+      setChatHistory(mockChatHistory);
+    }
+  }, []);
+
+  const filteredChats = chatHistory.filter(chat => 
+    chat.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleChatSelection = (chatId: string) => {
+    // Here we navigate to the main chat page with the specific chat ID
+    navigate(`/?chat=${chatId}`);
+  };
+
+  // Function to handle creating a new chat
+  const handleNewChat = () => {
+    // Navigate to the home page without any chat ID parameter to start fresh
+    navigate('/');
+  };
+
   // Mock data for chat history
-  const chatHistory: ChatHistoryItem[] = [
+  const mockChatHistory: ChatHistoryItem[] = [
     {
       id: "1",
       title: "Chatbot to Generate Full Stack Apps with Anthropic API",
@@ -63,21 +96,6 @@ const ChatHistory = () => {
     }
   ];
 
-  const filteredChats = chatHistory.filter(chat => 
-    chat.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const handleChatSelection = (chatId: string) => {
-    // Here we navigate to the main chat page with the specific chat ID
-    navigate(`/?chat=${chatId}`);
-  };
-
-  // Function to handle creating a new chat
-  const handleNewChat = () => {
-    // Navigate to the home page without any chat ID parameter to start fresh
-    navigate('/');
-  };
-
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <div className="flex justify-between items-center mb-8">
@@ -107,7 +125,7 @@ const ChatHistory = () => {
       </div>
       
       <p className="text-gray-600 mb-6">
-        You have {chatHistory.length} previous chats with Claude. <span className="text-blue-500 cursor-pointer">Select</span>
+        You have {filteredChats.length} previous chats with Claude. <span className="text-blue-500 cursor-pointer">Select</span>
       </p>
       
       <div className="space-y-4">

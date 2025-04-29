@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -12,6 +11,14 @@ import { ArtifactProvider, ArtifactLayout } from "@/components/artifact/Artifact
 import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
 import { useLocation } from "react-router-dom";
 
+// Interface for chat history items
+interface ChatHistoryItem {
+  id: string;
+  title: string;
+  lastMessage: string;
+  timestamp: string;
+}
+
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
@@ -19,6 +26,7 @@ const Index = () => {
   const [isGeneratingApp, setIsGeneratingApp] = useState(false);
   const [generationDialog, setGenerationDialog] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const location = useLocation();
@@ -29,40 +37,15 @@ const Index = () => {
     const chatId = searchParams.get('chat');
     
     if (chatId) {
+      setCurrentChatId(chatId);
       // Load the specific chat history
       loadChatHistory(chatId);
+    } else {
+      // Clear messages if starting a new chat
+      setMessages([]);
+      setCurrentChatId(null);
     }
   }, [location]);
-
-  const loadChatHistory = async (chatId: string) => {
-    console.log(`Loading chat history for chat ID: ${chatId}`);
-    
-    // In a real application, here we would fetch the chat history from the backend
-    // For now, we'll simulate loading chat data with mock messages based on mock data
-    const mockChatHistory = chatHistory.find(chat => chat.id === chatId);
-    
-    if (mockChatHistory) {
-      // Simulate loading previous messages based on the chat title
-      const userMessage: Message = {
-        id: "user-" + Date.now().toString(),
-        role: "user",
-        content: mockChatHistory.title,
-        timestamp: new Date(Date.now() - 3600000) // 1 hour ago
-      };
-      
-      const assistantMessage: Message = {
-        id: "assistant-" + Date.now().toString(),
-        role: "assistant",
-        content: `This is a previous conversation about "${mockChatHistory.title}". I'm here to continue helping you with this topic.`,
-        timestamp: new Date(Date.now() - 3500000) // A bit less than 1 hour ago
-      };
-      
-      setMessages([userMessage, assistantMessage]);
-      
-      // If this chat had a project ID, we would restore it here
-      // setCurrentProjectId(mockProjectId);
-    }
-  };
 
   // Mock chat history data (same as in ChatHistory.tsx)
   const chatHistory = [
@@ -109,6 +92,99 @@ const Index = () => {
       timestamp: "1 day ago"
     }
   ];
+
+  const loadChatHistory = async (chatId: string) => {
+    console.log(`Loading chat history for chat ID: ${chatId}`);
+    
+    // Try to load from localStorage first
+    const storedHistory = localStorage.getItem('chatHistory');
+    let localChatHistory = storedHistory ? JSON.parse(storedHistory) : [];
+    
+    // If not found in localStorage, use mock data
+    if (!localChatHistory || localChatHistory.length === 0) {
+      localChatHistory = chatHistory;
+    }
+    
+    const selectedChat = localChatHistory.find((chat: ChatHistoryItem) => chat.id === chatId);
+    
+    if (selectedChat) {
+      // Simulate loading previous messages based on the chat title
+      const userMessage: Message = {
+        id: "user-" + Date.now().toString(),
+        role: "user",
+        content: selectedChat.title,
+        timestamp: new Date(Date.now() - 3600000) // 1 hour ago
+      };
+      
+      const assistantMessage: Message = {
+        id: "assistant-" + Date.now().toString(),
+        role: "assistant",
+        content: `This is a previous conversation about "${selectedChat.title}". I'm here to continue helping you with this topic.`,
+        timestamp: new Date(Date.now() - 3500000) // A bit less than 1 hour ago
+      };
+      
+      setMessages([userMessage, assistantMessage]);
+      
+      // If this chat had a project ID, we would restore it here
+      // setCurrentProjectId(mockProjectId);
+    }
+  };
+
+  // Function to save the current conversation to chat history
+  const saveToHistory = (content: string, responseContent: string) => {
+    // Only save if there's actual content
+    if (!content.trim()) return;
+    
+    // Generate a chat title based on the first user message
+    const chatTitle = content.length > 50 
+      ? content.substring(0, 50) + "..." 
+      : content;
+    
+    const now = new Date();
+    const timeString = "Just now";
+    
+    // Create new chat history item
+    const newChat: ChatHistoryItem = {
+      id: currentChatId || Date.now().toString(),
+      title: chatTitle,
+      lastMessage: `Last message ${timeString}`,
+      timestamp: timeString
+    };
+    
+    // Get existing history or initialize empty array
+    const storedHistory = localStorage.getItem('chatHistory');
+    let chatHistoryArray: ChatHistoryItem[] = [];
+    
+    try {
+      if (storedHistory) {
+        chatHistoryArray = JSON.parse(storedHistory);
+      }
+    } catch (error) {
+      console.error("Error parsing chat history:", error);
+    }
+    
+    // If we have a current chat ID, update that chat
+    if (currentChatId) {
+      const existingIndex = chatHistoryArray.findIndex(chat => chat.id === currentChatId);
+      if (existingIndex >= 0) {
+        chatHistoryArray[existingIndex].lastMessage = `Last message ${timeString}`;
+        chatHistoryArray[existingIndex].timestamp = timeString;
+      } else {
+        chatHistoryArray.unshift(newChat);
+      }
+    } else {
+      // Set the current chat ID to the new chat's ID
+      const newChatId = Date.now().toString();
+      setCurrentChatId(newChatId);
+      newChat.id = newChatId;
+      
+      // Add new chat to beginning of array
+      chatHistoryArray.unshift(newChat);
+    }
+    
+    // Save updated history back to localStorage
+    localStorage.setItem('chatHistory', JSON.stringify(chatHistoryArray));
+  };
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -218,6 +294,11 @@ You can explore the file structure and content in the panel above. This is a sta
           title: "App Generated Successfully",
           description: `${appData.projectName} has been generated with ${appData.files.length} files.`,
         });
+        
+        // Save this conversation to chat history
+        if (data && data.response) {
+          saveToHistory(content, data.response);
+        }
       } catch (error) {
         console.error('Error calling function:', error);
         setGenerationDialog(false);
@@ -293,6 +374,11 @@ If you were trying to generate an app, this might be due to limits with our AI m
           title: "App Modified Successfully",
           description: "Your application has been updated with your requested changes.",
         });
+        
+        // Save this conversation to chat history
+        if (data && data.response) {
+          saveToHistory(content, data.response);
+        }
       } catch (error) {
         console.error('Error calling function:', error);
         setGenerationError(error.message || "An unexpected error occurred");
@@ -343,6 +429,9 @@ If you were trying to generate an app, this might be due to limits with our AI m
         
         setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
         setMessages(prev => [...prev, aiMessage]);
+        
+        // Save this conversation to chat history
+        saveToHistory(content, data.response);
       } catch (error) {
         console.error('Error calling function:', error);
         setGenerationError(error.message || "An unexpected error occurred");
