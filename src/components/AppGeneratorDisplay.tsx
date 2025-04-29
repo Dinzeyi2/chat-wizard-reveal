@@ -122,6 +122,8 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
         return;
       }
       
+      console.log("Fetching version history for project:", projectId);
+      
       // Fetch all versions of this project
       const { data: versions, error } = await supabase
         .from('app_projects')
@@ -130,6 +132,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
         .order('version', { ascending: false });
       
       if (error) {
+        console.error("Error fetching project versions:", error);
         throw error;
       }
       
@@ -141,8 +144,11 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
         .order('version', { ascending: false });
       
       if (childError) {
+        console.error("Error fetching child versions:", childError);
         throw childError;
       }
+      
+      console.log("Fetched versions:", versions?.length || 0, "child versions:", childVersions?.length || 0);
       
       // Combine and sort all versions
       const allVersions = [...(versions || []), ...(childVersions || [])];
@@ -169,13 +175,20 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
         description: `Restoring to version ${versionData.version}`,
       });
       
+      console.log("Restoring version:", versionData.version, "with ID:", versionData.id);
+      
       const { data, error } = await supabase.functions.invoke('restore-version', {
         body: { 
           projectId: versionData.id,
         }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error from restore-version function:", error);
+        throw error;
+      }
+      
+      console.log("Restore version response:", data);
       
       toast({
         title: "Version restored",
@@ -525,7 +538,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
             <Button 
               variant="ghost" 
               size="sm" 
-              className="h-7 px-2 text-xs"
+              className="h-7 px-2 text-xs bg-gray-50 hover:bg-gray-100"
               onClick={() => setShowVersionHistory(!showVersionHistory)}
             >
               <History className="h-3 w-3 mr-1" />
@@ -537,29 +550,32 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
       
       {showVersionHistory && (
         <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-          <h4 className="font-medium mb-2">Version History</h4>
+          <h4 className="font-medium mb-3">Version History</h4>
           {isLoadingHistory ? (
-            <p className="text-sm text-gray-500">Loading version history...</p>
+            <div className="flex items-center justify-center p-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+              <span className="ml-2 text-sm text-gray-500">Loading version history...</span>
+            </div>
           ) : versionHistory.length === 0 ? (
-            <p className="text-sm text-gray-500">No version history available</p>
+            <p className="text-sm text-gray-500 p-2">No version history available</p>
           ) : (
-            <ScrollArea className="h-[200px]">
-              <div className="space-y-2">
+            <ScrollArea className="h-[250px]">
+              <div className="space-y-3">
                 {versionHistory.map((version, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 border-b border-gray-100 last:border-0">
+                  <div key={index} className="flex items-center justify-between p-3 bg-white rounded-md border border-gray-100">
                     <div>
                       <p className="text-sm font-medium">Version {version.version}</p>
                       <p className="text-xs text-gray-500">
                         {new Date(version.created_at).toLocaleDateString()} {new Date(version.created_at).toLocaleTimeString()}
                       </p>
                       {version.modification_prompt && (
-                        <p className="text-xs text-gray-600 mt-1 italic">"{version.modification_prompt.substring(0, 50)}..."</p>
+                        <p className="text-xs text-gray-600 mt-1 italic max-w-[300px] truncate">"{version.modification_prompt}"</p>
                       )}
                     </div>
                     <Button 
-                      variant="outline" 
+                      variant="secondary" 
                       size="sm" 
-                      className="h-7"
+                      className="h-8 ml-2"
                       onClick={() => handleRestoreVersion(version)}
                     >
                       Restore
