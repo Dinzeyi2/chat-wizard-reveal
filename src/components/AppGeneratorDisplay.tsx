@@ -41,91 +41,197 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
   useEffect(() => {
     const extractAppData = (): GeneratedApp | null => {
       try {
-        let jsonMatch = null;
+        const content = message.content;
+        if (!content) return null;
+        
+        // Step 1: Try to find JSON block using multiple patterns
         let jsonText = "";
         
-        const jsonPattern1 = /```json([\s\S]*?)```/;
-        jsonMatch = message.content.match(jsonPattern1);
+        // Try to extract from code blocks with json tag
+        const jsonPatterns = [
+          /```json\s*([\s\S]*?)\s*```/,      // ```json ... ```
+          /```\s*([\s\S]*?)\s*```/,          // ``` ... ``` (any code block)
+          /\{[\s\S]*?"files"[\s\S]*?\}/,     // {..."files":...}
+          /\{[\s\S]*?"projectName"[\s\S]*?\}/ // {..."projectName":...}
+        ];
         
-        if (!jsonMatch) {
-          const jsonPattern2 = /```([\s\S]*?)```/;
-          jsonMatch = message.content.match(jsonPattern2);
-        }
-        
-        if (!jsonMatch) {
-          const jsonPattern3 = /\{[\s\S]*?"files"[\s\S]*?\}/;
-          jsonMatch = message.content.match(jsonPattern3);
-        }
-        
-        if (jsonMatch && jsonMatch[1]) {
-          jsonText = jsonMatch[1].trim();
-        } else if (jsonMatch) {
-          jsonText = jsonMatch[0].trim();
-        } else {
-          const startIndex = message.content.indexOf('{');
-          const endIndex = message.content.lastIndexOf('}');
-          
-          if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-            jsonText = message.content.substring(startIndex, endIndex + 1);
+        // Try each pattern until we find a match
+        for (const pattern of jsonPatterns) {
+          const match = content.match(pattern);
+          if (match && match[0]) {
+            if (match[1]) {
+              // First capturing group (for patterns with groups)
+              jsonText = match[1].trim();
+            } else {
+              // Whole match (for patterns without groups)
+              jsonText = match[0].trim();
+            }
+            
+            // Check if we found valid JSON with key indicators
+            if (jsonText && (
+                jsonText.includes('"files"') || 
+                jsonText.includes('"projectName"') ||
+                (jsonText.includes('"path"') && jsonText.includes('"content"'))
+              )) {
+              break;
+            }
           }
         }
         
-        console.log("Extracted JSON text:", jsonText.substring(0, 100) + (jsonText.length > 100 ? "..." : ""));
+        // If no pattern matched, try to find JSON object boundaries
+        if (!jsonText) {
+          const startIndex = content.indexOf('{');
+          const endIndex = content.lastIndexOf('}');
+          
+          if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+            jsonText = content.substring(startIndex, endIndex + 1);
+          }
+        }
         
+        console.log("JSON extraction attempt:", 
+          jsonText ? `Found ${jsonText.length} characters` : "No JSON found");
+        
+        // Step 2: Parse the JSON if we found it
         if (jsonText) {
           try {
-            const jsonData = JSON.parse(jsonText);
+            // First try direct parsing
+            const parsed = JSON.parse(jsonText);
             
-            if (jsonData) {
-              const projectName = jsonData.projectName || jsonData.name || "Generated App";
-              const description = jsonData.description || "Generated application";
+            // Check if parsed data has required fields or structure
+            if (parsed) {
+              // Find the project name using various possible fields
+              const projectName = parsed.projectName || parsed.name || 
+                                 parsed.project || parsed.title || "Generated App";
               
+              // Find description from various possible fields  
+              const description = parsed.description || parsed.summary || 
+                                 parsed.info || parsed.about || "Generated application";
+              
+              // Find files array using different possible structures
               let files = [];
-              if (Array.isArray(jsonData.files)) {
-                files = jsonData.files;
-              } else if (jsonData.fileStructure) {
-                const fileStructure = jsonData.fileStructure;
+              
+              if (Array.isArray(parsed.files)) {
+                files = parsed.files;
+              } else if (parsed.fileStructure) {
+                // Handle fileStructure format (used in some generators)
                 files = [];
-                Object.keys(fileStructure).forEach(category => {
-                  if (Array.isArray(fileStructure[category])) {
-                    fileStructure[category].forEach((path: string) => {
+                Object.keys(parsed.fileStructure).forEach(category => {
+                  if (Array.isArray(parsed.fileStructure[category])) {
+                    parsed.fileStructure[category].forEach((path: string) => {
+                      // Create placeholder entry for structure-only entries
                       files.push({ path, content: "// Content not available" });
                     });
                   }
                 });
+              } else if (parsed.components) {
+                // Some generators might use "components" instead of "files"
+                files = parsed.components.map((comp: any) => ({
+                  path: comp.path || comp.name || `component-${files.length}.js`,
+                  content: comp.content || comp.code || "// Content not available"
+                }));
+              } else if (parsed.pages) {
+                // Some generators might use "pages"
+                files = parsed.pages.map((page: any) => ({
+                  path: page.path || page.name || `page-${files.length}.js`,
+                  content: page.content || page.code || "// Content not available"
+                }));
               }
               
+              // Fallback: If we still have no files, create a minimal structure
               if (files.length === 0) {
-                console.warn("No files found in JSON data, using empty structure");
+                console.warn("No files found in JSON data, creating minimal structure");
                 files = [
-                  { 
-                    path: "src/App.jsx", 
-                    content: "// This is a placeholder file. The actual content couldn't be extracted." 
-                  }
+                  { path: "src/App.jsx", content: "// App component placeholder" },
+                  { path: "src/index.jsx", content: "// Entry point placeholder" },
+                  { path: "package.json", content: "// Package configuration placeholder" }
                 ];
               }
               
-              console.log("Successfully parsed app data with", files.length, "files");
+              // Extract technologies if available
+              const technologies = parsed.technologies || 
+                                   parsed.tech || 
+                                   parsed.techStack || 
+                                   [];
+              
+              console.log(`Successfully parsed app data with ${files.length} files`);
               return {
                 projectName,
                 description,
                 files,
-                technologies: jsonData.technologies || [],
-                explanation: jsonData.explanation || ""
+                technologies,
+                explanation: parsed.explanation || ""
               };
             }
-            
-            console.error("Invalid JSON structure:", jsonData);
-            return null;
           } catch (parseError) {
             console.error("JSON parse error:", parseError);
-            return null;
+            // Continue with fallback approach
           }
         }
-        return null;
+        
+        // Step 3: Fallback - use heuristics to extract information if JSON parsing failed
+        console.log("Using fallback extraction method");
+        
+        // Try to extract project name
+        const nameMatch = content.match(/project(?:Name|Title)?[":]\s*["']?([\w\s-]+)["']?/i) ||
+                          content.match(/I've generated a[n]?\s+(?:full-stack\s+)?application:?\s*["']?([\w\s-]+)["']?/i);
+        
+        const projectName = nameMatch ? nameMatch[1].trim() : "Generated App";
+        
+        // Try to extract description
+        const descMatch = content.match(/description[":]\s*["']?(.*?)["']?(?:[,}]|$)/i) ||
+                          content.match(/I've generated a[n]?\s+(?:full-stack\s+)?application.*?\n+(.*?)(?:\n|$)/i);
+                          
+        const description = descMatch ? descMatch[1].trim() : "Generated application";
+        
+        // Try to find file paths and create placeholder content
+        const pathMatches = [...content.matchAll(/["']?path["']?:\s*["']([^"']+)["']/g)];
+        const filePathMatches = [...content.matchAll(/(\w+\.(js|jsx|ts|tsx|css|html))(?:\s|"|'|,|$)/g)];
+        
+        let extractedFiles: GeneratedFile[] = [];
+        
+        // Add files from path properties
+        if (pathMatches.length > 0) {
+          extractedFiles = pathMatches.map(match => ({
+            path: match[1],
+            content: "// Content extracted based on path patterns"
+          }));
+        }
+        // Add files from direct mentions in text
+        else if (filePathMatches.length > 0) {
+          extractedFiles = filePathMatches.map(match => ({
+            path: match[1],
+            content: "// Content extracted based on filename patterns"
+          }));
+        }
+        // Create minimal placeholders if nothing else worked
+        else {
+          extractedFiles = [
+            { path: "src/App.jsx", content: "// App component" },
+            { path: "src/index.jsx", content: "// Entry point" },
+            { path: "package.json", content: "// Package configuration" }
+          ];
+        }
+        
+        console.log("Fallback extraction created", extractedFiles.length, "file placeholders");
+        
+        return {
+          projectName,
+          description,
+          files: extractedFiles,
+          technologies: [],
+          explanation: "Generated based on available information"
+        };
       } catch (error) {
         console.error("Failed to parse app data:", error);
-        return null;
+        return {
+          projectName: "Generated Application",
+          description: "An application was generated but details couldn't be fully extracted",
+          files: [
+            { path: "README.md", content: "# Generated Application\n\nThis is a placeholder for the generated application content." }
+          ],
+          technologies: [],
+          explanation: "Please review the message content for application details"
+        };
       }
     };
     
@@ -142,11 +248,45 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
         <Button
           className="w-full bg-blue-600 hover:bg-blue-700 flex items-center justify-between py-6 mb-4"
           onClick={() => {
-            toast({
-              title: "Error",
-              description: "Unable to parse application data. Please try generating the app again.",
-              variant: "destructive"
-            });
+            // Try one more time with direct message content - last resort
+            try {
+              const lastResortApp = {
+                projectName: "Generated Application",
+                description: "Application generated from message content",
+                files: [
+                  { path: "README.md", content: message.content }
+                ]
+              };
+              
+              const artifactFiles = [
+                {
+                  id: `file-readme`,
+                  name: "README.md",
+                  path: "README.md",
+                  language: "markdown",
+                  content: message.content
+                }
+              ];
+              
+              openArtifact({
+                id: `artifact-${Date.now()}`,
+                title: "Generated Application",
+                description: "Application code from message content",
+                files: artifactFiles
+              });
+              
+              toast({
+                title: "Code Viewer",
+                description: "Opened message content as README file"
+              });
+            } catch (error) {
+              console.error("Final fallback failed:", error);
+              toast({
+                title: "Error",
+                description: "Unable to parse application data. Please try generating the app again.",
+                variant: "destructive"
+              });
+            }
           }}
         >
           <div className="flex items-center">
@@ -212,11 +352,51 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message }) =>
       });
     } catch (error) {
       console.error("Error opening artifact:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: `Failed to open code: ${error instanceof Error ? error.message : 'Unknown error'}`
-      });
+      
+      // Fallback approach - open a simplified artifact with README
+      try {
+        const fallbackFiles = [
+          {
+            id: "file-readme",
+            name: "README.md",
+            path: "README.md",
+            language: "markdown",
+            content: `# ${appData.projectName}\n\n${appData.description}\n\n${
+              appData.files.map(f => `- ${f.path}`).join('\n')
+            }`
+          }
+        ];
+        
+        // Add at least one code file if possible
+        if (appData.files.length > 0) {
+          const firstFile = appData.files[0];
+          fallbackFiles.push({
+            id: "file-0",
+            name: firstFile.path.split('/').pop() || "file-0",
+            path: firstFile.path,
+            language: getLanguageFromPath(firstFile.path),
+            content: firstFile.content || "// Content not available"
+          });
+        }
+        
+        openArtifact({
+          id: `artifact-${Date.now()}`,
+          title: appData.projectName,
+          description: appData.description,
+          files: fallbackFiles
+        });
+        
+        toast({
+          title: "Code Viewer (Simplified)",
+          description: `Opened simplified view for ${appData.projectName}`
+        });
+      } catch (fallbackError) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: `Failed to open code: ${error instanceof Error ? error.message : 'Unknown error'}`
+        });
+      }
     }
   };
 
