@@ -1,3 +1,11 @@
+interface Window {
+  Babel?: any;
+  React?: any;
+  ReactDOM?: any;
+  WebContainer?: any;
+  SignUp?: any;
+}
+
 import { WebContainer } from '@webcontainer/api';
 
 /**
