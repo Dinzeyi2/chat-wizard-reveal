@@ -5,7 +5,6 @@ import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import { FileCode, X, ExternalLink, ChevronRight, Download, File, Code } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
-import './ArtifactSystem.css';
 
 // Types
 interface ArtifactFile {
@@ -46,62 +45,6 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
   const [currentArtifact, setCurrentArtifact] = useState<Artifact | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
-  useEffect(() => {
-    // Make sure CSS is applied when component mounts
-    const style = document.createElement('style');
-    const css = `
-      .artifact-system {
-        position: relative;
-        width: 100%;
-        height: 100%;
-        display: flex;
-      }
-      
-      .chat-area {
-        height: 100%;
-        overflow-y: auto;
-        transition: width 0.3s ease;
-        flex: 1;
-        width: 100%;
-      }
-      
-      .chat-area.artifact-open {
-        width: 40% !important;
-      }
-      
-      .artifact-expanded-view {
-        position: fixed;
-        top: 0;
-        right: 0;
-        width: 60%;
-        height: 100vh;
-        background-color: #18181b;
-        box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-        z-index: 100;
-      }
-      
-      @media (max-width: 768px) {
-        .chat-area.artifact-open {
-          width: 0 !important;
-          overflow: hidden;
-        }
-        
-        .artifact-expanded-view {
-          width: 100%;
-        }
-      }
-    `;
-    style.innerHTML = css;
-    document.head.appendChild(style);
-    
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
-
   const openArtifact = (artifact: Artifact) => {
     console.log("ArtifactProvider.openArtifact called with:", artifact.id);
     if (!artifact || !artifact.files || artifact.files.length === 0) {
@@ -114,39 +57,14 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
       return;
     }
     
-    // Ensure we're working with a valid artifact
-    console.log(`Opening artifact with ${artifact.files.length} files`);
-    
     // Set the artifact and open the viewer
     setCurrentArtifact(artifact);
     setIsOpen(true);
-    
-    // Add class to chat area to resize it
-    const chatAreas = document.querySelectorAll('.chat-area');
-    chatAreas.forEach(area => {
-      area.classList.add('artifact-open');
-    });
-    
-    // Force reflow to ensure the viewer is rendered
-    setTimeout(() => {
-      console.log("Forcing reflow to ensure artifact viewer is visible");
-      window.dispatchEvent(new Event('resize'));
-    }, 100);
-    
     console.log("Artifact viewer opened successfully");
   };
 
   const closeArtifact = () => {
-    console.log("Closing artifact viewer");
     setIsOpen(false);
-    
-    // Remove class from chat area to restore its original size
-    const chatAreas = document.querySelectorAll('.chat-area');
-    chatAreas.forEach(area => {
-      area.classList.remove('artifact-open');
-    });
-    
-    setTimeout(() => setCurrentArtifact(null), 300); // Clear after animation
   };
 
   return (
@@ -157,7 +75,6 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
       isOpen
     }}>
       {children}
-      {isOpen && currentArtifact && <ArtifactViewer />}
     </ArtifactContext.Provider>
   );
 };
@@ -170,9 +87,6 @@ export const ArtifactViewer: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'code' | 'preview'>('code');
 
   useEffect(() => {
-    console.log("ArtifactViewer mounted, isOpen:", isOpen);
-    console.log("Current artifact:", currentArtifact?.id);
-    
     if (currentArtifact && currentArtifact.files.length > 0) {
       setActiveFile(currentArtifact.files[0].id);
       
@@ -192,25 +106,9 @@ export const ArtifactViewer: React.FC = () => {
     } else {
       setActiveFile(null);
     }
-    
-    // Force reflow on mount
-    window.dispatchEvent(new Event('resize'));
-    
-    // Prevent scroll on body when viewer is open
-    document.body.style.overflow = 'hidden';
-    
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [currentArtifact, isOpen]);
+  }, [currentArtifact]);
 
-  if (!isOpen || !currentArtifact) {
-    console.log("ArtifactViewer not rendering because isOpen:", isOpen, "currentArtifact:", !!currentArtifact);
-    return null;
-  }
-
-  console.log("Rendering ArtifactViewer with artifact:", currentArtifact.id);
-  console.log("Number of files:", currentArtifact.files.length);
+  if (!isOpen || !currentArtifact) return null;
 
   const currentFile = currentArtifact.files.find(f => f.id === activeFile);
 
@@ -435,16 +333,17 @@ export const ArtifactViewer: React.FC = () => {
   );
 };
 
-// Simplified layout - this was the problem!
-// The code was trying to render a layout component which wasn't integrating properly
+// The Layout component that manages the artifact system
 export const ArtifactLayout: React.FC<{children: React.ReactNode}> = ({ children }) => {
   const { isOpen } = useArtifact();
-  
+
   return (
     <div className="artifact-system flex h-full">
-      <div className={`chat-area ${isOpen ? 'artifact-open' : ''}`}>
+      <div className={`chat-area transition-all duration-300 ease-in-out ${isOpen ? 'w-[40%] border-r' : 'w-full'}`}>
         {children}
       </div>
+      
+      {isOpen && <ArtifactViewer />}
     </div>
   );
 };
