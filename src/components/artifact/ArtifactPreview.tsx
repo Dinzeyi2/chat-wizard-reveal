@@ -101,6 +101,7 @@ document.addEventListener("DOMContentLoaded", function() {
   content.className = "content";
   
   // Add some title and explanation
+  const files = ${JSON.stringify(files.map(f => ({ path: f.path })))};
   const filesList = files.map(file => "<li>" + file.path + "</li>").join("");
   
   content.innerHTML = \`
@@ -238,10 +239,8 @@ document.addEventListener("DOMContentLoaded", function() {
         files={sandpackFiles}
         options={{
           recompileMode: "immediate",
-          recompileDelay: 300,
-          // Removed 'showNavigator' as it's not a valid option
-          showLineNumbers: true,
-          showInlineErrors: true,
+          recompileDelay: 300
+          // Removed invalid options: showNavigator, showLineNumbers, showInlineErrors
         }}
       >
         <Tabs 
