@@ -92,18 +92,6 @@
   background-color: white;
 }
 
-.terminal-output, .server-output {
-  max-height: 200px;
-  overflow-y: auto;
-  background-color: #282c34;
-  color: #abb2bf;
-  font-family: monospace;
-  padding: 0.5rem;
-  font-size: 0.875rem;
-  white-space: pre-wrap;
-  display: none;
-}
-
 /* File tree styling */
 .file-tree li {
   white-space: nowrap;
@@ -124,7 +112,7 @@
   }
 }
 
-/* WebContainer preview styles */
+/* Preview styles */
 .artifact-preview-container {
   width: 100%;
   height: 100%;
