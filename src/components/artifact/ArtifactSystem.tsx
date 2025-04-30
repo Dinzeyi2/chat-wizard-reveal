@@ -347,13 +347,15 @@ export const ArtifactViewer: React.FC = () => {
           </div>
         </div>
         
-        <div className="artifact-viewer-content flex flex-1 overflow-hidden">
-          <div className="file-explorer w-1/4 min-w-[220px] border-r border-zinc-800 bg-black overflow-y-auto">
-            <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 px-3 py-2">
-              <h4 className="text-sm font-medium text-gray-400">Files</h4>
+        <div className={`artifact-viewer-content flex flex-1 overflow-hidden ${activeTab === 'preview' ? 'preview-mode' : ''}`}>
+          {activeTab === 'code' && (
+            <div className="file-explorer w-1/4 min-w-[220px] border-r border-zinc-800 bg-black overflow-y-auto">
+              <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 px-3 py-2">
+                <h4 className="text-sm font-medium text-gray-400">Files</h4>
+              </div>
+              {renderFileTree()}
             </div>
-            {renderFileTree()}
-          </div>
+          )}
           
           <div className="file-content flex-1 overflow-auto flex flex-col">
             {activeTab === 'code' ? (
