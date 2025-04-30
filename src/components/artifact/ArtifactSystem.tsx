@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import { FileCode, X, ExternalLink, ChevronRight, Download, File, Code } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/hooks/use-toast';
 
 // Types
 interface ArtifactFile {
@@ -44,8 +46,21 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
   const [isOpen, setIsOpen] = useState(false);
 
   const openArtifact = (artifact: Artifact) => {
+    console.log("ArtifactProvider.openArtifact called with:", artifact.id);
+    if (!artifact || !artifact.files || artifact.files.length === 0) {
+      console.error("Cannot open artifact: Invalid artifact or empty files array");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Cannot display code: No valid files found"
+      });
+      return;
+    }
+    
+    // Set the artifact and open the viewer
     setCurrentArtifact(artifact);
     setIsOpen(true);
+    console.log("Artifact viewer opened successfully");
   };
 
   const closeArtifact = () => {
