@@ -1,13 +1,13 @@
 
 import React from 'react';
 import {
-  Sandpack,
   SandpackProvider,
   SandpackLayout,
   SandpackCodeEditor,
   SandpackPreview,
   SandpackConsole,
-  SandpackFileExplorer
+  SandpackFileExplorer,
+  type SandpackFiles
 } from '@codesandbox/sandpack-react';
 import '@codesandbox/sandpack-react/dist/index.css';
 
@@ -26,17 +26,12 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
   const formatFilesForSandpack = () => {
     if (!files || files.length === 0) return {};
     
-    const sandpackFiles: Record<string, { code: string }> = {};
+    const sandpackFiles: SandpackFiles = {};
     
     files.forEach(file => {
       // Use the file path as the key (e.g., "/src/App.js")
       const filePath = file.path.startsWith('/') ? file.path : `/${file.path}`;
       sandpackFiles[filePath] = { code: file.content };
-      
-      // Set the main file as the active one (we'll use the first one in the array)
-      if (Object.keys(sandpackFiles).length === 1) {
-        sandpackFiles[filePath].active = true;
-      }
     });
     
     // Make sure we have an index.js or App.js as entry point
@@ -44,8 +39,7 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
         path.includes('index.js') || path.includes('App.js') || 
         path.includes('index.ts') || path.includes('App.tsx'))) {
       sandpackFiles['/src/App.js'] = { 
-        code: 'export default function App() {\n  return <div>Hello World</div>;\n}',
-        active: true
+        code: 'export default function App() {\n  return <div>Hello World</div>;\n}'
       };
     }
     
@@ -82,7 +76,6 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
         theme="dark"
         options={{
           autorun: true,
-          showNavigator: true,
           showLineNumbers: true,
           showInlineErrors: true,
         }}
