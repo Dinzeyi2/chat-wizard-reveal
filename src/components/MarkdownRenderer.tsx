@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Message } from "@/types/chat";
 import AppGeneratorDisplay from "./AppGeneratorDisplay";
