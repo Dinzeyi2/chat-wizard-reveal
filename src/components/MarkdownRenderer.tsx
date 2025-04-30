@@ -121,7 +121,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
   if (message && isAppGeneration) {
     console.log("Rendering AppGeneratorDisplay for message:", message.id);
     return (
-      <AppGeneratorDisplay message={message} projectId={projectId} />
+      <ArtifactProvider>
+        <AppGeneratorDisplay message={message} projectId={projectId} />
+      </ArtifactProvider>
     );
   }
 
