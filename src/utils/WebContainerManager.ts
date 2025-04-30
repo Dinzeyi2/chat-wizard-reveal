@@ -1,5 +1,4 @@
-
-import { WebContainer } from '@webcontainer/api';
+import { WebContainer, auth } from '@webcontainer/api';
 import { toast } from '@/hooks/use-toast';
 
 // Main WebContainer class to manage the integration
@@ -16,6 +15,7 @@ export class WebContainerManager {
   private crossOriginIsolationDetected: boolean = false;
   private instanceLimitReached: boolean = false;
   private bootTimeoutMs: number = 15000; // 15 seconds timeout
+  private isAuthenticated: boolean = false;
 
   // Initialize the WebContainer
   async initialize() {
@@ -56,9 +56,25 @@ export class WebContainerManager {
         throw new Error('WebContainer requires a secure context (HTTPS or localhost)');
       }
       
+      // Initialize WebContainer authentication with client ID
+      try {
+        console.log('Initializing WebContainer authentication...');
+        await auth.init({
+          clientId: 'wc_api_dinzeyi2_0c4093800eedf65f7f692a274b7fcfb0',
+          scope: '',
+        });
+        console.log('WebContainer authentication initialized successfully');
+        this.isAuthenticated = true;
+      } catch (authError: any) {
+        console.warn('Failed to initialize WebContainer authentication:', authError);
+        // Continue without authentication as fallback
+        this.isAuthenticated = false;
+      }
+      
       // Boot the WebContainer with timeout and different strategies
       try {
         // First try with default configuration
+        console.log('Attempting to boot WebContainer with authentication...');
         this.webcontainer = await Promise.race([
           WebContainer.boot(),
           new Promise((_, reject) => 
