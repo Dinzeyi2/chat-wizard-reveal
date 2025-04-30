@@ -124,21 +124,11 @@
   }
 }
 
-/* WebContainer preview styles */
+/* Artifact preview styles */
 .artifact-preview-container {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: #18181b;
-}
-
-.preview-loading-indicator {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  width: 100%;
   background-color: #18181b;
 }
 
@@ -149,12 +139,4 @@
 
 .artifact-viewer-content.preview-mode .file-content {
   width: 100%;
-}
-
-.artifact-preview-container.full-screen {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
 }
