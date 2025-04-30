@@ -223,8 +223,6 @@ document.addEventListener("DOMContentLoaded", function() {
           recompileMode: "immediate",
           recompileDelay: 300,
           autorun: true,
-          showNavigator: true,
-          showLineNumbers: true,
           showInlineErrors: true,
           externalResources: [
             "https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css"
