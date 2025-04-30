@@ -65,7 +65,7 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
       
       result[path] = {
         code: file.content,
-        // Fix the type issue by using a more specific type cast
+        // Fix the type issue by using a type guard
         active: file.path.endsWith(".html") // Make HTML files active by default
       };
     });
@@ -147,11 +147,6 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
         theme={nightOwl}
         template={template}
         files={sandpackFiles}
-        options={{
-          showLineNumbers: true,
-          showInlineErrors: true,
-          showTabs: true,
-        }}
       >
         <Tabs 
           value={activeTab} 

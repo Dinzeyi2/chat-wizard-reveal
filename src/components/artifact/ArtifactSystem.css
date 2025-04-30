@@ -199,3 +199,31 @@
 .sp-console {
   height: 100% !important;
 }
+
+/* Basic Sandpack styles to compensate for missing CSS import */
+.sp-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.sp-tabs {
+  display: flex;
+  background-color: #1e1e1e;
+  border-bottom: 1px solid #333;
+}
+
+.sp-tab-button {
+  padding: 8px 16px;
+  color: #ccc;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.sp-tab-button.active {
+  color: white;
+  border-bottom: 2px solid #4d4dff;
+}

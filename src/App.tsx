@@ -9,7 +9,8 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ChatHistory from "./pages/ChatHistory";
 import "./components/artifact/ArtifactSystem.css";
-import "@codesandbox/sandpack-react/dist/index.css";
+// Don't import the CSS as it's not available directly
+// We'll add the necessary styles in ArtifactSystem.css
 
 const App = () => {
   // Create a client
