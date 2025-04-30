@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
@@ -5,6 +6,7 @@ import { FileCode, X, ExternalLink, ChevronRight, Download, File, Code } from 'l
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import './ArtifactSystem.css';
+import { ArtifactPreview } from './ArtifactPreview';
 
 // Types
 interface ArtifactFile {
@@ -354,26 +356,32 @@ export const ArtifactViewer: React.FC = () => {
           </div>
           
           <div className="file-content flex-1 overflow-auto flex flex-col">
-            {currentFile ? (
-              <>
-                <div className="file-path px-4 py-2 text-xs text-gray-400 bg-zinc-900 border-b border-zinc-800 flex justify-between items-center">
-                  <span>{currentFile.path}</span>
-                  <span className="text-gray-500">{getLanguageFromPath(currentFile.path).toUpperCase()}</span>
+            {activeTab === 'code' ? (
+              currentFile ? (
+                <>
+                  <div className="file-path px-4 py-2 text-xs text-gray-400 bg-zinc-900 border-b border-zinc-800 flex justify-between items-center">
+                    <span>{currentFile.path}</span>
+                    <span className="text-gray-500">{getLanguageFromPath(currentFile.path).toUpperCase()}</span>
+                  </div>
+                  <div className="code-container flex-1 overflow-auto bg-zinc-900">
+                    <SyntaxHighlighter 
+                      language={getLanguageFromPath(currentFile.path)}
+                      style={vs2015}
+                      customStyle={{ margin: 0, padding: '16px', height: '100%', fontSize: '14px', lineHeight: '1.5', backgroundColor: '#18181b' }}
+                      showLineNumbers={true}
+                    >
+                      {currentFile.content}
+                    </SyntaxHighlighter>
+                  </div>
+                </>
+              ) : (
+                <div className="no-file-selected p-4 text-center text-gray-500 mt-8 bg-zinc-900">
+                  Select a file to view its content
                 </div>
-                <div className="code-container flex-1 overflow-auto bg-zinc-900">
-                  <SyntaxHighlighter 
-                    language={getLanguageFromPath(currentFile.path)}
-                    style={vs2015}
-                    customStyle={{ margin: 0, padding: '16px', height: '100%', fontSize: '14px', lineHeight: '1.5', backgroundColor: '#18181b' }}
-                    showLineNumbers={true}
-                  >
-                    {currentFile.content}
-                  </SyntaxHighlighter>
-                </div>
-              </>
+              )
             ) : (
-              <div className="no-file-selected p-4 text-center text-gray-500 mt-8 bg-zinc-900">
-                Select a file to view its content
+              <div className="preview-container h-full w-full flex-1">
+                <ArtifactPreview files={currentArtifact.files} />
               </div>
             )}
           </div>
