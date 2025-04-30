@@ -341,7 +341,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
     );
   };
 
-  // Fixed and debugged handleViewFullProject function
+  // Modified function to handle viewing the full project
   const handleViewFullProject = () => {
     try {
       console.log("Opening artifact viewer with message content:", message.content.substring(0, 100) + "...");
@@ -408,10 +408,9 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
         files: files
       };
       
-      // Call the openArtifact function and verify it works
+      // Call the openArtifact function
       console.log("Calling openArtifact with artifact:", artifact.id);
       openArtifact(artifact);
-      console.log("openArtifact called successfully");
       
       // If we get here, we should show a message to the user
       toast({
