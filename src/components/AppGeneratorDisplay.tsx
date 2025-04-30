@@ -340,22 +340,28 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
     );
   };
 
-  // Completely rewritten handleViewFullProject to be more robust
+  // Completely rewritten handleViewFullProject to be more reliable
   const handleViewFullProject = () => {
     console.log("Opening artifact viewer with message content:", message.content.substring(0, 100) + "...");
-    console.log("Project ID:", appData?.projectId || propProjectId || "none");
     
     // Create a guaranteed artifact ID
     const artifactId = `artifact-${Date.now()}`;
     // Default title that will always work
     const projectTitle = appData?.projectName || "Generated Application";
     
-    // Try three different approaches to get files, with guaranteed fallbacks
+    // Try extracting code blocks first as the primary method
+    const extractedFiles = extractCodeBlocks();
+    
+    // Create final files array with proper structure
     let files = [];
     
-    // Method 1: Try to get files from parsed app data
-    if (appData?.files && appData.files.length > 0) {
-      console.log("Using parsed app data files, count:", appData.files.length);
+    if (extractedFiles && extractedFiles.length > 0) {
+      console.log("Using extracted code blocks, count:", extractedFiles.length);
+      files = extractedFiles;
+    } 
+    // If no extracted files, but we have appData, use those files
+    else if (appData?.files && appData.files.length > 0) {
+      console.log("Using appData files, count:", appData.files.length);
       files = appData.files.map((file, index) => ({
         id: `file-${index}`,
         name: file.path.split('/').pop() || `file-${index}`,
@@ -364,18 +370,8 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
         content: file.content
       }));
     }
-    
-    // Method 2: If no files from app data, try to extract code blocks
-    if (files.length === 0) {
-      console.log("Falling back to code block extraction");
-      const extractedFiles = extractCodeBlocks();
-      if (extractedFiles.length > 0) {
-        files = extractedFiles;
-      }
-    }
-    
-    // Method 3: Ultimate fallback - create at least one file with the message content
-    if (files.length === 0) {
+    // Ultimate fallback - create at least one file with the message content
+    else {
       console.log("Using ultimate fallback - creating content file");
       files = [{
         id: "content-file",
@@ -395,10 +391,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
       id: artifactId,
       title: projectTitle,
       description: appData?.description || "Generated application",
-      files: files,
-      metadata: {
-        projectId: appData?.projectId || propProjectId || null
-      }
+      files: files
     };
     
     // Open the artifact with our guaranteed valid artifact object
