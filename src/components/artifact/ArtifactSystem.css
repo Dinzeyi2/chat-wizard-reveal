@@ -89,6 +89,7 @@
   height: 100%;
   width: 100%;
   overflow: hidden;
+  background-color: white;
 }
 
 .terminal-output, .server-output {
@@ -129,22 +130,6 @@
   height: 100%;
   overflow: hidden;
   background-color: #18181b;
-}
-
-/* Sandpack specific styles */
-.artifact-preview-container .sp-wrapper {
-  height: 100% !important;
-  width: 100% !important;
-}
-
-.artifact-preview-container .sp-layout {
-  height: 100% !important;
-  width: 100% !important;
-  border: none !important;
-}
-
-.artifact-preview-container .sp-tabs {
-  background: #1e1e1e !important;
 }
 
 /* Full preview mode */

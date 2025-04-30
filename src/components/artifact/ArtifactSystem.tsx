@@ -117,7 +117,7 @@ export const ArtifactViewer: React.FC = () => {
   const { currentArtifact, closeArtifact, isOpen } = useArtifact();
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
-  const [activeTab, setActiveTab] = useState<'code' | 'preview'>('preview'); // Default to preview tab
+  const [activeTab, setActiveTab] = useState<'code' | 'preview'>('code');
 
   useEffect(() => {
     console.log("ArtifactViewer mounted, isOpen:", isOpen);
