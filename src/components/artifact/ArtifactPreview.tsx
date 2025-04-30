@@ -1,8 +1,9 @@
 
 import React, { useRef, useEffect, useState } from 'react';
-import { webContainerIntegration } from '@/utils/WebContainerManager';
+import { webContainerFix } from '@/utils/WebContainerFix';
 import { Loader2, AlertTriangle, ExternalLink, RefreshCw, Monitor } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/hooks/use-toast';
 
 interface ArtifactPreviewProps {
   files: Array<{
@@ -22,11 +23,10 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
   const [error, setError] = useState<string | null>(null);
   const [isCrossOriginError, setIsCrossOriginError] = useState(false);
   const [isInstanceLimitError, setIsInstanceLimitError] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
   const [showStaticPreview, setShowStaticPreview] = useState(false);
   const [activeTab, setActiveTab] = useState("preview");
   
-  // Set up preview when files change
+  // Setup preview when files change
   useEffect(() => {
     const setupPreview = async () => {
       if (!files || files.length === 0) {
@@ -43,26 +43,16 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
       setStatus("Setting up the preview environment...");
       
       try {
-        // Set the iframe reference
-        if (iframeRef.current) {
-          webContainerIntegration.setPreviewElement(iframeRef.current);
-        }
+        // Convert files to the format expected by WebContainerFix
+        const processedFiles = files.map(file => ({
+          path: file.path,
+          content: file.content,
+          type: file.language
+        }));
         
         // Set up event listeners for status updates
         const onReady = () => {
           setStatus("WebContainer ready");
-        };
-        
-        const onInstallStarted = () => {
-          setStatus("Installing dependencies...");
-        };
-        
-        const onInstallComplete = () => {
-          setStatus("Dependencies installed");
-        };
-        
-        const onServerStarting = () => {
-          setStatus("Starting development server...");
         };
         
         const onPreviewReady = (event: Event) => {
@@ -84,7 +74,7 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
           const errorMessage = errorDetail?.message || "Something went wrong";
           
           // Detect specific types of errors
-          if (errorDetail?.isCrossOriginError || 
+          if ((event as CustomEvent).detail?.isCrossOriginError || 
               errorMessage.includes("SharedArrayBuffer") || 
               errorMessage.includes("crossOriginIsolated")) {
             console.log("Detected cross-origin isolation error");
@@ -92,7 +82,7 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
           }
           
           // Check for instance limit errors
-          if (errorDetail?.isInstanceLimitError || 
+          if ((event as CustomEvent).detail?.isInstanceLimitError || 
               errorMessage.includes("Unable to create more instances")) {
             console.log("Detected instance limit error");
             setIsInstanceLimitError(true);
@@ -102,39 +92,31 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
           setStatus("Error: " + errorMessage);
           setIsLoading(false);
           setIsProcessing(false);
-          
-          // Automatically show static preview after 3 seconds if there's an error
-          setTimeout(() => {
-            if (!showStaticPreview) {
-              console.log("Auto-switching to static preview due to WebContainer error");
-              setShowStaticPreview(true);
-            }
-          }, 2000);
+        };
+        
+        const onStaticPreviewEnabled = () => {
+          console.log("Static preview enabled");
+          setShowStaticPreview(true);
         };
         
         // Add event listeners
         document.addEventListener('webcontainer-ready', onReady);
-        document.addEventListener('installation-started', onInstallStarted);
-        document.addEventListener('installation-complete', onInstallComplete);
-        document.addEventListener('server-starting', onServerStarting);
         document.addEventListener('preview-ready', onPreviewReady);
         document.addEventListener('webcontainer-error', onError);
-        document.addEventListener('installation-error', onError);
-        document.addEventListener('server-error', onError);
+        document.addEventListener('static-preview-enabled', onStaticPreviewEnabled);
         
-        // Process the artifact files
-        await webContainerIntegration.processArtifactFiles(files);
+        // Initialize WebContainerFix and set up files
+        await webContainerFix.initialize();
+        if (webContainerFix.getWebContainer()) {
+          await webContainerFix.setupFiles(processedFiles);
+        }
         
         // Cleanup event listeners on unmount
         return () => {
           document.removeEventListener('webcontainer-ready', onReady);
-          document.removeEventListener('installation-started', onInstallStarted);
-          document.removeEventListener('installation-complete', onInstallComplete);
-          document.removeEventListener('server-starting', onServerStarting);
           document.removeEventListener('preview-ready', onPreviewReady);
           document.removeEventListener('webcontainer-error', onError);
-          document.removeEventListener('installation-error', onError);
-          document.removeEventListener('server-error', onError);
+          document.removeEventListener('static-preview-enabled', onStaticPreviewEnabled);
         };
       } catch (error) {
         console.error("Error setting up preview:", error);
@@ -165,11 +147,9 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
     };
     
     setupPreview();
-  }, [files, retryCount]);
+  }, [files]);
   
   const handleRetry = async () => {
-    setRetryCount(prev => prev + 1);
-    await webContainerIntegration.containerManager.reset();
     setIsLoading(true);
     setIsProcessing(true);
     setError(null);
@@ -177,10 +157,13 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
     setIsInstanceLimitError(false);
     setShowStaticPreview(false);
     setStatus("Retrying...");
+    
+    await webContainerFix.reset();
   };
 
   const handleShowStaticPreview = () => {
     setShowStaticPreview(true);
+    webContainerFix.enableStaticPreview();
   };
 
   // Function to render a static code preview when WebContainer fails
@@ -222,44 +205,6 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
               margin-bottom: 32px;
               color: #666;
             }
-            .file-item {
-              margin-bottom: 1rem;
-              border-radius: 8px;
-              overflow: hidden;
-              border: 1px solid #ddd;
-              background: white;
-            }
-            .file-header {
-              display: flex;
-              align-items: center;
-              padding: 10px 16px;
-              background-color: #f1f3f5;
-              border-bottom: 1px solid #ddd;
-              cursor: pointer;
-              user-select: none;
-            }
-            .file-header:hover {
-              background-color: #e9ecef;
-            }
-            .file-icon {
-              margin-right: 10px;
-              font-weight: bold;
-            }
-            .file-content {
-              padding: 16px;
-              overflow-x: auto;
-              display: none;
-            }
-            .file-content pre {
-              margin: 0;
-              font-family: monospace;
-              white-space: pre-wrap;
-              font-size: 14px;
-              line-height: 1.5;
-            }
-            .file-item.open .file-content {
-              display: block;
-            }
             details {
               margin-bottom: 16px;
               border: 1px solid #e2e8f0;
@@ -298,19 +243,6 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
               `).join('')}
             </div>
           </div>
-          
-          <script>
-            // Allow expanding/collapsing file items
-            document.addEventListener('DOMContentLoaded', function() {
-              const headers = document.querySelectorAll('.file-header');
-              headers.forEach(header => {
-                header.addEventListener('click', function() {
-                  const fileItem = this.parentElement;
-                  fileItem.classList.toggle('open');
-                });
-              });
-            });
-          </script>
         </body>
       </html>
     `;
