@@ -101,21 +101,21 @@ document.addEventListener("DOMContentLoaded", function() {
   content.className = "content";
   
   // Add some title and explanation
+  const filesList = files.map(file => "<li>" + file.path + "</li>").join("");
+  
   content.innerHTML = \`
     <h1>Code Preview</h1>
     <p>Your code is being previewed in this sandbox environment.</p>
     <div id="preview-content">
       <h2>Files in preview:</h2>
-      <ul>
-        ${files.map(file => \`<li>\${file.path}</li>\`).join('')}
-      </ul>
+      <ul>\${filesList}</ul>
     </div>
   \`;
   
   // Add it to the document
   document.body.appendChild(content);
   
-  console.log("Preview content initialized with", ${files.length}, "files");
+  console.log("Preview content initialized with", files.length, "files");
 });`,
         hidden: true
       };
