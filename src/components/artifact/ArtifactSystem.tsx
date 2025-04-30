@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
@@ -63,6 +64,11 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
         flex: 1;
       }
       
+      .chat-area.artifact-open {
+        width: 40%;
+        max-width: 40%;
+      }
+      
       .artifact-expanded-view {
         position: fixed;
         top: 0;
@@ -104,6 +110,11 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
     setCurrentArtifact(artifact);
     setIsOpen(true);
     
+    // Apply the artifact-open class to the chat-area elements
+    document.querySelectorAll('.chat-area').forEach(el => {
+      el.classList.add('artifact-open');
+    });
+    
     // Force reflow to ensure the viewer is rendered
     setTimeout(() => {
       console.log("Forcing reflow to ensure artifact viewer is visible");
@@ -116,6 +127,12 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
   const closeArtifact = () => {
     console.log("Closing artifact viewer");
     setIsOpen(false);
+    
+    // Remove the artifact-open class from the chat-area elements
+    document.querySelectorAll('.chat-area').forEach(el => {
+      el.classList.remove('artifact-open');
+    });
+    
     setTimeout(() => setCurrentArtifact(null), 300); // Clear after animation
   };
 
@@ -408,9 +425,11 @@ export const ArtifactViewer: React.FC = () => {
 // Simplified layout - this was the problem!
 // The code was trying to render a layout component which wasn't integrating properly
 export const ArtifactLayout: React.FC<{children: React.ReactNode}> = ({ children }) => {
+  const { isOpen } = useArtifact();
+  
   return (
     <div className="artifact-system flex h-full">
-      <div className="chat-area">
+      <div className={`chat-area ${isOpen ? 'artifact-open' : ''}`}>
         {children}
       </div>
     </div>
