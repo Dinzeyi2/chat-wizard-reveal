@@ -239,7 +239,7 @@ document.addEventListener("DOMContentLoaded", function() {
         options={{
           recompileMode: "immediate",
           recompileDelay: 300,
-          showNavigator: false,
+          // Removed 'showNavigator' as it's not a valid option
           showLineNumbers: true,
           showInlineErrors: true,
         }}
