@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Message } from "@/types/chat";
 import AppGeneratorDisplay from "./AppGeneratorDisplay";
@@ -114,8 +113,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
            (hasJsonContent && (hasProjectName || hasFiles)) || 
            (hasGenerationPhrase && (hasAppKeyword || hasFileStructure)) ||
            (hasGenerationKeyword && hasAppKeyword && (hasFileStructure || hasMultipleCodeBlocks)) ||
-           (projectId !== null) || // If we detected a projectId, it's definitely app generation
-           (hasMultipleCodeBlocks && hasFileStructure); // If we have multiple code blocks and file structure
+           (projectId !== null) || 
+           (hasMultipleCodeBlocks && hasFileStructure);
   }, [content, message, projectId]);
   
   if (message && isAppGeneration) {
