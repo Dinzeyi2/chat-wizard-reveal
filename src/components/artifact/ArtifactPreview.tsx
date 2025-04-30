@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { webContainerIntegration } from '@/utils/WebContainerManager';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, ExternalLink, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface ArtifactPreviewProps {
@@ -20,6 +20,7 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [status, setStatus] = useState("Initializing...");
   const [error, setError] = useState<string | null>(null);
+  const [isCrossOriginError, setIsCrossOriginError] = useState(false);
   
   // Set up preview when files change
   useEffect(() => {
@@ -33,6 +34,7 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
       setIsLoading(true);
       setIsProcessing(true);
       setError(null);
+      setIsCrossOriginError(false);
       setStatus("Setting up the preview environment...");
       
       try {
@@ -76,6 +78,12 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
           console.error("WebContainer error:", errorDetail);
           const errorMessage = errorDetail?.message || "Something went wrong";
           
+          // Check for cross-origin isolation errors
+          if (errorMessage.includes("SharedArrayBuffer") || 
+              errorMessage.includes("crossOriginIsolated")) {
+            setIsCrossOriginError(true);
+          }
+          
           setError(errorMessage);
           setStatus("Error: " + errorMessage);
           setIsLoading(false);
@@ -108,6 +116,14 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
         };
       } catch (error) {
         console.error("Error setting up preview:", error);
+        
+        // Check for cross-origin isolation errors
+        if (error instanceof Error && 
+            (error.message.includes("SharedArrayBuffer") || 
+             error.message.includes("crossOriginIsolated"))) {
+          setIsCrossOriginError(true);
+        }
+        
         setError(error instanceof Error ? error.message : "Failed to set up preview environment");
         setStatus("Failed to set up preview environment");
         setIsLoading(false);
@@ -123,8 +139,64 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
     setIsLoading(true);
     setIsProcessing(true);
     setError(null);
+    setIsCrossOriginError(false);
     setStatus("Retrying...");
     await webContainerIntegration.processArtifactFiles(files);
+  };
+
+  // Function to render a static code preview when WebContainer fails
+  const renderStaticPreview = () => {
+    // This is a simple code viewer fallback
+    const getHtmlContent = () => {
+      // Create a simple HTML preview using the files
+      const htmlFile = files.find(f => f.path.endsWith('.html'));
+      const cssFiles = files.filter(f => f.path.endsWith('.css'));
+      const jsFiles = files.filter(f => f.path.endsWith('.js') || f.path.endsWith('.jsx'));
+      
+      let html = htmlFile?.content || `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>Code Preview</title>
+            <style>
+              body { font-family: system-ui, sans-serif; margin: 20px; }
+              .preview-container { max-width: 800px; margin: 0 auto; }
+              .message { text-align: center; padding: 20px; background: #f5f5f5; border-radius: 8px; }
+            </style>
+            ${cssFiles.map(f => `<style>${f.content}</style>`).join('\n')}
+          </head>
+          <body>
+            <div class="preview-container">
+              <div class="message">
+                <h2>Static Preview</h2>
+                <p>This is a static preview of your code. Interactive features are not available.</p>
+              </div>
+              <div id="code-files">
+                ${files.map(f => `
+                  <details>
+                    <summary>${f.path}</summary>
+                    <pre><code>${f.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>
+                  </details>
+                `).join('\n')}
+              </div>
+            </div>
+            ${jsFiles.map(f => `<script type="text/plain">${f.content}</script>`).join('\n')}
+          </body>
+        </html>
+      `;
+      
+      return html;
+    };
+    
+    return (
+      <iframe
+        srcDoc={getHtmlContent()}
+        className="w-full h-full border-none"
+        title="Static Code Preview"
+        sandbox="allow-same-origin"
+      />
+    );
   };
 
   return (
@@ -142,33 +214,58 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
       )}
       
       {error && (
-        <div className="flex flex-col items-center justify-center p-8 h-full">
-          <AlertTriangle className="h-12 w-12 text-red-500 mb-4" />
-          <div className="text-center">
-            <p className="font-medium text-gray-200">WebContainer Error</p>
-            <p className="text-sm text-gray-400 mt-1">{error}</p>
-            {error.includes("Unable to create more instances") && (
-              <div className="mt-4 max-w-md mx-auto">
-                <p className="text-sm text-gray-300 mb-2">
-                  WebContainer has a limit on concurrent instances. You can:
-                </p>
-                <ul className="text-sm text-gray-400 list-disc pl-5 mb-4">
-                  <li>Refresh the page and try again</li>
-                  <li>Close other tabs using WebContainer</li>
-                  <li>View the code only without preview</li>
+        <div className="webcontainer-error-container">
+          <AlertTriangle className="webcontainer-error-icon h-12 w-12" />
+          <h3 className="webcontainer-error-title">WebContainer Error</h3>
+          <p className="webcontainer-error-message">{error}</p>
+          
+          {isCrossOriginError ? (
+            <div className="max-w-md mx-auto text-center">
+              <p className="text-sm text-gray-300 mb-4">
+                The WebContainer requires special browser settings to work properly. This error occurs due to 
+                cross-origin isolation requirements.
+              </p>
+              
+              <div className="bg-zinc-800 p-4 rounded-lg mb-4 text-left">
+                <h4 className="text-sm font-semibold text-gray-200 mb-2">Alternative options:</h4>
+                <ul className="text-sm text-gray-400 list-disc pl-5 space-y-2">
+                  <li>View the static code preview below</li>
+                  <li>Switch to the "Code" tab to view the source code</li>
+                  <li>Try using a different browser or device</li>
                 </ul>
+              </div>
+              
+              <div className="flex justify-center space-x-3 mb-6">
                 <Button 
                   onClick={handleRetry} 
-                  className="mt-2" 
                   variant="outline"
+                  className="flex items-center gap-2"
                 >
+                  <RefreshCw className="h-4 w-4" />
                   Retry
                 </Button>
               </div>
-            )}
-          </div>
+              
+              <h4 className="text-sm font-semibold text-gray-200 mb-2">Static Preview</h4>
+              <div className="h-64 border border-gray-700 rounded-lg overflow-hidden bg-white">
+                {renderStaticPreview()}
+              </div>
+            </div>
+          ) : (
+            <div className="webcontainer-error-actions">
+              <Button 
+                onClick={handleRetry} 
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Retry
+              </Button>
+            </div>
+          )}
           
           <div className="mt-8 p-4 bg-zinc-800 rounded-lg w-full max-w-lg overflow-auto">
+            <h4 className="text-sm font-semibold text-gray-200 mb-2">Files List:</h4>
             <pre className="text-xs text-gray-300 whitespace-pre-wrap">
               <code>
                 {JSON.stringify(files.map(f => ({path: f.path, size: f.content.length})), null, 2)}

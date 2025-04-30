@@ -169,6 +169,7 @@
   background-color: #18181b;
   padding: 2rem;
   text-align: center;
+  overflow-y: auto;
 }
 
 .webcontainer-error-icon {
@@ -186,10 +187,23 @@
 .webcontainer-error-message {
   color: #94a3b8;
   margin-bottom: 1.5rem;
+  max-width: 600px;
 }
 
 .webcontainer-error-actions {
   display: flex;
   justify-content: center;
   gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Static preview container */
+.static-preview-container {
+  background-color: white;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  margin-top: 1.5rem;
+  border: 1px solid #2a2a2a;
+  width: 100%;
+  max-width: 800px;
 }

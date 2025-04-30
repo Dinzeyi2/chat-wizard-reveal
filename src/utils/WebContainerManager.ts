@@ -12,6 +12,7 @@ export class WebContainerManager {
   private fileSystem: any = {};
   private initializationAttempts: number = 0;
   private readonly MAX_INITIALIZATION_ATTEMPTS = 2;
+  private crossOriginIsolationDetected: boolean = false;
 
   // Initialize the WebContainer
   async initialize() {
@@ -32,12 +33,29 @@ export class WebContainerManager {
         throw new Error('Max initialization attempts exceeded. Please refresh the page and try again.');
       }
 
+      // Check if we've already detected cross-origin isolation issues
+      if (this.crossOriginIsolationDetected) {
+        throw new Error('Cross-origin isolation required but not available in this environment.');
+      }
+
       this.initializationAttempts++;
       this.isBooting = true;
       console.log('Initializing WebContainer... (Attempt ' + this.initializationAttempts + ')');
       
       // Boot the WebContainer
-      this.webcontainer = await WebContainer.boot();
+      try {
+        this.webcontainer = await WebContainer.boot();
+      } catch (error: any) {
+        // Check specifically for SharedArrayBuffer/cross-origin isolation errors
+        if (error.message && (
+          error.message.includes('SharedArrayBuffer') || 
+          error.message.includes('crossOriginIsolated')
+        )) {
+          this.crossOriginIsolationDetected = true;
+          throw new Error('WebContainer requires cross-origin isolation which is not enabled in this environment.');
+        }
+        throw error;
+      }
       
       // Set up communication channel for terminal output
       this.webcontainer.on('server-ready', (port: number, url: string) => {
@@ -55,11 +73,24 @@ export class WebContainerManager {
       this.isBooting = false;
       console.error('Failed to initialize WebContainer:', error);
       
+      // Check for cross-origin isolation errors
+      if (error.message && (
+        error.message.includes('SharedArrayBuffer') || 
+        error.message.includes('crossOriginIsolated')
+      )) {
+        this.crossOriginIsolationDetected = true;
+        console.log('WebContainer requires cross-origin isolation which is not available.');
+        
+        toast({
+          title: "WebContainer Error",
+          description: "WebContainer requires cross-origin isolation which is not available in this environment.",
+          variant: "destructive"
+        });
+      } 
       // Check for the "Unable to create more instances" error
-      if (error.message && error.message.includes('Unable to create more instances')) {
+      else if (error.message && error.message.includes('Unable to create more instances')) {
         console.log('WebContainer instance limit reached. Please close other tabs or refresh the page.');
         
-        // Special handling for this specific error
         toast({
           title: "WebContainer Error",
           description: "Unable to create more WebContainer instances. Please refresh the page or close other tabs.",
@@ -74,7 +105,11 @@ export class WebContainerManager {
       }
       
       this.dispatchEvent(new CustomEvent('webcontainer-error', { 
-        detail: { error, recoverable: this.initializationAttempts < this.MAX_INITIALIZATION_ATTEMPTS } 
+        detail: { 
+          error, 
+          recoverable: this.initializationAttempts < this.MAX_INITIALIZATION_ATTEMPTS,
+          isCrossOriginError: this.crossOriginIsolationDetected
+        } 
       }));
       
       return false;
@@ -483,6 +518,9 @@ h1 {
     this.packages = new Map();
     this.fileSystem = {};
     this.previewUrl = null;
+    
+    // Reset cross-origin detection on reset to allow trying again
+    this.crossOriginIsolationDetected = false;
     
     try {
       // Try to terminate the existing instance if possible
