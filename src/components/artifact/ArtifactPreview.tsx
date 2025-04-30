@@ -50,8 +50,36 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
   </head>
   <body>
     <div id="root"></div>
+    <div id="app"></div>
   </body>
 </html>`,
+        hidden: true
+      };
+    }
+    
+    // Check if we need to create a basic index.js
+    let hasIndexJs = files.some(file => 
+      file.path === "index.js" || 
+      file.path === "/index.js" ||
+      file.path === "src/index.js" || 
+      file.path === "/src/index.js"
+    );
+    
+    // If there's no index.js but there are other files, create a simple one
+    if (!hasIndexJs && files.length > 0) {
+      // Simple index.js that doesn't rely on specific element IDs
+      result["/index.js"] = {
+        code: `
+// This is a basic entry point for the preview
+console.log("Preview initialized");
+
+document.addEventListener("DOMContentLoaded", function() {
+  // Create content if it doesn't exist
+  const content = document.createElement("div");
+  content.innerHTML = "<h1>Preview Content</h1><p>Your code is being previewed here.</p>";
+  document.body.appendChild(content);
+});
+`,
         hidden: true
       };
     }
