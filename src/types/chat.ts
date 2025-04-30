@@ -22,3 +22,21 @@ export interface ActionButton {
   label: string;
   icon: string;
 }
+
+// Add a Json type to help with Supabase compatibility
+export type Json = 
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
+// ChatHistoryItem interface with consistent property naming
+export interface ChatHistoryItem {
+  id: string;
+  title: string;
+  last_message?: string;
+  timestamp: string;
+  messages?: Message[]; 
+}

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -328,7 +327,7 @@ const ChatHistory = () => {
               <div className="flex justify-between items-start">
                 <div>
                   <h2 className="font-medium text-gray-800">{chat.title}</h2>
-                  <p className="text-sm text-gray-500">{chat.lastMessage || "No messages"}</p>
+                  <p className="text-sm text-gray-500">{chat.last_message || "No messages"}</p>
                   {chat.messages && (
                     <p className="text-xs text-gray-400 mt-1">
                       {chat.messages.length} messages

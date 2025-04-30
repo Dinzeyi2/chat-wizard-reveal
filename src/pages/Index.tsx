@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
 import WelcomeScreen from "@/components/WelcomeScreen";
-import { Message } from "@/types/chat";
+import { Message, Json } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -202,13 +202,19 @@ const Index = () => {
         const { data: session } = await supabase.auth.getSession();
         
         if (session.session) {
+          // Convert Message[] to a JSON-compatible structure for Supabase
+          const serializableMessages = updatedMessages.map(msg => ({
+            ...msg,
+            timestamp: msg.timestamp.toISOString()
+          }));
+          
           if (currentChatId) {
             // Update existing chat
             const { error } = await supabase
               .from('chat_history')
               .update({
                 last_message: `Last message ${timeString}`,
-                messages: updatedMessages,
+                messages: serializableMessages as unknown as Json,
                 updated_at: now.toISOString()
               })
               .eq('id', currentChatId);
@@ -221,12 +227,12 @@ const Index = () => {
             // Create new chat
             const { data, error } = await supabase
               .from('chat_history')
-              .insert([{
+              .insert({
                 user_id: session.session.user.id,
                 title: chatTitle,
                 last_message: `Last message ${timeString}`,
-                messages: updatedMessages
-              }])
+                messages: serializableMessages as unknown as Json
+              })
               .select();
             
             if (error) {
