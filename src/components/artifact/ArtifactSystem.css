@@ -16,6 +16,8 @@
 
 .chat-area.artifact-open {
   width: 40% !important;
+  max-width: 40%;
+  flex: 0 0 40%;
 }
 
 .artifact-expanded-view {
@@ -94,6 +96,8 @@
 @media (max-width: 768px) {
   .chat-area.artifact-open {
     width: 0 !important;
+    max-width: 0;
+    flex: 0;
   }
   
   .artifact-expanded-view {
