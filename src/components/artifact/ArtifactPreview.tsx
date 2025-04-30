@@ -5,11 +5,13 @@ import {
   SandpackLayout, 
   SandpackPreview, 
   SandpackConsole,
-  SandpackFiles
+  SandpackFiles,
+  SandpackStack
 } from '@codesandbox/sandpack-react';
 import { nightOwl } from '@codesandbox/sandpack-themes';
-import { Loader2, TerminalSquare } from 'lucide-react';
+import { Loader2, TerminalSquare, AlertCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 
 interface ArtifactPreviewProps {
   files: Array<{
@@ -24,6 +26,7 @@ interface ArtifactPreviewProps {
 export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"preview" | "console">("preview");
+  const [previewError, setPreviewError] = useState<string | null>(null);
   
   // Transform files to Sandpack format
   const sandpackFiles: SandpackFiles = React.useMemo(() => {
@@ -77,9 +80,9 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
   <body>
     <div id="root"></div>
     <div id="app"></div>
+    <script src="/index.js"></script>
   </body>
-</html>
-      `,
+</html>`,
       hidden: false
     };
     
@@ -122,8 +125,7 @@ document.addEventListener("DOMContentLoaded", function() {
   });
   
   console.log("Preview content displayed");
-});
-      `,
+});`,
       hidden: false
     };
     
@@ -145,8 +147,12 @@ document.addEventListener("DOMContentLoaded", function() {
     return result;
   }, [files]);
 
-  // Define the exact type for the template
-  const template = "vanilla" as const;
+  // Use a properly typed template value
+  const template = React.useMemo((): "vanilla" | "react" | "react-ts" | "vite" => {
+    // Default to vanilla template for most reliable rendering
+    console.log("Using vanilla template");
+    return "vanilla";
+  }, []);
   
   useEffect(() => {
     // Simulate loading for better UX
@@ -168,26 +174,6 @@ document.addEventListener("DOMContentLoaded", function() {
     
     return () => clearTimeout(timer);
   }, [activeTab]);
-
-  // Add debugging logs for iframe visibility
-  useEffect(() => {
-    if (!isLoading && activeTab === "preview") {
-      const checkIframe = setInterval(() => {
-        const iframe = document.querySelector('.sp-preview-iframe') as HTMLIFrameElement;
-        if (iframe) {
-          console.log("Found preview iframe, ensuring visibility");
-          iframe.style.display = 'block';
-          iframe.style.visibility = 'visible';
-          iframe.style.opacity = '1';
-          iframe.style.height = '100%';
-          iframe.style.width = '100%';
-          clearInterval(checkIframe);
-        }
-      }, 500);
-
-      return () => clearInterval(checkIframe);
-    }
-  }, [isLoading, activeTab]);
 
   if (isLoading) {
     return (
@@ -223,18 +209,19 @@ document.addEventListener("DOMContentLoaded", function() {
           recompileMode: "immediate",
           recompileDelay: 300,
           autorun: true,
-          showInlineErrors: true,
           externalResources: [
             "https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css"
           ],
           classes: {
-            "sp-wrapper": "h-full !bg-zinc-900",
-            "sp-stack": "h-full",
-            "sp-preview-container": "h-full !bg-white",
-            "sp-preview-iframe": "h-full !bg-white"
+            "sp-wrapper": "h-full !important",
+            "sp-stack": "h-full !important",
+            "sp-preview-container": "h-full !important bg-white !important",
+            "sp-preview": "h-full !important",
+            "sp-preview-iframe": "h-full !important bg-white !important"
           }
         }}
         customSetup={{
+          dependencies: {},
           entry: "/index.js"
         }}
       >
@@ -261,16 +248,22 @@ document.addEventListener("DOMContentLoaded", function() {
           
           <TabsContent value="preview" className="border-none p-0 m-0 h-full">
             <SandpackLayout className="h-full w-full">
-              <SandpackPreview 
-                showOpenInCodeSandbox={true}
-                showRefreshButton={true}
-              />
+              <SandpackStack className="h-full w-full">
+                <SandpackPreview 
+                  showNavigator={true}
+                  showRefreshButton={true}
+                  showRestartButton={true}
+                  className="!h-full !w-full sp-preview-force"
+                />
+              </SandpackStack>
             </SandpackLayout>
           </TabsContent>
           
           <TabsContent value="console" className="border-none p-0 m-0 h-full">
             <SandpackLayout className="h-full">
-              <SandpackConsole className="h-full" />
+              <SandpackStack className="h-full">
+                <SandpackConsole className="h-full" />
+              </SandpackStack>
             </SandpackLayout>
           </TabsContent>
         </Tabs>

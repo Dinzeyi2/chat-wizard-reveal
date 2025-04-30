@@ -147,87 +147,182 @@
   height: 100%;
 }
 
-/* Context menu custom styling */
+/* Context menu custom styling - Added */
 [data-radix-popper-content-wrapper] {
   z-index: 9999 !important;
 }
 
-/* Critical Sandpack Fixes - These are the most important styles */
+.user-profile-context-menu [data-radix-popper-content-wrapper] {
+  color: white !important;
+}
 
-/* Make sure the wrapper is visible and takes full height */
+/* Apply styles to both context menu and dropdown menu items */
+[data-radix-context-menu] [role="menuitem"]:focus,
+[data-radix-dropdown-menu] [role="menuitem"]:focus {
+  background-color: #2A2A2A !important;
+  color: white !important;
+  outline: none;
+}
+
+.dark [data-radix-context-menu] [role="menuitem"]:focus,
+.dark [data-radix-dropdown-menu] [role="menuitem"]:focus {
+  background-color: #2A2A2A !important;
+  color: white !important;
+}
+
+/* Style content for both menu types */
+[data-radix-context-menu] [data-radix-menu-content],
+[data-radix-dropdown-menu] [data-radix-menu-content] {
+  background-color: #1A1F2C !important;
+  border-color: #2A2A2A !important;
+}
+
+/* Enhanced Sandpack custom styles */
 .sp-wrapper {
   height: 100% !important;
-  overflow: visible !important;
-  background-color: transparent !important;
+  background-color: #18181b !important;
   border: none !important;
 }
 
-/* Make sure the layout takes full height */
-.sp-layout {
-  height: 100% !important;
-  min-height: 500px !important;
-  border: none !important;
-}
-
-/* Make sure the stack takes full height */
 .sp-stack {
   height: 100% !important;
-  min-height: 500px !important;
   border: none !important;
 }
 
-/* Make sure the preview container is visible and takes full height */
 .sp-preview-container {
-  height: 100% !important;
-  min-height: 300px !important;
   background-color: white !important;
-  overflow: visible !important;
+  height: 100% !important;
+  overflow: auto !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
-/* !!!CRITICAL!!! - Make sure the iframe is visible */
 .sp-preview-iframe {
   height: 100% !important;
   width: 100% !important;
+  border: none !important;
+  background-color: white !important;
+  flex: 1 !important;
+  min-height: 400px !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.sp-console {
+  height: 100% !important;
+  background-color: #1e1e1e !important;
+  color: #d4d4d4 !important;
+  border-radius: 0 !important;
+  overflow: auto !important;
+}
+
+.sp-console-item {
+  font-family: monospace !important;
+  font-size: 13px !important;
+  padding: 6px 12px !important;
+  border-bottom: 1px solid #2a2a2a !important;
+}
+
+.sp-console-error {
+  background-color: rgba(255, 99, 71, 0.1) !important;
+  color: tomato !important;
+}
+
+.sp-layout {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  border: none !important;
+}
+
+.sp-tabs {
+  display: flex !important;
+  background-color: #1e1e1e !important;
+  border-bottom: 1px solid #333 !important;
+}
+
+.sp-tab-button {
+  padding: 8px 16px !important;
+  color: #ccc !important;
+  border: none !important;
+  background: none !important;
+  cursor: pointer !important;
+}
+
+.sp-tab-button.active {
+  color: white !important;
+  border-bottom: 2px solid #4d4dff !important;
+}
+
+/* Fix for Sandpack preview height */
+.artifact-preview-container .sp-wrapper,
+.artifact-preview-container .sp-layout,
+.artifact-preview-container .sp-stack {
+  height: 100% !important;
+  min-height: 500px !important;
+  border: none !important;
+}
+
+.artifact-preview-container [data-radix-tabs-content] {
+  height: calc(100% - 40px) !important;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Make sure Sandpack loading indicator is visible */
+.sp-loading {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+  color: white !important;
+}
+
+/* Critical fix for the iframe visibility */
+iframe.sp-preview-iframe {
+  background-color: #ffffff !important;
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
   position: static !important;
   transform: none !important;
+  height: 100% !important;
+  width: 100% !important;
+}
+
+/* Additional fixes for preview display issues */
+.sandpack {
+  --sp-layout-height: 100% !important;
+  --sp-border-radius: 0 !important;
+  height: 100% !important;
+}
+
+.sp-preview {
+  height: 100% !important;
   min-height: 400px !important;
-  background-color: white !important;
-  border: none !important;
   overflow: auto !important;
 }
 
-/* Make sure tabs content takes full height */
-[data-radix-tabs-content] {
-  height: calc(100% - 40px) !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
-
-/* Make console take full height */
-.sp-console {
+/* Special class to force iframe visibility */
+.sp-preview-force {
   height: 100% !important;
-  min-height: 500px !important;
-  background-color: #1e1e1e !important;
 }
 
-/* Ensure preview is shown in full height */
-.sp-preview {
-  height: 100% !important;
-  min-height: 500px !important;
-}
-
-/* Additional classes to force visibility */
-.force-visible {
+.sp-preview-force iframe {
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
+  height: 100% !important;
 }
 
-/* Ensure sandpack is using the right height variables */
-.sandpack {
-  --sp-layout-height: 100% !important;
-  height: 100% !important;
+/* Fix CORS security issues with iframe */
+.sp-preview-container {
+  background-color: white !important;
+}
+
+/* Make sure content is shown */
+.sp-wrapper {
+  background-color: transparent !important;
 }
