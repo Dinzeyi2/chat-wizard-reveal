@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ChatHistory from "./pages/ChatHistory";
 import "./components/artifact/ArtifactSystem.css";
+import "@codesandbox/sandpack-react/dist/index.css";
 
 const App = () => {
   // Create a client
