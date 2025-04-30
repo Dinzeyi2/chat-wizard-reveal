@@ -1,8 +1,9 @@
+
 import React from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { Avatar, AvatarFallback } from "./ui/avatar";
-import { ArtifactProvider, useArtifact, ArtifactLayout } from "./artifact/ArtifactSystem";
+import { ArtifactProvider } from "./artifact/ArtifactSystem";
 
 interface ChatWindowProps {
   messages: Message[];
@@ -10,17 +11,7 @@ interface ChatWindowProps {
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ messages, loading }) => {
-  // Try to access the artifact context to determine if we're in artifact mode
-  const isInArtifactContext = (() => {
-    try {
-      useArtifact();
-      return true;
-    } catch {
-      return false;
-    }
-  })();
-
-  const MessageContent = () => (
+  return (
     <div className="px-4 py-5 md:px-8 lg:px-12">
       {messages.map((message) => (
         <div key={message.id} className="mb-8">
@@ -54,20 +45,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, loading }) => {
         </div>
       )}
     </div>
-  );
-
-  // If we're already in an artifact context, just render the messages
-  if (isInArtifactContext) {
-    return <MessageContent />;
-  }
-
-  // Otherwise wrap with the provider and layout
-  return (
-    <ArtifactProvider>
-      <ArtifactLayout>
-        <MessageContent />
-      </ArtifactLayout>
-    </ArtifactProvider>
   );
 };
 

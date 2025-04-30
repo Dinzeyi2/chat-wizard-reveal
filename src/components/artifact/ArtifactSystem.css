@@ -12,17 +12,12 @@
   transition: width 0.3s ease;
 }
 
-.chat-area.artifact-open {
-  width: 40%;
-  float: left;
-}
-
 .artifact-expanded-view {
-  position: fixed;
+  position: absolute;
   top: 0;
   right: 0;
   width: 60%;
-  height: 100vh;
+  height: 100%;
   background-color: #18181b;
   box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
   overflow: hidden;
@@ -91,12 +86,12 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .chat-area.artifact-open {
+  .chat-area.w-[40%] {
     width: 0;
-    display: none;
   }
   
   .artifact-expanded-view {
     width: 100%;
   }
 }
+

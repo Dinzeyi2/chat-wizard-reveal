@@ -1,9 +1,8 @@
-
 import React from "react";
 import { Message } from "@/types/chat";
 import AppGeneratorDisplay from "./AppGeneratorDisplay";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArtifactProvider, ArtifactLayout } from "./artifact/ArtifactSystem";
+import { ArtifactProvider } from "./artifact/ArtifactSystem";
 
 interface MarkdownRendererProps {
   content: string;
