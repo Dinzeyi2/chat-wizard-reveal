@@ -124,7 +124,7 @@
   }
 }
 
-/* Artifact preview styles */
+/* WebContainer preview styles */
 .artifact-preview-container {
   width: 100%;
   height: 100%;
@@ -157,43 +157,4 @@
   left: 0;
   width: 100%;
   height: 100%;
-}
-
-/* Sandpack custom styles */
-.sp-wrapper {
-  height: 100%;
-  width: 100%;
-}
-
-.sp-layout {
-  height: 100% !important;
-  border: none !important;
-  border-radius: 0 !important;
-}
-
-.sp-preview-container {
-  background: white !important;
-}
-
-.sp-tabs {
-  background-color: #18181b !important;
-}
-
-.sp-tab-button {
-  color: #a1a1aa !important;
-  background-color: transparent !important;
-}
-
-.sp-tab-button[data-active=true] {
-  color: white !important;
-  background-color: #27272a !important;
-}
-
-.sp-stack {
-  height: 100% !important;
-}
-
-.sp-console {
-  height: 100% !important;
-  max-height: none !important;
 }
