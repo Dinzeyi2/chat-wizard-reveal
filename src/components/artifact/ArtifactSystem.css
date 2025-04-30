@@ -168,18 +168,23 @@
   color: white !important;
 }
 
-[data-radix-context-menu] [role="menuitem"]:focus {
+/* Apply styles to both context menu and dropdown menu items */
+[data-radix-context-menu] [role="menuitem"]:focus,
+[data-radix-dropdown-menu] [role="menuitem"]:focus {
   background-color: #2A2A2A !important;
   color: white !important;
   outline: none;
 }
 
-.dark [data-radix-context-menu] [role="menuitem"]:focus {
+.dark [data-radix-context-menu] [role="menuitem"]:focus,
+.dark [data-radix-dropdown-menu] [role="menuitem"]:focus {
   background-color: #2A2A2A !important;
   color: white !important;
 }
 
-[data-radix-context-menu] [data-radix-menu-content] {
+/* Style content for both menu types */
+[data-radix-context-menu] [data-radix-menu-content],
+[data-radix-dropdown-menu] [data-radix-menu-content] {
   background-color: #1A1F2C !important;
   border-color: #2A2A2A !important;
 }
