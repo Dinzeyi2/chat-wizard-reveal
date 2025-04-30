@@ -355,7 +355,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
     
     // Method 1: Try to get files from parsed app data
     if (appData?.files && appData.files.length > 0) {
-      console.log("Using parsed app data files");
+      console.log("Using parsed app data files, count:", appData.files.length);
       files = appData.files.map((file, index) => ({
         id: `file-${index}`,
         name: file.path.split('/').pop() || `file-${index}`,
@@ -386,6 +386,10 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
       }];
     }
     
+    // Log what we're actually opening
+    console.log(`Opening artifact with ${files.length} files:`, 
+      files.map(f => f.path).join(', '));
+    
     // Ensure we have a valid artifact to open
     const artifact = {
       id: artifactId,
@@ -398,7 +402,6 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
     };
     
     // Open the artifact with our guaranteed valid artifact object
-    console.log("Opening artifact with", files.length, "files");
     openArtifact(artifact);
   };
 
@@ -593,12 +596,12 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
           <span className="font-medium text-lg">{isModification ? "View updated code" : "View code"}</span>
         </div>
         <Button 
-          variant="ghost" 
+          variant="default" 
           size="sm" 
-          className="hover:bg-transparent" 
+          className="bg-blue-600 hover:bg-blue-700" 
           onClick={handleViewFullProject}
         >
-          <ChevronRight className="h-5 w-5 text-gray-400" />
+          View Code <ChevronRight className="h-4 w-4 ml-1" />
         </Button>
       </div>
       

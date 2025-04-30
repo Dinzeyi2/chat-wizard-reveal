@@ -148,7 +148,19 @@ export const useUiScraper = (apiKeyOrOptions?: string | UseUiScraperOptions, opt
       setIsLoading(true);
       setError(null);
       
-      const result = await codeGenerator.generateCode(prompt);
+      // Add better logging for debugging
+      console.log("Generating code from prompt:", prompt.substring(0, 100) + "...");
+      
+      // Use the passed API key or the one from initialization
+      const apiKey = claudeKey || claudeApiKey;
+      if (!apiKey) {
+        console.warn("No Claude API key provided for code generation");
+      }
+      
+      // Generate the code
+      const result = await codeGenerator.generateCode(prompt, apiKey);
+      console.log("Code generation result:", result);
+      
       setGeneratedCode(result);
       
       if (result.success) {
@@ -162,6 +174,7 @@ export const useUiScraper = (apiKeyOrOptions?: string | UseUiScraperOptions, opt
       }
     } catch (err: any) {
       const error = err instanceof Error ? err : new Error(err?.message || "Unknown error");
+      console.error("Error generating code:", error);
       setError(error);
       uiScraperOptions.onError?.(error);
       

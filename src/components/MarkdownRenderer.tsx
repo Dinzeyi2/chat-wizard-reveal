@@ -94,15 +94,32 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
                             content.toLowerCase().includes('updated')
                           ));
     
+    // Debug
+    console.log("App generation detection:", {
+      hasJsonContent,
+      hasProjectName,
+      hasFiles,
+      hasGenerationPhrase,
+      hasAppKeyword,
+      hasGenerationKeyword,
+      hasFileStructure,
+      hasMultipleCodeBlocks,
+      projectId,
+      isModification,
+      codeBlockCount
+    });
+    
     // Be VERY lenient - if multiple conditions are met, treat it as app generation
     return isModification || 
            (hasJsonContent && (hasProjectName || hasFiles)) || 
            (hasGenerationPhrase && (hasAppKeyword || hasFileStructure)) ||
            (hasGenerationKeyword && hasAppKeyword && (hasFileStructure || hasMultipleCodeBlocks)) ||
-           (projectId !== null); // If we detected a projectId, it's definitely app generation
+           (projectId !== null) || // If we detected a projectId, it's definitely app generation
+           (hasMultipleCodeBlocks && hasFileStructure); // If we have multiple code blocks and file structure
   }, [content, message, projectId]);
   
   if (message && isAppGeneration) {
+    console.log("Rendering AppGeneratorDisplay for message:", message.id);
     return (
       <ArtifactProvider>
         <AppGeneratorDisplay message={message} projectId={projectId} />
