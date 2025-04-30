@@ -35,9 +35,9 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
     const result: SandpackFiles = {};
     
     // First identify if we have an index.html
-    let hasIndexHtml = files.some(file => file.path === "index.html");
+    let hasIndexHtml = files.some(file => file.path === "index.html" || file.path === "/index.html");
     
-    // If no index.html, we'll need to create one
+    // If no index.html, we'll need to create one with visible content
     if (!hasIndexHtml) {
       result["/index.html"] = {
         code: `
@@ -67,15 +67,28 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
         border-radius: 8px;
         padding: 20px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+      }
+      pre {
+        background-color: #f0f0f0;
+        padding: 10px;
+        border-radius: 4px;
+        overflow: auto;
+      }
+      .file-name {
+        font-weight: bold;
+        margin-bottom: 5px;
+        color: #4a5568;
       }
     </style>
   </head>
   <body>
     <div id="root"></div>
     <div id="app"></div>
+    <script src="/index.js"></script>
   </body>
 </html>`,
-        hidden: true
+        hidden: false
       };
     }
     
@@ -87,38 +100,53 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
       file.path === "/src/index.js"
     );
     
-    // If there's no index.js but there are other files, create a simple one
+    // If there's no index.js but there are other files, create a simple one with visible output
     if (!hasIndexJs && files.length > 0) {
-      // Create a more visible default content
       result["/index.js"] = {
         code: `
 // This is a basic entry point for the preview
-console.log("Preview initialized");
+console.log("Preview initialized with files:", ${JSON.stringify(files.map(f => f.path))});
 
 document.addEventListener("DOMContentLoaded", function() {
-  // Create a visible container with styling
-  const content = document.createElement("div");
-  content.className = "content";
+  // Create a visible container
+  const container = document.createElement("div");
+  document.body.appendChild(container);
   
-  // Add some title and explanation
-  const files = ${JSON.stringify(files.map(f => ({ path: f.path })))};
-  const filesList = files.map(file => "<li>" + file.path + "</li>").join("");
+  // Add title and description
+  const header = document.createElement("h1");
+  header.textContent = "Code Preview";
+  container.appendChild(header);
   
-  content.innerHTML = \`
-    <h1>Code Preview</h1>
-    <p>Your code is being previewed in this sandbox environment.</p>
-    <div id="preview-content">
-      <h2>Files in preview:</h2>
-      <ul>\${filesList}</ul>
-    </div>
-  \`;
+  const description = document.createElement("p");
+  description.textContent = "Below are the files included in this preview:";
+  container.appendChild(description);
   
-  // Add it to the document
-  document.body.appendChild(content);
+  // Display each file
+  const filesList = ${JSON.stringify(files.map(f => ({ path: f.path, content: f.content })))};
   
-  console.log("Preview content initialized with", files.length, "files");
+  filesList.forEach(file => {
+    const fileContainer = document.createElement("div");
+    fileContainer.className = "content";
+    
+    const fileName = document.createElement("div");
+    fileName.className = "file-name";
+    fileName.textContent = file.path;
+    fileContainer.appendChild(fileName);
+    
+    // For non-binary files, show a preview of content
+    if (file.content) {
+      const contentPreview = document.createElement("pre");
+      // Limit content to first 100 chars
+      contentPreview.textContent = file.content.substring(0, 100) + (file.content.length > 100 ? "..." : "");
+      fileContainer.appendChild(contentPreview);
+    }
+    
+    container.appendChild(fileContainer);
+  });
+  
+  console.log("Preview content displayed");
 });`,
-        hidden: true
+        hidden: false
       };
     }
     
@@ -237,8 +265,9 @@ document.addEventListener("DOMContentLoaded", function() {
         files={sandpackFiles}
         options={{
           recompileMode: "immediate",
-          recompileDelay: 300
-          // Removed invalid options: showNavigator, showLineNumbers, showInlineErrors
+          recompileDelay: 300,
+          autorun: true,
+          bundlerURL: "https://sandpack-bundler.pages.dev"
         }}
       >
         <Tabs 
@@ -269,6 +298,7 @@ document.addEventListener("DOMContentLoaded", function() {
                   showOpenInCodeSandbox={false}
                   className="h-full"
                   showRefreshButton={true}
+                  showRestartButton={true}
                 />
               </SandpackStack>
             </SandpackLayout>

@@ -204,6 +204,8 @@
   border: none !important;
   background-color: white !important;
   flex: 1 !important;
+  min-height: 400px !important;
+  display: block !important;
 }
 
 .sp-console {
@@ -293,4 +295,21 @@ iframe.sp-preview-iframe {
   height: 100% !important;
   min-height: 400px !important;
   overflow: auto !important;
+}
+
+/* Force iframe visibility */
+iframe.sp-preview-iframe {
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* Fix CORS security issues with iframe */
+.sp-preview-container {
+  background-color: white !important;
+}
+
+/* Make sure content is shown */
+.sp-wrapper {
+  background-color: transparent !important;
 }
