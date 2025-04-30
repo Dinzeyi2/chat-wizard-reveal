@@ -124,7 +124,7 @@
   }
 }
 
-/* WebContainer preview styles */
+/* Artifact preview container styles */
 .artifact-preview-container {
   width: 100%;
   height: 100%;
@@ -132,14 +132,24 @@
   background-color: #18181b;
 }
 
-.preview-loading-indicator {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+/* Sandpack custom styles */
+.artifact-preview-container .sp-wrapper {
   height: 100%;
   width: 100%;
-  background-color: #18181b;
+}
+
+.artifact-preview-container .sp-layout {
+  border: none !important;
+  border-radius: 0 !important;
+  height: 100% !important;
+}
+
+.artifact-preview-container .sp-preview-container {
+  background-color: white !important;
+}
+
+.artifact-preview-container .sp-tabs {
+  background-color: #1e1e1e !important;
 }
 
 /* Full preview mode */
