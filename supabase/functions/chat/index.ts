@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { corsHeaders } from "../_shared/cors.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4"
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -13,6 +14,26 @@ serve(async (req) => {
     const { message, projectId, lastModification } = await req.json()
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
     const claudeApiKey = Deno.env.get('CLAUDE_API_KEY')
+
+    // Create a Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    // Get user ID from the JWT if available
+    let userId = null
+    const authHeader = req.headers.get('Authorization')
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '')
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser(token)
+        if (!error && user) {
+          userId = user.id
+        }
+      } catch (error) {
+        console.error("Error getting user from token:", error)
+      }
+    }
 
     if (!openAIApiKey) {
       throw new Error('OpenAI API key is not configured')
@@ -243,6 +264,79 @@ Finally, provide a brief explanation of the component you created.
         const aiResponse = summaryData.choices[0].message.content + 
           `\n\nYour app has been updated with these modifications. You can explore the updated code using the "View code" button above.`;
 
+        // If user is authenticated, store the chat history
+        if (userId) {
+          try {
+            // Check if chat already exists for this project
+            const { data: existingChats } = await supabase
+              .from('chat_history')
+              .select('id')
+              .eq('user_id', userId)
+              .eq('messages', JSON.stringify({ metadata: { projectId: modifyResult.projectId } }), { substring: true })
+              .limit(1);
+
+            let chatId;
+            
+            if (existingChats && existingChats.length > 0) {
+              // Update existing chat
+              chatId = existingChats[0].id;
+              await supabase
+                .from('chat_history')
+                .update({
+                  last_message: `Modified project: ${message.substring(0, 30)}...`,
+                  messages: JSON.stringify([
+                    {
+                      id: Date.now().toString(),
+                      role: "user",
+                      content: message,
+                      timestamp: new Date().toISOString()
+                    },
+                    {
+                      id: (Date.now() + 1).toString(),
+                      role: "assistant",
+                      content: aiResponse,
+                      metadata: { projectId: modifyResult.projectId },
+                      timestamp: new Date().toISOString()
+                    }
+                  ]),
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', chatId);
+            } else {
+              // Create new chat
+              const { data } = await supabase
+                .from('chat_history')
+                .insert({
+                  user_id: userId,
+                  title: `App Modification: ${message.substring(0, 30)}...`,
+                  last_message: `Modified project ${new Date().toLocaleString()}`,
+                  messages: JSON.stringify([
+                    {
+                      id: Date.now().toString(),
+                      role: "user",
+                      content: message,
+                      timestamp: new Date().toISOString()
+                    },
+                    {
+                      id: (Date.now() + 1).toString(),
+                      role: "assistant",
+                      content: aiResponse,
+                      metadata: { projectId: modifyResult.projectId },
+                      timestamp: new Date().toISOString()
+                    }
+                  ])
+                })
+                .select('id');
+              
+              if (data && data[0]) {
+                chatId = data[0].id;
+              }
+            }
+          } catch (dbError) {
+            console.error("Error storing chat history in Supabase:", dbError);
+          }
+        }
+
         return new Response(JSON.stringify({ response: aiResponse, projectId: modifyResult.projectId }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -276,6 +370,36 @@ Finally, provide a brief explanation of the component you created.
 
     const data = await response.json()
     const aiResponse = data.choices[0].message.content
+
+    // If user is authenticated, store the chat history
+    if (userId) {
+      try {
+        // Create new chat or update existing
+        await supabase
+          .from('chat_history')
+          .insert({
+            user_id: userId,
+            title: message.length > 50 ? message.substring(0, 50) + '...' : message,
+            last_message: 'Last message just now',
+            messages: JSON.stringify([
+              {
+                id: Date.now().toString(),
+                role: "user",
+                content: message,
+                timestamp: new Date().toISOString()
+              },
+              {
+                id: (Date.now() + 1).toString(),
+                role: "assistant",
+                content: aiResponse,
+                timestamp: new Date().toISOString()
+              }
+            ])
+          })
+      } catch (dbError) {
+        console.error("Error storing chat history in Supabase:", dbError);
+      }
+    }
 
     return new Response(JSON.stringify({ response: aiResponse }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
