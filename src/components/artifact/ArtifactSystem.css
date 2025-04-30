@@ -140,3 +140,35 @@
 .artifact-viewer-content.preview-mode .file-content {
   width: 100%;
 }
+
+/* Sandpack specific overrides */
+.sp-wrapper {
+  height: 100% !important;
+  border: none !important;
+  background-color: transparent !important;
+}
+
+.sp-layout {
+  height: 100% !important;
+  border: none !important;
+  background-color: transparent !important;
+}
+
+.sp-file-explorer {
+  border-right: 1px solid #333 !important;
+  background-color: #1e1e1e !important;
+}
+
+.sp-code-editor {
+  border-right: 1px solid #333 !important;
+}
+
+.sp-preview-container {
+  background-color: white !important;
+}
+
+.sp-console {
+  height: 30% !important;
+  background-color: #1a1a1a !important;
+  border-top: 1px solid #333 !important;
+}
