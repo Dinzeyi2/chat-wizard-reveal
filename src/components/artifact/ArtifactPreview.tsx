@@ -147,8 +147,8 @@ document.addEventListener("DOMContentLoaded", function() {
     return result;
   }, [files]);
 
-  // Determine template based on files
-  const template = React.useMemo(() => {
+  // Use a properly typed template value
+  const template = React.useMemo((): "vanilla" | "react" | "react-ts" | "vite" => {
     // Default to vanilla template for most reliable rendering
     console.log("Using vanilla template");
     return "vanilla";
