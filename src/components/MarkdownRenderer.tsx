@@ -3,7 +3,7 @@ import React from "react";
 import { Message } from "@/types/chat";
 import AppGeneratorDisplay from "./AppGeneratorDisplay";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useArtifact } from "./artifact/ArtifactSystem";
+import { useArtifact, ArtifactProvider } from "./artifact/ArtifactSystem";
 
 interface MarkdownRendererProps {
   content: string;
@@ -120,7 +120,11 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
   
   if (message && isAppGeneration) {
     console.log("Rendering AppGeneratorDisplay for message:", message.id);
-    return <AppGeneratorDisplay message={message} projectId={projectId} />;
+    return (
+      <ArtifactProvider>
+        <AppGeneratorDisplay message={message} projectId={projectId} />
+      </ArtifactProvider>
+    );
   }
 
   // Process normal markdown with better formatting

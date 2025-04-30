@@ -1,143 +1,106 @@
 
-/* Artifact Viewer Styles */
-
+/* Artifact System Styles */
 .artifact-system {
-  display: flex;
+  position: relative;
+  width: 100%;
   height: 100%;
-  overflow: hidden;
+  display: flex;
 }
 
 .chat-area {
-  flex: 1;
-  transition: width 0.3s ease;
-  overflow-y: auto;
-  max-width: 100%;
   height: 100%;
+  overflow-y: auto;
+  transition: width 0.3s ease;
+  flex: 1;
 }
 
 .chat-area.artifact-open {
-  width: 40%;
-  flex-basis: 40%;
-  flex-grow: 0;
-  flex-shrink: 0;
-  min-width: 320px;
-  border-right: 1px solid #2d2d2d;
+  width: 40% !important;
+  max-width: 40%;
+  flex: 0 0 40%;
 }
 
 .artifact-expanded-view {
   position: fixed;
   top: 0;
   right: 0;
-  bottom: 0;
   width: 60%;
-  max-width: 60%;
+  height: 100vh;
   background-color: #18181b;
-  z-index: 50;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: all 0.3s ease;
-  box-shadow: -5px 0 15px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
+  z-index: 100;
 }
 
 .artifact-viewer {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: #18181b;
-  color: #e4e4e7;
 }
 
 .artifact-viewer-header {
-  height: 48px;
-  padding: 0 16px;
-  background-color: #27272a;
-  border-bottom: 1px solid #3f3f46;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  background-color: #0f0f0f !important;
+  border-bottom: 1px solid #2a2a2a;
+  padding: 0.5rem !important;
 }
 
-.artifact-viewer-content {
-  flex: 1;
+.file-viewer-tabs {
   display: flex;
-  overflow: hidden;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .file-viewer-tab {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
   color: #a1a1aa;
-  border-bottom: 2px solid transparent;
-  padding: 0 8px;
-  height: 100%;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 
 .file-viewer-tab.active {
-  color: #e4e4e7;
-  border-bottom-color: #818cf8;
-}
-
-.file-viewer-tab svg {
-  width: 16px;
-  height: 16px;
-}
-
-.file-viewer-tabs {
-  display: flex;
-  height: 100%;
-  gap: 8px;
-}
-
-.file-path {
   background-color: #27272a;
-  padding: 8px 16px;
-  color: #a1a1aa;
-  font-size: 12px;
-  border-bottom: 1px solid #3f3f46;
+  color: #ffffff;
 }
 
-.code-container {
-  flex: 1;
-  overflow: auto;
+.file-viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-/* Preview specific styles */
-.preview-container {
-  width: 100%;
-  height: 100%;
-  border: none;
-  background-color: white;
-}
-
-.webcontainer-status {
-  background-color: #18181b;
-  color: #a1a1aa;
-}
-
-/* File explorer styles */
 .file-tree {
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
-.file-explorer {
-  background-color: #18181b;
-  border-right: 1px solid #3f3f46;
+.code-container {
+  min-height: 300px;
 }
 
-/* Make sure mobile displays correctly */
+/* File tree styling */
+.file-tree li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Responsive adjustments */
 @media (max-width: 768px) {
   .chat-area.artifact-open {
-    width: 0;
-    display: none;
+    width: 0 !important;
+    max-width: 0;
+    flex: 0;
   }
   
   .artifact-expanded-view {
     width: 100%;
-    max-width: 100%;
   }
 }

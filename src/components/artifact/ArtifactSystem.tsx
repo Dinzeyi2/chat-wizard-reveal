@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
@@ -6,7 +5,6 @@ import { FileCode, X, ExternalLink, ChevronRight, Download, File, Code } from 'l
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import './ArtifactSystem.css';
-import { getWebContainerManager } from '@/utils/WebContainerIntegration';
 
 // Types
 interface ArtifactFile {
@@ -90,39 +88,6 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
       window.dispatchEvent(new Event('resize'));
     }, 100);
     
-    // Initialize WebContainer with the artifact files
-    const webContainerManager = getWebContainerManager();
-    
-    const artifactFiles = artifact.files.map(file => ({
-      path: file.path,
-      content: file.content,
-      type: file.language
-    }));
-    
-    // Process the files with the WebContainer
-    webContainerManager.initialize().then(() => {
-      webContainerManager.setupFileSystem(artifactFiles).then(() => {
-        webContainerManager.mountFileSystem().then(() => {
-          // Detect dependencies in all JavaScript/TypeScript files
-          const promises = artifactFiles
-            .filter(file => 
-              file.path.endsWith('.js') || file.path.endsWith('.jsx') || 
-              file.path.endsWith('.ts') || file.path.endsWith('.tsx'))
-            .map(file => webContainerManager.detectAndAddDependencies(file.content));
-          
-          Promise.all(promises).then(() => {
-            webContainerManager.installDependencies().then(() => {
-              webContainerManager.startDevServer().then(() => {
-                console.log('WebContainer development server started');
-              });
-            });
-          });
-        });
-      });
-    }).catch(error => {
-      console.error('Error initializing WebContainer:', error);
-    });
-    
     console.log("Artifact viewer opened successfully");
   };
 
@@ -151,8 +116,6 @@ export const ArtifactViewer: React.FC = () => {
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<'code' | 'preview'>('code');
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [installationStatus, setInstallationStatus] = useState<string>('initializing');
 
   useEffect(() => {
     console.log("ArtifactViewer mounted, isOpen:", isOpen);
@@ -184,55 +147,8 @@ export const ArtifactViewer: React.FC = () => {
     // Prevent scroll on body when viewer is open
     document.body.style.overflow = 'hidden';
     
-    // Set up event listeners for WebContainer events
-    const webContainerManager = getWebContainerManager();
-    
-    const handlePreviewReady = (event: CustomEvent) => {
-      const url = event.detail.url;
-      setPreviewUrl(url);
-      setInstallationStatus('preview-ready');
-    };
-    
-    const handleInstallationStarted = () => {
-      setInstallationStatus('installing');
-    };
-    
-    const handleInstallationComplete = () => {
-      setInstallationStatus('installed');
-    };
-    
-    const handleServerStarting = () => {
-      setInstallationStatus('starting-server');
-    };
-    
-    const handleWebContainerError = () => {
-      setInstallationStatus('error');
-    };
-    
-    webContainerManager.addEventListener('preview-ready', handlePreviewReady as EventListener);
-    webContainerManager.addEventListener('installation-started', handleInstallationStarted);
-    webContainerManager.addEventListener('installation-complete', handleInstallationComplete);
-    webContainerManager.addEventListener('server-starting', handleServerStarting);
-    webContainerManager.addEventListener('webcontainer-error', handleWebContainerError);
-    webContainerManager.addEventListener('server-error', handleWebContainerError);
-    
-    // Check if we already have a preview URL
-    const existingUrl = webContainerManager.getPreviewUrl();
-    if (existingUrl) {
-      setPreviewUrl(existingUrl);
-      setInstallationStatus('preview-ready');
-    }
-    
     return () => {
       document.body.style.overflow = '';
-      
-      // Clean up event listeners
-      webContainerManager.removeEventListener('preview-ready', handlePreviewReady as EventListener);
-      webContainerManager.removeEventListener('installation-started', handleInstallationStarted);
-      webContainerManager.removeEventListener('installation-complete', handleInstallationComplete);
-      webContainerManager.removeEventListener('server-starting', handleServerStarting);
-      webContainerManager.removeEventListener('webcontainer-error', handleWebContainerError);
-      webContainerManager.removeEventListener('server-error', handleWebContainerError);
     };
   }, [currentArtifact, isOpen]);
 
@@ -438,88 +354,26 @@ export const ArtifactViewer: React.FC = () => {
           </div>
           
           <div className="file-content flex-1 overflow-auto flex flex-col">
-            {activeTab === 'code' ? (
-              currentFile ? (
-                <>
-                  <div className="file-path px-4 py-2 text-xs text-gray-400 bg-zinc-900 border-b border-zinc-800 flex justify-between items-center">
-                    <span>{currentFile.path}</span>
-                    <span className="text-gray-500">{getLanguageFromPath(currentFile.path).toUpperCase()}</span>
-                  </div>
-                  <div className="code-container flex-1 overflow-auto bg-zinc-900">
-                    <SyntaxHighlighter 
-                      language={getLanguageFromPath(currentFile.path)}
-                      style={vs2015}
-                      customStyle={{ margin: 0, padding: '16px', height: '100%', fontSize: '14px', lineHeight: '1.5', backgroundColor: '#18181b' }}
-                      showLineNumbers={true}
-                    >
-                      {currentFile.content}
-                    </SyntaxHighlighter>
-                  </div>
-                </>
-              ) : (
-                <div className="no-file-selected p-4 text-center text-gray-500 mt-8 bg-zinc-900">
-                  Select a file to view its content
+            {currentFile ? (
+              <>
+                <div className="file-path px-4 py-2 text-xs text-gray-400 bg-zinc-900 border-b border-zinc-800 flex justify-between items-center">
+                  <span>{currentFile.path}</span>
+                  <span className="text-gray-500">{getLanguageFromPath(currentFile.path).toUpperCase()}</span>
                 </div>
-              )
+                <div className="code-container flex-1 overflow-auto bg-zinc-900">
+                  <SyntaxHighlighter 
+                    language={getLanguageFromPath(currentFile.path)}
+                    style={vs2015}
+                    customStyle={{ margin: 0, padding: '16px', height: '100%', fontSize: '14px', lineHeight: '1.5', backgroundColor: '#18181b' }}
+                    showLineNumbers={true}
+                  >
+                    {currentFile.content}
+                  </SyntaxHighlighter>
+                </div>
+              </>
             ) : (
-              // Preview tab content
-              <div className="preview-container flex-1 flex flex-col bg-zinc-900">
-                <div className="webcontainer-status px-4 py-2 text-xs border-b border-zinc-800 flex justify-between items-center">
-                  {installationStatus === 'initializing' && (
-                    <span className="text-blue-400">Initializing preview environment...</span>
-                  )}
-                  {installationStatus === 'installing' && (
-                    <span className="text-blue-400">Installing dependencies...</span>
-                  )}
-                  {installationStatus === 'installed' && (
-                    <span className="text-green-400">Dependencies installed, starting server...</span>
-                  )}
-                  {installationStatus === 'starting-server' && (
-                    <span className="text-blue-400">Starting development server...</span>
-                  )}
-                  {installationStatus === 'preview-ready' && (
-                    <span className="text-green-400">Preview ready</span>
-                  )}
-                  {installationStatus === 'error' && (
-                    <span className="text-red-400">Error starting preview</span>
-                  )}
-                </div>
-                
-                {previewUrl ? (
-                  <iframe 
-                    src={previewUrl} 
-                    className="flex-1 w-full border-none"
-                    title="Code Preview"
-                    sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
-                  />
-                ) : (
-                  <div className="flex-1 flex items-center justify-center text-gray-400">
-                    {installationStatus === 'error' ? (
-                      <div className="text-center">
-                        <p className="text-red-400 text-lg font-medium">Failed to load preview</p>
-                        <p className="mt-2">There was an error setting up the preview environment.</p>
-                        <Button 
-                          variant="outline" 
-                          className="mt-4"
-                          onClick={() => {
-                            setInstallationStatus('initializing');
-                            getWebContainerManager().reset();
-                          }}
-                        >
-                          Try Again
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
-                        <p>Setting up preview environment...</p>
-                        {installationStatus === 'installing' && (
-                          <p className="text-sm mt-2">Installing dependencies (this may take a minute)...</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
+              <div className="no-file-selected p-4 text-center text-gray-500 mt-8 bg-zinc-900">
+                Select a file to view its content
               </div>
             )}
           </div>
