@@ -1,4 +1,3 @@
-
 import { WebContainer } from '@webcontainer/api';
 import { toast } from '@/hooks/use-toast';
 
@@ -11,6 +10,8 @@ export class WebContainerManager {
   private isReady: boolean = false;
   private packages: Map<string, string> = new Map();
   private fileSystem: any = {};
+  private initializationAttempts: number = 0;
+  private readonly MAX_INITIALIZATION_ATTEMPTS = 2;
 
   // Initialize the WebContainer
   async initialize() {
@@ -20,8 +21,20 @@ export class WebContainerManager {
         return false;
       }
 
+      // If we already have a webcontainer instance, use it
+      if (this.webcontainer && this.isReady) {
+        console.log('WebContainer is already initialized, reusing existing instance');
+        return true;
+      }
+
+      // If we've exceeded the maximum number of attempts, don't try again
+      if (this.initializationAttempts >= this.MAX_INITIALIZATION_ATTEMPTS) {
+        throw new Error('Max initialization attempts exceeded. Please refresh the page and try again.');
+      }
+
+      this.initializationAttempts++;
       this.isBooting = true;
-      console.log('Initializing WebContainer...');
+      console.log('Initializing WebContainer... (Attempt ' + this.initializationAttempts + ')');
       
       // Boot the WebContainer
       this.webcontainer = await WebContainer.boot();
@@ -41,12 +54,29 @@ export class WebContainerManager {
     } catch (error: any) {
       this.isBooting = false;
       console.error('Failed to initialize WebContainer:', error);
-      this.dispatchEvent(new CustomEvent('webcontainer-error', { detail: { error } }));
-      toast({
-        title: "WebContainer Error",
-        description: `Failed to initialize: ${error.message || 'Unknown error'}`,
-        variant: "destructive"
-      });
+      
+      // Check for the "Unable to create more instances" error
+      if (error.message && error.message.includes('Unable to create more instances')) {
+        console.log('WebContainer instance limit reached. Please close other tabs or refresh the page.');
+        
+        // Special handling for this specific error
+        toast({
+          title: "WebContainer Error",
+          description: "Unable to create more WebContainer instances. Please refresh the page or close other tabs.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "WebContainer Error",
+          description: `Failed to initialize: ${error.message || 'Unknown error'}`,
+          variant: "destructive"
+        });
+      }
+      
+      this.dispatchEvent(new CustomEvent('webcontainer-error', { 
+        detail: { error, recoverable: this.initializationAttempts < this.MAX_INITIALIZATION_ATTEMPTS } 
+      }));
+      
       return false;
     }
   }
@@ -67,7 +97,10 @@ export class WebContainerManager {
   // Create a file system structure from code artifacts
   async setupFileSystem(artifacts: Array<{path: string, content: string, type?: string}>) {
     if (!this.isReady) {
-      await this.initialize();
+      const success = await this.initialize();
+      if (!success) {
+        throw new Error('Failed to initialize WebContainer');
+      }
     }
 
     const fileSystem: any = {};
@@ -443,20 +476,28 @@ h1 {
 
   // Reset the WebContainer environment
   async reset() {
-    if (this.webcontainer) {
-      // No direct API to reset, so we're recreating everything
-      this.webcontainer = null;
-      this.terminal = null;
-      this.previewUrl = null;
-      this.isReady = false;
-      this.isBooting = false;
-      this.packages = new Map();
-      this.fileSystem = {};
+    // Reset counters and state
+    this.initializationAttempts = 0;
+    this.isReady = false;
+    this.isBooting = false;
+    this.packages = new Map();
+    this.fileSystem = {};
+    this.previewUrl = null;
+    
+    try {
+      // Try to terminate the existing instance if possible
+      if (this.webcontainer) {
+        // No direct API to reset, so we're recreating everything
+        this.webcontainer = null;
+        this.terminal = null;
+      }
       
       // Re-initialize
       return await this.initialize();
+    } catch (error) {
+      console.error('Failed to reset WebContainer:', error);
+      return false;
     }
-    return false;
   }
 }
 
@@ -509,30 +550,38 @@ export class ArtifactWebContainerIntegration {
 
   // Process artifact files
   async processArtifactFiles(files: any[]) {
-    const artifacts = files.map(file => ({
-      path: this.getProperFilePath(file),
-      content: file.content,
-      type: this.getFileType(file.path)
-    }));
-
-    // Set up file system with artifacts
-    await this.containerManager.setupFileSystem(artifacts);
-    
-    // Detect dependencies from all code artifacts
-    for (const artifact of artifacts) {
-      if (this.isCodeFile(artifact.path)) {
-        await this.containerManager.detectAndAddDependencies(artifact.content);
+    try {
+      const artifacts = files.map(file => ({
+        path: this.getProperFilePath(file),
+        content: file.content,
+        type: this.getFileType(file.path)
+      }));
+  
+      // Set up file system with artifacts
+      await this.containerManager.setupFileSystem(artifacts);
+      
+      // Detect dependencies from all code artifacts
+      for (const artifact of artifacts) {
+        if (this.isCodeFile(artifact.path)) {
+          await this.containerManager.detectAndAddDependencies(artifact.content);
+        }
       }
+      
+      // Mount the file system
+      await this.containerManager.mountFileSystem();
+      
+      // Install dependencies
+      await this.containerManager.installDependencies();
+      
+      // Start development server
+      await this.containerManager.startDevServer();
+    } catch (error) {
+      console.error("Error processing artifact files:", error);
+      this.containerManager.dispatchEvent(new CustomEvent('webcontainer-error', { 
+        detail: { error, msg: "Failed to process artifact files" } 
+      }));
+      throw error; // Re-throw to be caught by ArtifactPreview
     }
-    
-    // Mount the file system
-    await this.containerManager.mountFileSystem();
-    
-    // Install dependencies
-    await this.containerManager.installDependencies();
-    
-    // Start development server
-    await this.containerManager.startDevServer();
   }
 
   private getProperFilePath(file: any): string {

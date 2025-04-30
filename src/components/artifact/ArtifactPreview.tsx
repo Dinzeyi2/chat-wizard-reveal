@@ -1,7 +1,8 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { webContainerIntegration } from '@/utils/WebContainerManager';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ArtifactPreviewProps {
   files: Array<{
@@ -18,6 +19,7 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [status, setStatus] = useState("Initializing...");
+  const [error, setError] = useState<string | null>(null);
   
   // Set up preview when files change
   useEffect(() => {
@@ -30,6 +32,7 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
       
       setIsLoading(true);
       setIsProcessing(true);
+      setError(null);
       setStatus("Setting up the preview environment...");
       
       try {
@@ -60,6 +63,7 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
           setStatus("Preview ready");
           setIsLoading(false);
           setIsProcessing(false);
+          setError(null);
           
           // Make sure the iframe is updated with the server URL
           if (iframeRef.current && url) {
@@ -68,8 +72,12 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
         };
         
         const onError = (event: Event) => {
-          console.error("WebContainer error:", (event as CustomEvent).detail?.error);
-          setStatus("Error: " + ((event as CustomEvent).detail?.error?.message || "Something went wrong"));
+          const errorDetail = (event as CustomEvent).detail?.error;
+          console.error("WebContainer error:", errorDetail);
+          const errorMessage = errorDetail?.message || "Something went wrong";
+          
+          setError(errorMessage);
+          setStatus("Error: " + errorMessage);
           setIsLoading(false);
           setIsProcessing(false);
         };
@@ -100,6 +108,7 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
         };
       } catch (error) {
         console.error("Error setting up preview:", error);
+        setError(error instanceof Error ? error.message : "Failed to set up preview environment");
         setStatus("Failed to set up preview environment");
         setIsLoading(false);
         setIsProcessing(false);
@@ -109,6 +118,15 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
     setupPreview();
   }, [files]);
   
+  const handleRetry = async () => {
+    await webContainerIntegration.containerManager.reset();
+    setIsLoading(true);
+    setIsProcessing(true);
+    setError(null);
+    setStatus("Retrying...");
+    await webContainerIntegration.processArtifactFiles(files);
+  };
+
   return (
     <div className="artifact-preview-container h-full flex flex-col">
       {isLoading && (
@@ -122,9 +140,47 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
           </div>
         </div>
       )}
+      
+      {error && (
+        <div className="flex flex-col items-center justify-center p-8 h-full">
+          <AlertTriangle className="h-12 w-12 text-red-500 mb-4" />
+          <div className="text-center">
+            <p className="font-medium text-gray-200">WebContainer Error</p>
+            <p className="text-sm text-gray-400 mt-1">{error}</p>
+            {error.includes("Unable to create more instances") && (
+              <div className="mt-4 max-w-md mx-auto">
+                <p className="text-sm text-gray-300 mb-2">
+                  WebContainer has a limit on concurrent instances. You can:
+                </p>
+                <ul className="text-sm text-gray-400 list-disc pl-5 mb-4">
+                  <li>Refresh the page and try again</li>
+                  <li>Close other tabs using WebContainer</li>
+                  <li>View the code only without preview</li>
+                </ul>
+                <Button 
+                  onClick={handleRetry} 
+                  className="mt-2" 
+                  variant="outline"
+                >
+                  Retry
+                </Button>
+              </div>
+            )}
+          </div>
+          
+          <div className="mt-8 p-4 bg-zinc-800 rounded-lg w-full max-w-lg overflow-auto">
+            <pre className="text-xs text-gray-300 whitespace-pre-wrap">
+              <code>
+                {JSON.stringify(files.map(f => ({path: f.path, size: f.content.length})), null, 2)}
+              </code>
+            </pre>
+          </div>
+        </div>
+      )}
+      
       <iframe 
         ref={iframeRef}
-        className={`w-full h-full border-none flex-1 ${isLoading ? 'hidden' : 'block'}`}
+        className={`w-full h-full border-none flex-1 ${isLoading || error ? 'hidden' : 'block'}`}
         title="Code Preview"
         sandbox="allow-scripts allow-modals allow-forms allow-same-origin allow-popups allow-top-navigation-by-user-activation"
       />
