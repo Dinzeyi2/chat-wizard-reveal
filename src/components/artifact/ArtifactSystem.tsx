@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
@@ -59,7 +58,8 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
     
     // Force reflow to ensure CSS changes take effect
     if (chatArea) {
-      void chatArea.offsetHeight;
+      // Cast to HTMLElement to fix TypeScript error
+      void (chatArea as HTMLElement).offsetHeight;
     }
   }, [isOpen]);
 
