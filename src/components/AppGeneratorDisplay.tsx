@@ -38,11 +38,12 @@ interface AppGeneratorDisplayProps {
 
 const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, projectId: propProjectId }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const { openArtifact } = useArtifact();
+  const { openArtifact, isOpen: artifactIsOpen } = useArtifact();
   const [appData, setAppData] = useState<GeneratedApp | null>(null);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [versionHistory, setVersionHistory] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [artifactOpened, setArtifactOpened] = useState(false);
   const { toast } = useToast();
   
   useEffect(() => {
@@ -101,7 +102,17 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
     };
     
     setAppData(extractAppData());
+
+    // Reset artifact opened state when component mounts
+    setArtifactOpened(false);
   }, [message, propProjectId]);
+  
+  // Track artifact viewer state changes
+  useEffect(() => {
+    if (artifactIsOpen) {
+      setArtifactOpened(true);
+    }
+  }, [artifactIsOpen]);
   
   useEffect(() => {
     // Load version history when project ID is available and when showVersionHistory becomes true
@@ -412,6 +423,9 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
       console.log("Calling openArtifact with artifact:", artifact.id);
       openArtifact(artifact);
       
+      // Set local state to track that we've opened an artifact
+      setArtifactOpened(true);
+      
       // If we get here, we should show a message to the user
       toast({
         title: "Code viewer opened",
@@ -519,6 +533,15 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
     ];
   };
 
+  // If no app data could be extracted but artifact is open, render a minimal view
+  if (!appData && artifactOpened) {
+    return (
+      <div className="my-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+        <p className="text-gray-600">Viewing available code in the artifact viewer.</p>
+      </div>
+    );
+  }
+
   // If no app data could be extracted, show a simple message
   if (!appData) {
     return (
@@ -531,6 +554,17 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
         >
           <Code className="mr-2 h-4 w-4" /> View Available Code
         </Button>
+      </div>
+    );
+  }
+
+  // If artifact is open and we have app data, show a minimal summary
+  if (artifactOpened) {
+    return (
+      <div className="my-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+        <h3 className="text-lg font-semibold">{appData.projectName}</h3>
+        <p className="text-gray-600 mt-1">{appData.description}</p>
+        <p className="text-gray-600 mt-2">Viewing {appData.files.length} files in the code viewer.</p>
       </div>
     );
   }
