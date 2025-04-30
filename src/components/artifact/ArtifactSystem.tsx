@@ -46,44 +46,16 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    // Make sure CSS is applied when component mounts
-    const style = document.createElement('style');
-    const css = `
-      .artifact-system {
-        position: relative;
-        width: 100%;
-        height: 100%;
-        display: flex;
+    // Update chat area class when artifact opens/closes
+    const chatArea = document.querySelector('.chat-area');
+    if (chatArea) {
+      if (isOpen) {
+        chatArea.classList.add('artifact-open');
+      } else {
+        chatArea.classList.remove('artifact-open');
       }
-      
-      .chat-area {
-        height: 100%;
-        overflow-y: auto;
-        transition: width 0.3s ease;
-        flex: 1;
-      }
-      
-      .artifact-expanded-view {
-        position: fixed;
-        top: 0;
-        right: 0;
-        width: 60%;
-        height: 100vh;
-        background-color: #18181b;
-        box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-        z-index: 100;
-      }
-    `;
-    style.innerHTML = css;
-    document.head.appendChild(style);
-    
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
+    }
+  }, [isOpen]);
 
   const openArtifact = (artifact: Artifact) => {
     console.log("ArtifactProvider.openArtifact called with:", artifact.id);
@@ -405,11 +377,10 @@ export const ArtifactViewer: React.FC = () => {
   );
 };
 
-// Simplified layout - this was the problem!
-// The code was trying to render a layout component which wasn't integrating properly
+// Simplified layout for the artifact system
 export const ArtifactLayout: React.FC<{children: React.ReactNode}> = ({ children }) => {
   return (
-    <div className="artifact-system flex h-full">
+    <div className="artifact-system">
       <div className="chat-area">
         {children}
       </div>
