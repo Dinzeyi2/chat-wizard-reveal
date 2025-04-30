@@ -266,7 +266,6 @@ document.addEventListener("DOMContentLoaded", function() {
               <SandpackPreview 
                 showOpenInCodeSandbox={true}
                 showRefreshButton={true}
-                showNavigator={true}
               />
             </SandpackLayout>
           </TabsContent>
