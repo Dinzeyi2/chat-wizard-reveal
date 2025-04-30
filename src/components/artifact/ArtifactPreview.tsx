@@ -148,7 +148,6 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
         template={template}
         files={sandpackFiles}
         options={{
-          showNavigator: false,
           showLineNumbers: true,
           showInlineErrors: true,
           showTabs: true,
