@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react";
 import { ArtifactProvider, ArtifactLayout } from "@/components/artifact/ArtifactSystem";
 import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
 import { useLocation } from "react-router-dom";
+import { UserProfileMenu } from "@/components/UserProfileMenu";
 
 // Interface for chat history items
 interface ChatHistoryItem {
@@ -595,9 +596,7 @@ If you were trying to generate an app, this might be due to limits with our AI m
                 <div className="ml-5 px-3 py-1 rounded-full bg-gray-100 flex items-center">
                   <span>Temporary</span>
                 </div>
-                <div className="ml-2 w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white">
-                  O
-                </div>
+                <UserProfileMenu />
               </div>
             </div>
             

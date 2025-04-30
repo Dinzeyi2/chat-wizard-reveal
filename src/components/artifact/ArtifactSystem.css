@@ -158,3 +158,28 @@
   width: 100%;
   height: 100%;
 }
+
+/* Context menu custom styling - Added */
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
+
+.user-profile-context-menu [data-radix-popper-content-wrapper] {
+  color: white !important;
+}
+
+[data-radix-context-menu] [role="menuitem"]:focus {
+  background-color: #2A2A2A !important;
+  color: white !important;
+  outline: none;
+}
+
+.dark [data-radix-context-menu] [role="menuitem"]:focus {
+  background-color: #2A2A2A !important;
+  color: white !important;
+}
+
+[data-radix-context-menu] [data-radix-menu-content] {
+  background-color: #1A1F2C !important;
+  border-color: #2A2A2A !important;
+}
