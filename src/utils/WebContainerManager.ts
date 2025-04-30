@@ -1,3 +1,4 @@
+
 import { WebContainer } from '@webcontainer/api';
 import { toast } from '@/hooks/use-toast';
 
@@ -49,8 +50,15 @@ export class WebContainerManager {
       this.isBooting = true;
       console.log('Initializing WebContainer... (Attempt ' + this.initializationAttempts + ')');
       
-      // Boot the WebContainer with timeout
+      // Check if we're in a secure context (HTTPS or localhost)
+      if (!window.isSecureContext) {
+        this.isBooting = false;
+        throw new Error('WebContainer requires a secure context (HTTPS or localhost)');
+      }
+      
+      // Boot the WebContainer with timeout and different strategies
       try {
+        // First try with default configuration
         this.webcontainer = await Promise.race([
           WebContainer.boot(),
           new Promise((_, reject) => 
@@ -58,22 +66,39 @@ export class WebContainerManager {
             this.bootTimeoutMs)
           )
         ]);
-      } catch (error: any) {
-        // Check for instance limit errors
-        if (error.message && error.message.includes('Unable to create more instances')) {
-          this.instanceLimitReached = true;
-          throw new Error('WebContainer instance limit reached. Please close other tabs or refresh the page.');
-        }
+      } catch (bootError: any) {
+        console.log('First boot attempt failed:', bootError.message);
         
-        // Check specifically for SharedArrayBuffer/cross-origin isolation errors
-        if (error.message && (
-          error.message.includes('SharedArrayBuffer') || 
-          error.message.includes('crossOriginIsolated')
+        // Check for common errors
+        if (bootError.message && (
+            bootError.message.includes('SharedArrayBuffer') || 
+            bootError.message.includes('crossOriginIsolated')
         )) {
           this.crossOriginIsolationDetected = true;
           throw new Error('WebContainer requires cross-origin isolation which is not enabled in this environment.');
         }
-        throw error;
+        
+        if (bootError.message && bootError.message.includes('Unable to create more instances')) {
+          this.instanceLimitReached = true;
+          throw new Error('WebContainer instance limit reached. Please close other tabs or refresh the page.');
+        }
+        
+        // Try an alternative configuration as a last resort
+        try {
+          console.log('Trying alternative WebContainer configuration...');
+          this.webcontainer = await Promise.race([
+            WebContainer.boot({
+              coep: 'credentialless',
+              workdirName: 'webcontainer-workdir'
+            }),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Alternative boot timeout')), 10000)
+            )
+          ]);
+        } catch (altError: any) {
+          // Final failure, give up
+          throw altError;
+        }
       }
       
       // Set up communication channel for terminal output
@@ -450,14 +475,19 @@ h1 {
       // Set up terminal output handlers
       const outputElement = document.getElementById('terminal-output') || document.createElement('div');
       
-      this.terminal.output.pipeTo(
-        new WritableStream({
-          write: (data: string) => {
-            outputElement.innerHTML += `<div>${data}</div>`;
-            console.log('Terminal output:', data);
-          }
-        })
-      );
+      try {
+        this.terminal.output.pipeTo(
+          new WritableStream({
+            write: (data: string) => {
+              outputElement.innerHTML += `<div>${data}</div>`;
+              console.log('Terminal output:', data);
+            }
+          })
+        );
+      } catch (pipeError) {
+        console.error('Failed to pipe terminal output:', pipeError);
+        // Just log the error but continue - this isn't critical
+      }
       
       // Wait for installation to complete
       const installExitCode = await this.terminal.exit;
@@ -504,14 +534,19 @@ h1 {
       // Set up server output handlers
       const outputElement = document.getElementById('server-output') || document.createElement('div');
       
-      serverProcess.output.pipeTo(
-        new WritableStream({
-          write: (data: string) => {
-            outputElement.innerHTML += `<div>${data}</div>`;
-            console.log('Server output:', data);
-          }
-        })
-      );
+      try {
+        serverProcess.output.pipeTo(
+          new WritableStream({
+            write: (data: string) => {
+              outputElement.innerHTML += `<div>${data}</div>`;
+              console.log('Server output:', data);
+            }
+          })
+        );
+      } catch (pipeError) {
+        console.error('Failed to pipe server output:', pipeError);
+        // Just log the error but continue - this isn't critical
+      }
       
       // The 'server-ready' event will be triggered by WebContainer when the server is running
       return true;

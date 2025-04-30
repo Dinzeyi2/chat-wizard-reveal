@@ -24,6 +24,7 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
   const [isInstanceLimitError, setIsInstanceLimitError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [showStaticPreview, setShowStaticPreview] = useState(false);
+  const [activeTab, setActiveTab] = useState("preview");
   
   // Set up preview when files change
   useEffect(() => {
@@ -39,7 +40,6 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
       setError(null);
       setIsCrossOriginError(false);
       setIsInstanceLimitError(false);
-      setShowStaticPreview(false);
       setStatus("Setting up the preview environment...");
       
       try {
@@ -83,16 +83,18 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
           console.error("WebContainer error:", errorDetail);
           const errorMessage = errorDetail?.message || "Something went wrong";
           
-          // Check for cross-origin isolation errors
+          // Detect specific types of errors
           if (errorDetail?.isCrossOriginError || 
               errorMessage.includes("SharedArrayBuffer") || 
               errorMessage.includes("crossOriginIsolated")) {
+            console.log("Detected cross-origin isolation error");
             setIsCrossOriginError(true);
           }
           
           // Check for instance limit errors
           if (errorDetail?.isInstanceLimitError || 
               errorMessage.includes("Unable to create more instances")) {
+            console.log("Detected instance limit error");
             setIsInstanceLimitError(true);
           }
           
@@ -102,13 +104,12 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
           setIsProcessing(false);
           
           // Automatically show static preview after 3 seconds if there's an error
-          const timer = setTimeout(() => {
+          setTimeout(() => {
             if (!showStaticPreview) {
+              console.log("Auto-switching to static preview due to WebContainer error");
               setShowStaticPreview(true);
             }
-          }, 3000);
-          
-          return () => clearTimeout(timer);
+          }, 2000);
         };
         
         // Add event listeners
@@ -159,7 +160,7 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
         // Show static preview after error
         setTimeout(() => {
           setShowStaticPreview(true);
-        }, 2000);
+        }, 1500);
       }
     };
     
@@ -184,53 +185,140 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
 
   // Function to render a static code preview when WebContainer fails
   const renderStaticPreview = () => {
-    // This is a simple code viewer fallback
-    const getHtmlContent = () => {
-      // Create a simple HTML preview using the files
-      const htmlFile = files.find(f => f.path.endsWith('.html'));
-      const cssFiles = files.filter(f => f.path.endsWith('.css'));
-      const jsFiles = files.filter(f => f.path.endsWith('.js') || f.path.endsWith('.jsx'));
-      
-      let html = htmlFile?.content || `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="UTF-8">
-            <title>Code Preview</title>
-            <style>
-              body { font-family: system-ui, sans-serif; margin: 20px; }
-              .preview-container { max-width: 800px; margin: 0 auto; }
-              .message { text-align: center; padding: 20px; background: #f5f5f5; border-radius: 8px; }
-            </style>
-            ${cssFiles.map(f => `<style>${f.content}</style>`).join('\n')}
-          </head>
-          <body>
-            <div class="preview-container">
-              <div class="message">
-                <h2>Static Preview</h2>
-                <p>This is a static preview of your code. Interactive features are not available.</p>
-              </div>
-              <div id="code-files">
-                ${files.map(f => `
-                  <details>
-                    <summary>${f.path}</summary>
-                    <pre><code>${f.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>
-                  </details>
-                `).join('\n')}
-              </div>
+    // Create a simple HTML preview using the files
+    const htmlFile = files.find(f => f.path.endsWith('.html'));
+    const cssFiles = files.filter(f => f.path.endsWith('.css'));
+    const jsFiles = files.filter(f => f.path.endsWith('.js') || f.path.endsWith('.jsx'));
+    
+    // Prepare HTML content with file previews
+    const staticContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Static Code Preview</title>
+          <style>
+            body { 
+              font-family: system-ui, sans-serif; 
+              margin: 0; 
+              padding: 0;
+              background-color: #f8f9fa;
+              color: #333;
+            }
+            .preview-container { 
+              max-width: 100%; 
+              margin: 0 auto; 
+              padding: 20px;
+            }
+            .static-header {
+              font-size: 24px;
+              text-align: center;
+              margin-bottom: 16px;
+              color: #333;
+            }
+            .static-message {
+              font-size: 16px;
+              text-align: center;
+              margin-bottom: 32px;
+              color: #666;
+            }
+            .file-item {
+              margin-bottom: 1rem;
+              border-radius: 8px;
+              overflow: hidden;
+              border: 1px solid #ddd;
+              background: white;
+            }
+            .file-header {
+              display: flex;
+              align-items: center;
+              padding: 10px 16px;
+              background-color: #f1f3f5;
+              border-bottom: 1px solid #ddd;
+              cursor: pointer;
+              user-select: none;
+            }
+            .file-header:hover {
+              background-color: #e9ecef;
+            }
+            .file-icon {
+              margin-right: 10px;
+              font-weight: bold;
+            }
+            .file-content {
+              padding: 16px;
+              overflow-x: auto;
+              display: none;
+            }
+            .file-content pre {
+              margin: 0;
+              font-family: monospace;
+              white-space: pre-wrap;
+              font-size: 14px;
+              line-height: 1.5;
+            }
+            .file-item.open .file-content {
+              display: block;
+            }
+            details {
+              margin-bottom: 16px;
+              border: 1px solid #e2e8f0;
+              border-radius: 8px;
+              overflow: hidden;
+            }
+            summary {
+              padding: 12px 16px;
+              background-color: #f8fafc;
+              cursor: pointer;
+              font-weight: 600;
+            }
+            details pre {
+              margin: 0;
+              padding: 16px;
+              background-color: #ffffff;
+              overflow-x: auto;
+              font-family: monospace;
+              font-size: 14px;
+              line-height: 1.5;
+            }
+            ${cssFiles.map(f => f.content).join('\n')}
+          </style>
+        </head>
+        <body>
+          <div class="preview-container">
+            <h2 class="static-header">Static Preview</h2>
+            <p class="static-message">This is a static preview of your code. Interactive features are not available.</p>
+            
+            <div id="file-list">
+              ${files.map(file => `
+                <details>
+                  <summary>${file.path}</summary>
+                  <pre><code>${file.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>
+                </details>
+              `).join('')}
             </div>
-            ${jsFiles.map(f => `<script type="text/plain">${f.content}</script>`).join('\n')}
-          </body>
-        </html>
-      `;
-      
-      return html;
-    };
+          </div>
+          
+          <script>
+            // Allow expanding/collapsing file items
+            document.addEventListener('DOMContentLoaded', function() {
+              const headers = document.querySelectorAll('.file-header');
+              headers.forEach(header => {
+                header.addEventListener('click', function() {
+                  const fileItem = this.parentElement;
+                  fileItem.classList.toggle('open');
+                });
+              });
+            });
+          </script>
+        </body>
+      </html>
+    `;
     
     return (
       <iframe
-        srcDoc={getHtmlContent()}
-        className="w-full h-full border-none"
+        srcDoc={staticContent}
+        className="w-full h-full border-none static-preview-iframe"
         title="Static Code Preview"
         sandbox="allow-same-origin"
       />
@@ -257,7 +345,7 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
           <h3 className="webcontainer-error-title">WebContainer Error</h3>
           <p className="webcontainer-error-message">{error}</p>
           
-          {isInstanceLimitError ? (
+          {isInstanceLimitError && (
             <div className="max-w-md mx-auto text-center">
               <p className="text-sm text-gray-300 mb-4">
                 WebContainer has reached its instance limit. This often happens when there are too many 
@@ -273,23 +361,27 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
                 </ul>
               </div>
             </div>
-          ) : isCrossOriginError ? (
+          )}
+          
+          {isCrossOriginError && !isInstanceLimitError && (
             <div className="max-w-md mx-auto text-center">
               <p className="text-sm text-gray-300 mb-4">
-                The WebContainer requires special browser settings to work properly. This error occurs due to 
-                cross-origin isolation requirements.
+                The WebContainer requires cross-origin isolation which is not available in this environment.
+                This is a common issue with the WebContainer API.
               </p>
               
               <div className="bg-zinc-800 p-4 rounded-lg mb-4 text-left">
                 <h4 className="text-sm font-semibold text-gray-200 mb-2">Alternative options:</h4>
                 <ul className="text-sm text-gray-400 list-disc pl-5 space-y-2">
-                  <li>View the static code preview instead</li>
-                  <li>Switch to the "Code" tab to view the source code</li>
-                  <li>Try using a different browser or device</li>
+                  <li>View the static code preview instead (recommended)</li>
+                  <li>Try using a different browser</li>
+                  <li>Try again later - this is sometimes a temporary issue</li>
                 </ul>
               </div>
             </div>
-          ) : (
+          )}
+          
+          {!isCrossOriginError && !isInstanceLimitError && (
             <div className="max-w-md mx-auto text-center">
               <p className="text-sm text-gray-300 mb-4">
                 There was a problem initializing the WebContainer preview environment.
