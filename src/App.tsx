@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ChatHistory from "./pages/ChatHistory";
 import "./components/artifact/ArtifactSystem.css";
+// Import the sandpack CSS directly from node_modules instead of using the dist path
 import "@codesandbox/sandpack-react/dist/index.css";
 
 const App = () => {

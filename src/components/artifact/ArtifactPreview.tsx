@@ -11,7 +11,7 @@ import {
   SandpackStack
 } from '@codesandbox/sandpack-react';
 import { nightOwl } from '@codesandbox/sandpack-themes';
-import { Loader2, Code, TerminalSquare } from 'lucide-react';
+import { Loader2, TerminalSquare } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 
@@ -65,15 +65,22 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
       
       result[path] = {
         code: file.content,
+        // Fix the type issue by using a more specific type cast
         active: file.path.endsWith(".html") // Make HTML files active by default
       };
     });
     
     // If no files were made active, make the first one active
-    const hasActive = Object.values(result).some(file => file.active);
+    const hasActive = Object.values(result).some(file => 
+      // Use a type guard to check if 'active' exists
+      typeof file === 'object' && file !== null && 'active' in file && file.active === true
+    );
+    
     if (!hasActive && Object.keys(result).length > 0) {
       const firstKey = Object.keys(result)[0];
-      result[firstKey].active = true;
+      if (result[firstKey] && typeof result[firstKey] === 'object') {
+        (result[firstKey] as { active?: boolean }).active = true;
+      }
     }
     
     return result;
