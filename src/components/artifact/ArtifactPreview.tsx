@@ -24,6 +24,7 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
   const [isCrossOriginError, setIsCrossOriginError] = useState(false);
   const [isInstanceLimitError, setIsInstanceLimitError] = useState(false);
   const [showStaticPreview, setShowStaticPreview] = useState(false);
+  const [staticPreviewContent, setStaticPreviewContent] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("preview");
   
   // Setup preview when files change
@@ -99,17 +100,26 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
           setShowStaticPreview(true);
         };
         
+        const onStaticPreviewContent = (event: Event) => {
+          const content = (event as CustomEvent).detail?.content;
+          if (content) {
+            setStaticPreviewContent(content);
+          }
+        };
+        
         // Add event listeners
         document.addEventListener('webcontainer-ready', onReady);
         document.addEventListener('preview-ready', onPreviewReady);
         document.addEventListener('webcontainer-error', onError);
         document.addEventListener('static-preview-enabled', onStaticPreviewEnabled);
+        document.addEventListener('static-preview-content', onStaticPreviewContent);
         
         // Initialize WebContainerFix and set up files
-        await webContainerFix.initialize();
-        if (webContainerFix.getWebContainer()) {
-          await webContainerFix.setupFiles(processedFiles);
+        if (!webContainerFix.getWebContainer()) {
+          await webContainerFix.initialize();
         }
+        
+        await webContainerFix.setupFiles(processedFiles);
         
         // Cleanup event listeners on unmount
         return () => {
@@ -117,6 +127,7 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
           document.removeEventListener('preview-ready', onPreviewReady);
           document.removeEventListener('webcontainer-error', onError);
           document.removeEventListener('static-preview-enabled', onStaticPreviewEnabled);
+          document.removeEventListener('static-preview-content', onStaticPreviewContent);
         };
       } catch (error) {
         console.error("Error setting up preview:", error);
@@ -168,10 +179,69 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
 
   // Function to render a static code preview when WebContainer fails
   const renderStaticPreview = () => {
+    if (staticPreviewContent) {
+      // If we have React-rendered content, use it
+      return (
+        <iframe
+          srcDoc={`
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>React Static Preview</title>
+                <style>
+                  body { 
+                    font-family: system-ui, sans-serif; 
+                    margin: 0; 
+                    padding: 0;
+                    background-color: #f5f5f5;
+                  }
+                  .preview-container { 
+                    max-width: 800px; 
+                    margin: 0 auto; 
+                    padding: 20px;
+                  }
+                  .static-preview-container {
+                    background-color: white;
+                    border-radius: 8px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                    padding: 20px;
+                  }
+                </style>
+              </head>
+              <body>
+                <div class="preview-container">
+                  ${staticPreviewContent}
+                </div>
+                <script>
+                  // Intercept form submissions
+                  document.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    console.log('Form submission intercepted in static preview');
+                  });
+                </script>
+              </body>
+            </html>
+          `}
+          className="w-full h-full border-none static-preview-iframe"
+          title="React Static Preview"
+          sandbox="allow-scripts allow-same-origin"
+        />
+      );
+    }
+    
     // Create a simple HTML preview using the files
     const htmlFile = files.find(f => f.path.endsWith('.html'));
     const cssFiles = files.filter(f => f.path.endsWith('.css'));
     const jsFiles = files.filter(f => f.path.endsWith('.js') || f.path.endsWith('.jsx'));
+    
+    // Find React component files
+    const reactFiles = files.filter(f => 
+      f.path.endsWith('.jsx') || 
+      f.path.endsWith('.tsx') || 
+      (f.content && f.content.includes('import React'))
+    );
     
     // Prepare HTML content with file previews
     const staticContent = `
