@@ -31,6 +31,7 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
   
   // Transform files to Sandpack format
   const sandpackFiles: SandpackFiles = React.useMemo(() => {
+    console.log("Processing files for preview:", files.length);
     const result: SandpackFiles = {};
     
     // First identify if we have an index.html
@@ -83,6 +84,7 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
       }
     }
     
+    console.log("Processed files for Sandpack:", Object.keys(result).length);
     return result;
   }, [files]);
 
@@ -100,22 +102,44 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
     // Check if it's just HTML/CSS/JS
     const hasHTML = files.some(file => file.path.endsWith(".html"));
     
-    if (isReact) return "react";
-    if (isVue) return "vue";
-    if (hasHTML) return "vanilla";
+    if (isReact) {
+      console.log("Detected React project");
+      return "react";
+    }
+    if (isVue) {
+      console.log("Detected Vue project");
+      return "vue";
+    }
+    if (hasHTML) {
+      console.log("Detected HTML project");
+      return "vanilla";
+    }
     
     // Default to vanilla
+    console.log("Using default vanilla template");
     return "vanilla";
   }, [files]);
   
   useEffect(() => {
     // Simulate loading to ensure everything renders properly
+    console.log("ArtifactPreview mounted, loading preview...");
     const timer = setTimeout(() => {
       setIsLoading(false);
+      console.log("Preview loading complete");
     }, 1000);
     
     return () => clearTimeout(timer);
   }, []);
+
+  // Force resize on tab change to ensure preview renders properly
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+      console.log("Forced resize in ArtifactPreview for tab:", activeTab);
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [activeTab]);
 
   if (isLoading) {
     return (
@@ -147,11 +171,15 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
         theme={nightOwl}
         template={template}
         files={sandpackFiles}
+        options={{
+          recompileMode: "immediate",
+          recompileDelay: 300,
+        }}
       >
         <Tabs 
           value={activeTab} 
           onValueChange={(value) => setActiveTab(value as "preview" | "console")} 
-          className="w-full"
+          className="w-full h-full"
         >
           <div className="flex justify-between items-center border-b border-zinc-800 px-2">
             <TabsList className="bg-transparent border-b-0 p-0">
@@ -169,18 +197,21 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
             </TabsList>
           </div>
           
-          <TabsContent value="preview" className="border-none p-0 m-0">
-            <SandpackLayout>
-              <SandpackStack>
-                <SandpackPreview showRefreshButton showOpenInCodeSandbox={false} />
+          <TabsContent value="preview" className="border-none p-0 m-0 h-full">
+            <SandpackLayout className="h-full">
+              <SandpackStack className="h-full">
+                <SandpackPreview 
+                  showOpenInCodeSandbox={false}
+                  className="h-full"
+                />
               </SandpackStack>
             </SandpackLayout>
           </TabsContent>
           
-          <TabsContent value="console" className="border-none p-0 m-0">
-            <SandpackLayout>
-              <SandpackStack>
-                <SandpackConsole />
+          <TabsContent value="console" className="border-none p-0 m-0 h-full">
+            <SandpackLayout className="h-full">
+              <SandpackStack className="h-full">
+                <SandpackConsole className="h-full" />
               </SandpackStack>
             </SandpackLayout>
           </TabsContent>

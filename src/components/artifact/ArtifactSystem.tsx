@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
@@ -153,6 +154,22 @@ export const ArtifactViewer: React.FC = () => {
     };
   }, [currentArtifact, isOpen]);
 
+  // Debug log when tab changes
+  useEffect(() => {
+    console.log("Active tab changed to:", activeTab);
+  }, [activeTab]);
+
+  const handleTabChange = (tab: 'code' | 'preview') => {
+    console.log("Changing tab to:", tab);
+    setActiveTab(tab);
+    // Force reflow when switching to preview tab to ensure Sandpack renders properly
+    if (tab === 'preview') {
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 50);
+    }
+  };
+
   if (!isOpen || !currentArtifact) {
     console.log("ArtifactViewer not rendering because isOpen:", isOpen, "currentArtifact:", !!currentArtifact);
     return null;
@@ -300,7 +317,7 @@ export const ArtifactViewer: React.FC = () => {
               variant="ghost"
               size="sm"
               className={`file-viewer-tab ${activeTab === 'preview' ? 'active' : ''}`}
-              onClick={() => setActiveTab('preview')}
+              onClick={() => handleTabChange('preview')}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
@@ -313,7 +330,7 @@ export const ArtifactViewer: React.FC = () => {
               variant="ghost"
               size="sm"
               className={`file-viewer-tab ${activeTab === 'code' ? 'active' : ''}`}
-              onClick={() => setActiveTab('code')}
+              onClick={() => handleTabChange('code')}
             >
               <Code size={18} />
               Code

@@ -177,53 +177,91 @@
   border-color: #2A2A2A !important;
 }
 
-/* Sandpack custom styles */
+/* Enhanced Sandpack custom styles */
 .sp-wrapper {
   height: 100% !important;
   background-color: #18181b !important;
+  border: none !important;
 }
 
 .sp-stack {
   height: 100% !important;
+  border: none !important;
 }
 
 .sp-preview-container {
   background-color: white !important;
+  height: 100% !important;
+  overflow: auto !important;
+  padding: 0 !important;
 }
 
 .sp-preview-iframe {
   height: 100% !important;
   width: 100% !important;
+  border: none !important;
 }
 
 .sp-console {
   height: 100% !important;
+  background-color: #1e1e1e !important;
+  color: #d4d4d4 !important;
+  border-radius: 0 !important;
+  overflow: auto !important;
 }
 
-/* Basic Sandpack styles to compensate for missing CSS import */
+.sp-console-item {
+  font-family: monospace !important;
+  font-size: 13px !important;
+  padding: 6px 12px !important;
+  border-bottom: 1px solid #2a2a2a !important;
+}
+
+.sp-console-error {
+  background-color: rgba(255, 99, 71, 0.1) !important;
+  color: tomato !important;
+}
+
 .sp-layout {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  border: none !important;
 }
 
 .sp-tabs {
-  display: flex;
-  background-color: #1e1e1e;
-  border-bottom: 1px solid #333;
+  display: flex !important;
+  background-color: #1e1e1e !important;
+  border-bottom: 1px solid #333 !important;
 }
 
 .sp-tab-button {
-  padding: 8px 16px;
-  color: #ccc;
-  border: none;
-  background: none;
-  cursor: pointer;
+  padding: 8px 16px !important;
+  color: #ccc !important;
+  border: none !important;
+  background: none !important;
+  cursor: pointer !important;
 }
 
 .sp-tab-button.active {
-  color: white;
-  border-bottom: 2px solid #4d4dff;
+  color: white !important;
+  border-bottom: 2px solid #4d4dff !important;
+}
+
+/* Fix for Sandpack preview height */
+.artifact-preview-container .sp-wrapper,
+.artifact-preview-container .sp-layout,
+.artifact-preview-container .sp-stack {
+  height: 100% !important;
+  min-height: 500px !important;
+  border: none !important;
+}
+
+.artifact-preview-container [data-radix-tabs-content] {
+  height: calc(100% - 40px) !important;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
