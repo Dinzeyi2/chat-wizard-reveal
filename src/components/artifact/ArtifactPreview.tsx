@@ -1,8 +1,19 @@
 
-import React, { useRef, useEffect, useState } from 'react';
-import { webContainerFix } from '@/utils/WebContainerFix';
-import { Loader2, AlertTriangle, ExternalLink, RefreshCw, Monitor } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  Sandpack, 
+  SandpackProvider, 
+  SandpackLayout, 
+  SandpackPreview, 
+  SandpackCodeEditor,
+  useSandpack,
+  SandpackConsole
+} from '@codesandbox/sandpack-react';
+import { nightOwl } from '@codesandbox/sandpack-themes';
+import { sandpackManager } from '@/utils/SandpackManager';
+import { Loader2, AlertTriangle, ExternalLink, RefreshCw, Monitor, Code, Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
 
 interface ArtifactPreviewProps {
@@ -15,311 +26,168 @@ interface ArtifactPreviewProps {
   }>;
 }
 
+// Custom error boundary for Sandpack
+const SandpackErrorBoundary: React.FC<{children: React.ReactNode}> = ({ children }) => {
+  const [hasError, setHasError] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      console.error('Error in Sandpack:', event.error);
+      setError(event.error);
+      setHasError(true);
+    };
+
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
+  }, []);
+
+  if (hasError) {
+    return (
+      <div className="sandpack-error-container p-6 flex flex-col items-center justify-center h-full">
+        <AlertTriangle className="h-12 w-12 text-red-500 mb-4" />
+        <h3 className="text-lg font-semibold mb-2">Sandpack Error</h3>
+        <p className="text-sm text-gray-600 mb-4 text-center">
+          {error?.message || 'There was an error loading the code preview.'}
+        </p>
+        <Button 
+          onClick={() => setHasError(false)}
+          variant="outline"
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Try Again
+        </Button>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+};
+
+// Custom console for Sandpack
+const ConsoleListener: React.FC = () => {
+  const { listen } = useSandpack();
+
+  useEffect(() => {
+    const unsubscribe = listen((message) => {
+      if (message.type === 'start') {
+        console.log('Sandpack is starting...');
+      }
+      if (message.type === 'done') {
+        console.log('Sandpack bundling complete');
+      }
+      if (message.type === 'error') {
+        console.error('Sandpack error:', message.error);
+        toast({
+          title: "Preview Error",
+          description: message.error.message || "An error occurred in the preview",
+          variant: "destructive"
+        });
+      }
+    });
+    
+    return unsubscribe;
+  }, [listen]);
+
+  return null;
+};
+
 export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [status, setStatus] = useState("Initializing...");
   const [error, setError] = useState<string | null>(null);
-  const [isCrossOriginError, setIsCrossOriginError] = useState(false);
-  const [isInstanceLimitError, setIsInstanceLimitError] = useState(false);
+  const [sandpackFiles, setSandpackFiles] = useState<any>({});
+  const [customSetup, setCustomSetup] = useState<any>({});
   const [showStaticPreview, setShowStaticPreview] = useState(false);
   const [staticPreviewContent, setStaticPreviewContent] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("preview");
+  const [activeFile, setActiveFile] = useState<string | null>(null);
   
-  // Setup preview when files change
+  // Process files when they change
   useEffect(() => {
-    const setupPreview = async () => {
+    const prepareFiles = async () => {
       if (!files || files.length === 0) {
-        setStatus("No files to preview");
+        setError("No files to preview");
         setIsLoading(false);
         return;
       }
       
       setIsLoading(true);
-      setIsProcessing(true);
       setError(null);
-      setIsCrossOriginError(false);
-      setIsInstanceLimitError(false);
-      setStatus("Setting up the preview environment...");
       
       try {
-        // Convert files to the format expected by WebContainerFix
-        const processedFiles = files.map(file => ({
+        console.log(`Processing ${files.length} files for Sandpack preview`);
+        
+        // Convert files to the format expected by SandpackManager
+        const formattedFiles = files.map(file => ({
           path: file.path,
           content: file.content,
           type: file.language
         }));
         
-        // Set up event listeners for status updates
-        const onReady = () => {
-          setStatus("WebContainer ready");
-        };
+        // Detect dependencies in the files
+        const dependencies = sandpackManager.detectDependencies(formattedFiles);
         
-        const onPreviewReady = (event: Event) => {
-          const url = (event as CustomEvent).detail?.url;
-          setStatus("Preview ready");
-          setIsLoading(false);
-          setIsProcessing(false);
-          setError(null);
-          
-          // Make sure the iframe is updated with the server URL
-          if (iframeRef.current && url) {
-            iframeRef.current.src = url;
-          }
-        };
+        // Process files for Sandpack format
+        const processedFiles = sandpackManager.processFiles(formattedFiles);
         
-        const onError = (event: Event) => {
-          const errorDetail = (event as CustomEvent).detail?.error;
-          console.error("WebContainer error:", errorDetail);
-          const errorMessage = errorDetail?.message || "Something went wrong";
-          
-          // Detect specific types of errors
-          if ((event as CustomEvent).detail?.isCrossOriginError || 
-              errorMessage.includes("SharedArrayBuffer") || 
-              errorMessage.includes("crossOriginIsolated")) {
-            console.log("Detected cross-origin isolation error");
-            setIsCrossOriginError(true);
-          }
-          
-          // Check for instance limit errors
-          if ((event as CustomEvent).detail?.isInstanceLimitError || 
-              errorMessage.includes("Unable to create more instances")) {
-            console.log("Detected instance limit error");
-            setIsInstanceLimitError(true);
-          }
-          
-          setError(errorMessage);
-          setStatus("Error: " + errorMessage);
-          setIsLoading(false);
-          setIsProcessing(false);
-        };
+        // Find a good default file to show in the editor
+        const mainFile = Object.keys(processedFiles).find(path => 
+          path.includes('/App.') || path.includes('/index.') || path.endsWith('.jsx')
+        ) || Object.keys(processedFiles)[0];
         
-        const onStaticPreviewEnabled = () => {
-          console.log("Static preview enabled");
-          setShowStaticPreview(true);
-        };
+        setActiveFile(mainFile);
+        setSandpackFiles(processedFiles);
+        setCustomSetup({ dependencies });
         
-        const onStaticPreviewContent = (event: Event) => {
-          const content = (event as CustomEvent).detail?.content;
-          if (content) {
-            setStaticPreviewContent(content);
-          }
-        };
+        // Generate static preview content as a fallback
+        const staticHtml = sandpackManager.generateStaticPreview(formattedFiles);
+        setStaticPreviewContent(staticHtml);
         
-        // Add event listeners
-        document.addEventListener('webcontainer-ready', onReady);
-        document.addEventListener('preview-ready', onPreviewReady);
-        document.addEventListener('webcontainer-error', onError);
-        document.addEventListener('static-preview-enabled', onStaticPreviewEnabled);
-        document.addEventListener('static-preview-content', onStaticPreviewContent);
-        
-        // Initialize WebContainerFix and set up files
-        if (!webContainerFix.getWebContainer()) {
-          await webContainerFix.initialize();
-        }
-        
-        await webContainerFix.setupFiles(processedFiles);
-        
-        // Cleanup event listeners on unmount
-        return () => {
-          document.removeEventListener('webcontainer-ready', onReady);
-          document.removeEventListener('preview-ready', onPreviewReady);
-          document.removeEventListener('webcontainer-error', onError);
-          document.removeEventListener('static-preview-enabled', onStaticPreviewEnabled);
-          document.removeEventListener('static-preview-content', onStaticPreviewContent);
-        };
-      } catch (error) {
-        console.error("Error setting up preview:", error);
-        
-        // Check for cross-origin isolation errors
-        if (error instanceof Error && 
-            (error.message.includes("SharedArrayBuffer") || 
-             error.message.includes("crossOriginIsolated"))) {
-          setIsCrossOriginError(true);
-        }
-        
-        // Check for instance limit errors
-        if (error instanceof Error && 
-            error.message.includes("Unable to create more instances")) {
-          setIsInstanceLimitError(true);
-        }
-        
-        setError(error instanceof Error ? error.message : "Failed to set up preview environment");
-        setStatus("Failed to set up preview environment");
         setIsLoading(false);
-        setIsProcessing(false);
-        
-        // Show static preview after error
-        setTimeout(() => {
-          setShowStaticPreview(true);
-        }, 1500);
+      } catch (error) {
+        console.error("Error preparing Sandpack files:", error);
+        setError(error instanceof Error ? error.message : "Failed to prepare preview");
+        setIsLoading(false);
+        setShowStaticPreview(true);
       }
     };
     
-    setupPreview();
+    prepareFiles();
   }, [files]);
-  
-  const handleRetry = async () => {
-    setIsLoading(true);
-    setIsProcessing(true);
-    setError(null);
-    setIsCrossOriginError(false);
-    setIsInstanceLimitError(false);
-    setShowStaticPreview(false);
-    setStatus("Retrying...");
-    
-    await webContainerFix.reset();
-  };
 
   const handleShowStaticPreview = () => {
     setShowStaticPreview(true);
-    webContainerFix.enableStaticPreview();
   };
 
-  // Function to render a static code preview when WebContainer fails
+  const handleResetSandpack = () => {
+    setIsLoading(true);
+    setError(null);
+    setShowStaticPreview(false);
+    
+    // Slight delay to ensure reset
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+  };
+
+  // Render static preview when Sandpack fails
   const renderStaticPreview = () => {
-    if (staticPreviewContent) {
-      // If we have React-rendered content, use it
+    if (!staticPreviewContent) {
       return (
-        <iframe
-          srcDoc={`
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>React Static Preview</title>
-                <style>
-                  body { 
-                    font-family: system-ui, sans-serif; 
-                    margin: 0; 
-                    padding: 0;
-                    background-color: #f5f5f5;
-                  }
-                  .preview-container { 
-                    max-width: 800px; 
-                    margin: 0 auto; 
-                    padding: 20px;
-                  }
-                  .static-preview-container {
-                    background-color: white;
-                    border-radius: 8px;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                    padding: 20px;
-                  }
-                </style>
-              </head>
-              <body>
-                <div class="preview-container">
-                  ${staticPreviewContent}
-                </div>
-                <script>
-                  // Intercept form submissions
-                  document.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    console.log('Form submission intercepted in static preview');
-                  });
-                </script>
-              </body>
-            </html>
-          `}
-          className="w-full h-full border-none static-preview-iframe"
-          title="React Static Preview"
-          sandbox="allow-scripts allow-same-origin"
-        />
+        <div className="static-preview-fallback p-6 text-center">
+          <AlertTriangle className="h-12 w-12 mx-auto text-yellow-500 mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Preview Unavailable</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Could not generate a preview for the current files.
+          </p>
+        </div>
       );
     }
     
-    // Create a simple HTML preview using the files
-    const htmlFile = files.find(f => f.path.endsWith('.html'));
-    const cssFiles = files.filter(f => f.path.endsWith('.css'));
-    const jsFiles = files.filter(f => f.path.endsWith('.js') || f.path.endsWith('.jsx'));
-    
-    // Find React component files
-    const reactFiles = files.filter(f => 
-      f.path.endsWith('.jsx') || 
-      f.path.endsWith('.tsx') || 
-      (f.content && f.content.includes('import React'))
-    );
-    
-    // Prepare HTML content with file previews
-    const staticContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>Static Code Preview</title>
-          <style>
-            body { 
-              font-family: system-ui, sans-serif; 
-              margin: 0; 
-              padding: 0;
-              background-color: #f8f9fa;
-              color: #333;
-            }
-            .preview-container { 
-              max-width: 100%; 
-              margin: 0 auto; 
-              padding: 20px;
-            }
-            .static-header {
-              font-size: 24px;
-              text-align: center;
-              margin-bottom: 16px;
-              color: #333;
-            }
-            .static-message {
-              font-size: 16px;
-              text-align: center;
-              margin-bottom: 32px;
-              color: #666;
-            }
-            details {
-              margin-bottom: 16px;
-              border: 1px solid #e2e8f0;
-              border-radius: 8px;
-              overflow: hidden;
-            }
-            summary {
-              padding: 12px 16px;
-              background-color: #f8fafc;
-              cursor: pointer;
-              font-weight: 600;
-            }
-            details pre {
-              margin: 0;
-              padding: 16px;
-              background-color: #ffffff;
-              overflow-x: auto;
-              font-family: monospace;
-              font-size: 14px;
-              line-height: 1.5;
-            }
-            ${cssFiles.map(f => f.content).join('\n')}
-          </style>
-        </head>
-        <body>
-          <div class="preview-container">
-            <h2 class="static-header">Static Preview</h2>
-            <p class="static-message">This is a static preview of your code. Interactive features are not available.</p>
-            
-            <div id="file-list">
-              ${files.map(file => `
-                <details>
-                  <summary>${file.path}</summary>
-                  <pre><code>${file.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>
-                </details>
-              `).join('')}
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
-    
     return (
       <iframe
-        srcDoc={staticContent}
+        srcDoc={staticPreviewContent}
         className="w-full h-full border-none static-preview-iframe"
         title="Static Code Preview"
         sandbox="allow-same-origin"
@@ -329,101 +197,104 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
 
   return (
     <div className="artifact-preview-container h-full flex flex-col">
-      {isLoading && !showStaticPreview && (
-        <div className="preview-loading-indicator p-8">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+      {isLoading ? (
+        <div className="preview-loading-indicator p-8 flex items-center justify-center h-full">
           <div className="text-center">
-            <p className="font-medium text-gray-200">{status}</p>
-            {isProcessing && (
-              <p className="text-sm text-gray-400 mt-1">This may take a few moments</p>
-            )}
+            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4 mx-auto" />
+            <p className="font-medium text-gray-200">Preparing preview...</p>
+            <p className="text-sm text-gray-400 mt-1">This may take a few moments</p>
           </div>
         </div>
-      )}
-      
-      {error && !showStaticPreview && (
-        <div className="webcontainer-error-container">
-          <AlertTriangle className="webcontainer-error-icon h-12 w-12" />
-          <h3 className="webcontainer-error-title">WebContainer Error</h3>
-          <p className="webcontainer-error-message">{error}</p>
-          
-          {isInstanceLimitError && (
-            <div className="max-w-md mx-auto text-center">
-              <p className="text-sm text-gray-300 mb-4">
-                WebContainer has reached its instance limit. This often happens when there are too many 
-                WebContainer instances running in other tabs or the environment is limited.
-              </p>
-              
-              <div className="bg-zinc-800 p-4 rounded-lg mb-4 text-left">
-                <h4 className="text-sm font-semibold text-gray-200 mb-2">Try these solutions:</h4>
-                <ul className="text-sm text-gray-400 list-disc pl-5 space-y-2">
-                  <li>Close other tabs with WebContainer instances</li>
-                  <li>Refresh this page to reset the WebContainer</li>
-                  <li>View the static code preview instead</li>
-                </ul>
-              </div>
-            </div>
-          )}
-          
-          {isCrossOriginError && !isInstanceLimitError && (
-            <div className="max-w-md mx-auto text-center">
-              <p className="text-sm text-gray-300 mb-4">
-                The WebContainer requires cross-origin isolation which is not available in this environment.
-                This is a common issue with the WebContainer API.
-              </p>
-              
-              <div className="bg-zinc-800 p-4 rounded-lg mb-4 text-left">
-                <h4 className="text-sm font-semibold text-gray-200 mb-2">Alternative options:</h4>
-                <ul className="text-sm text-gray-400 list-disc pl-5 space-y-2">
-                  <li>View the static code preview instead (recommended)</li>
-                  <li>Try using a different browser</li>
-                  <li>Try again later - this is sometimes a temporary issue</li>
-                </ul>
-              </div>
-            </div>
-          )}
-          
-          {!isCrossOriginError && !isInstanceLimitError && (
-            <div className="max-w-md mx-auto text-center">
-              <p className="text-sm text-gray-300 mb-4">
-                There was a problem initializing the WebContainer preview environment.
-              </p>
-            </div>
-          )}
-          
-          <div className="webcontainer-error-actions">
+      ) : error && !showStaticPreview ? (
+        <div className="sandpack-error-container p-8 flex flex-col items-center justify-center h-full">
+          <AlertTriangle className="h-12 w-12 text-red-500 mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Preview Error</h3>
+          <p className="text-sm text-gray-300 mb-4 text-center max-w-md">
+            {error}
+          </p>
+          <div className="flex space-x-3">
             <Button 
-              onClick={handleRetry} 
+              onClick={handleResetSandpack} 
               variant="outline"
               className="flex items-center gap-2"
             >
               <RefreshCw className="h-4 w-4" />
-              Retry
+              Try Again
             </Button>
             
             <Button 
               onClick={handleShowStaticPreview} 
               variant="outline"
-              className="flex items-center gap-2 ml-3"
+              className="flex items-center gap-2"
             >
               <Monitor className="h-4 w-4" />
               View Static Preview
             </Button>
           </div>
         </div>
-      )}
-      
-      {showStaticPreview ? (
+      ) : showStaticPreview ? (
         <div className="static-preview-container h-full">
           {renderStaticPreview()}
         </div>
       ) : (
-        <iframe 
-          ref={iframeRef}
-          className={`w-full h-full border-none flex-1 ${isLoading || error ? 'hidden' : 'block'}`}
-          title="Code Preview"
-          sandbox="allow-scripts allow-modals allow-forms allow-same-origin allow-popups allow-top-navigation-by-user-activation"
-        />
+        <SandpackErrorBoundary>
+          <SandpackProvider
+            theme={nightOwl}
+            files={sandpackFiles}
+            template="vite-react"
+            customSetup={customSetup}
+            options={{
+              activeFile: activeFile || undefined,
+              visibleFiles: Object.keys(sandpackFiles).filter(path => !sandpackFiles[path].hidden),
+              recompileMode: "delayed",
+              recompileDelay: 500,
+              classes: {
+                "sp-wrapper": "h-full border-none",
+                "sp-layout": "h-full border-none"
+              }
+            }}
+          >
+            <ConsoleListener />
+            <div className="h-full flex flex-col">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <div className="border-b px-2">
+                  <TabsList className="bg-transparent border-b-0 justify-start mb-0">
+                    <TabsTrigger value="preview" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-500 data-[state=active]:shadow-none rounded-none">
+                      <Monitor className="h-4 w-4 mr-2" />
+                      Preview
+                    </TabsTrigger>
+                    <TabsTrigger value="code" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-500 data-[state=active]:shadow-none rounded-none">
+                      <Code className="h-4 w-4 mr-2" />
+                      Code
+                    </TabsTrigger>
+                    <TabsTrigger value="console" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-500 data-[state=active]:shadow-none rounded-none">
+                      <Terminal className="h-4 w-4 mr-2" />
+                      Console
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+                
+                <TabsContent value="preview" className="mt-0 h-full">
+                  <SandpackLayout className="h-full">
+                    <SandpackPreview showNavigator={true} showRefreshButton={true} />
+                  </SandpackLayout>
+                </TabsContent>
+                
+                <TabsContent value="code" className="mt-0 h-full">
+                  <SandpackLayout className="h-full">
+                    <SandpackCodeEditor showTabs showLineNumbers wrapContent closableTabs />
+                  </SandpackLayout>
+                </TabsContent>
+                
+                <TabsContent value="console" className="mt-0 h-full">
+                  <SandpackLayout className="h-full">
+                    <SandpackConsole />
+                  </SandpackLayout>
+                </TabsContent>
+              </Tabs>
+            </div>
+          </SandpackProvider>
+        </SandpackErrorBoundary>
       )}
     </div>
   );
