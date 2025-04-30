@@ -92,6 +92,18 @@
   background-color: white;
 }
 
+.terminal-output, .server-output {
+  max-height: 200px;
+  overflow-y: auto;
+  background-color: #282c34;
+  color: #abb2bf;
+  font-family: monospace;
+  padding: 0.5rem;
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  display: none;
+}
+
 /* File tree styling */
 .file-tree li {
   white-space: nowrap;
@@ -127,22 +139,4 @@
 
 .artifact-viewer-content.preview-mode .file-content {
   width: 100%;
-}
-
-/* Sandpack specific styles */
-.sp-wrapper, .sp-stack, .sp-layout {
-  height: 100% !important;
-}
-
-.sp-stack, .sp-editor {
-  flex: 1;
-}
-
-.sp-preview-container {
-  flex: 1;
-  max-height: 70%;
-}
-
-.sp-console {
-  max-height: 30%;
 }
