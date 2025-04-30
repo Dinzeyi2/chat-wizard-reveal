@@ -194,12 +194,16 @@
   height: 100% !important;
   overflow: auto !important;
   padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 .sp-preview-iframe {
   height: 100% !important;
   width: 100% !important;
   border: none !important;
+  background-color: white !important;
+  flex: 1 !important;
 }
 
 .sp-console {
@@ -264,4 +268,16 @@
   flex: 1 !important;
   display: flex !important;
   flex-direction: column !important;
+}
+
+/* Make sure Sandpack loading indicator is visible */
+.sp-loading {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+  color: white !important;
+}
+
+/* Ensure iframe is visible with correct background */
+iframe.sp-preview-iframe {
+  background-color: #ffffff !important;
+  display: block !important;
 }

@@ -47,6 +47,28 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Code Preview</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f5f5f5;
+        color: #333;
+      }
+      h1 {
+        color: #2d3748;
+        margin-bottom: 10px;
+      }
+      p {
+        margin-bottom: 20px;
+      }
+      .content {
+        background-color: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
@@ -67,19 +89,34 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
     
     // If there's no index.js but there are other files, create a simple one
     if (!hasIndexJs && files.length > 0) {
-      // Simple index.js that doesn't rely on specific element IDs
+      // Create a more visible default content
       result["/index.js"] = {
         code: `
 // This is a basic entry point for the preview
 console.log("Preview initialized");
 
 document.addEventListener("DOMContentLoaded", function() {
-  // Create content if it doesn't exist
+  // Create a visible container with styling
   const content = document.createElement("div");
-  content.innerHTML = "<h1>Preview Content</h1><p>Your code is being previewed here.</p>";
+  content.className = "content";
+  
+  // Add some title and explanation
+  content.innerHTML = \`
+    <h1>Code Preview</h1>
+    <p>Your code is being previewed in this sandbox environment.</p>
+    <div id="preview-content">
+      <h2>Files in preview:</h2>
+      <ul>
+        ${files.map(file => \`<li>\${file.path}</li>\`).join('')}
+      </ul>
+    </div>
+  \`;
+  
+  // Add it to the document
   document.body.appendChild(content);
-});
-`,
+  
+  console.log("Preview content initialized with", ${files.length}, "files");
+});`,
         hidden: true
       };
     }
@@ -202,6 +239,9 @@ document.addEventListener("DOMContentLoaded", function() {
         options={{
           recompileMode: "immediate",
           recompileDelay: 300,
+          showNavigator: false,
+          showLineNumbers: true,
+          showInlineErrors: true,
         }}
       >
         <Tabs 
@@ -231,6 +271,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 <SandpackPreview 
                   showOpenInCodeSandbox={false}
                   className="h-full"
+                  showRefreshButton={true}
                 />
               </SandpackStack>
             </SandpackLayout>
