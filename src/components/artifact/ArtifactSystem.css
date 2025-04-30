@@ -281,3 +281,16 @@ iframe.sp-preview-iframe {
   background-color: #ffffff !important;
   display: block !important;
 }
+
+/* Additional fixes for preview display issues */
+.sandpack {
+  --sp-layout-height: 100% !important;
+  --sp-border-radius: 0 !important;
+  height: 100% !important;
+}
+
+.sp-preview {
+  height: 100% !important;
+  min-height: 400px !important;
+  overflow: auto !important;
+}

@@ -132,14 +132,12 @@ document.addEventListener("DOMContentLoaded", function() {
       
       result[path] = {
         code: file.content,
-        // Fix the type issue by using a type guard
         active: file.path.endsWith(".html") // Make HTML files active by default
       };
     });
     
     // If no files were made active, make the first one active
     const hasActive = Object.values(result).some(file => 
-      // Use a type guard to check if 'active' exists
       typeof file === 'object' && file !== null && 'active' in file && file.active === true
     );
     
