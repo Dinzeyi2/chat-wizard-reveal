@@ -157,8 +157,14 @@ export const useUiScraper = (apiKeyOrOptions?: string | UseUiScraperOptions, opt
         console.warn("No Claude API key provided for code generation");
       }
       
-      // Generate the code
-      const result = await codeGenerator.generateCode(prompt, apiKey);
+      // If we have a Claude API key, we should ensure it's set in the generator
+      if (apiKey && apiKey !== codeGenerator.getClaudeApiKey()) {
+        // Update the API key in the code generator
+        codeGenerator.setClaudeApiKey(apiKey);
+      }
+      
+      // Generate the code - only pass the prompt
+      const result = await codeGenerator.generateCode(prompt);
       console.log("Code generation result:", result);
       
       setGeneratedCode(result);

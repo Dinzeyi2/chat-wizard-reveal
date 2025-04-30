@@ -1,3 +1,4 @@
+
 /**
  * UI Code Generator - Main Integration
  * This module integrates the Perplexity AI Design Scraper with the Claude Code Customizer
@@ -70,6 +71,21 @@ export class UICodeGenerator {
     
     // Track generation history for potential reuse
     this.generationHistory = [];
+  }
+  
+  /**
+   * Get the current Claude API key
+   */
+  getClaudeApiKey(): string | undefined {
+    return this.claudeApiKey;
+  }
+  
+  /**
+   * Set a new Claude API key
+   */
+  setClaudeApiKey(apiKey: string): void {
+    this.claudeApiKey = apiKey;
+    this.customizer = new ClaudeCodeCustomizer(apiKey);
   }
   
   /**
