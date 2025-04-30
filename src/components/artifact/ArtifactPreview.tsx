@@ -4,14 +4,12 @@ import {
   SandpackProvider, 
   SandpackLayout, 
   SandpackPreview, 
-  SandpackCodeEditor,
   SandpackConsole,
-  useSandpack,
   SandpackFiles,
   SandpackStack
 } from '@codesandbox/sandpack-react';
 import { nightOwl } from '@codesandbox/sandpack-themes';
-import { Loader2, TerminalSquare } from 'lucide-react';
+import { Loader2, TerminalSquare, AlertCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 
@@ -28,19 +26,16 @@ interface ArtifactPreviewProps {
 export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"preview" | "console">("preview");
+  const [previewError, setPreviewError] = useState<string | null>(null);
   
   // Transform files to Sandpack format
   const sandpackFiles: SandpackFiles = React.useMemo(() => {
     console.log("Processing files for preview:", files.length);
     const result: SandpackFiles = {};
     
-    // First identify if we have an index.html
-    let hasIndexHtml = files.some(file => file.path === "index.html" || file.path === "/index.html");
-    
-    // If no index.html, we'll need to create one with visible content
-    if (!hasIndexHtml) {
-      result["/index.html"] = {
-        code: `
+    // Always create an index.html file for better visibility
+    result["/index.html"] = {
+      code: `
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -88,41 +83,30 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
     <script src="/index.js"></script>
   </body>
 </html>`,
-        hidden: false
-      };
-    }
+      hidden: false
+    };
     
-    // Check if we need to create a basic index.js
-    let hasIndexJs = files.some(file => 
-      file.path === "index.js" || 
-      file.path === "/index.js" ||
-      file.path === "src/index.js" || 
-      file.path === "/src/index.js"
-    );
-    
-    // If there's no index.js but there are other files, create a simple one with visible output
-    if (!hasIndexJs && files.length > 0) {
-      result["/index.js"] = {
-        code: `
-// This is a basic entry point for the preview
+    // Always create an index.js file that will display files content
+    result["/index.js"] = {
+      code: `
+// This script generates the preview display
 console.log("Preview initialized with files:", ${JSON.stringify(files.map(f => f.path))});
 
 document.addEventListener("DOMContentLoaded", function() {
-  // Create a visible container
   const container = document.createElement("div");
+  container.className = "content";
   document.body.appendChild(container);
   
-  // Add title and description
   const header = document.createElement("h1");
   header.textContent = "Code Preview";
   container.appendChild(header);
   
   const description = document.createElement("p");
-  description.textContent = "Below are the files included in this preview:";
+  description.textContent = "Files in this preview:";
   container.appendChild(description);
   
   // Display each file
-  const filesList = ${JSON.stringify(files.map(f => ({ path: f.path, content: f.content })))};
+  const filesList = ${JSON.stringify(files.map(f => ({ path: f.path, content: f.content.substring(0, 200) })))};
   
   filesList.forEach(file => {
     const fileContainer = document.createElement("div");
@@ -133,24 +117,19 @@ document.addEventListener("DOMContentLoaded", function() {
     fileName.textContent = file.path;
     fileContainer.appendChild(fileName);
     
-    // For non-binary files, show a preview of content
-    if (file.content) {
-      const contentPreview = document.createElement("pre");
-      // Limit content to first 100 chars
-      contentPreview.textContent = file.content.substring(0, 100) + (file.content.length > 100 ? "..." : "");
-      fileContainer.appendChild(contentPreview);
-    }
+    const contentPreview = document.createElement("pre");
+    contentPreview.textContent = file.content + (file.content.length > 200 ? "..." : "");
+    fileContainer.appendChild(contentPreview);
     
     container.appendChild(fileContainer);
   });
   
   console.log("Preview content displayed");
 });`,
-        hidden: false
-      };
-    }
+      hidden: false
+    };
     
-    // Process all files
+    // Add all user's files
     files.forEach(file => {
       // Skip any path with node_modules
       if (file.path.includes("node_modules")) return;
@@ -158,23 +137,11 @@ document.addEventListener("DOMContentLoaded", function() {
       // Ensure the path starts with /
       const path = file.path.startsWith("/") ? file.path : `/${file.path}`;
       
+      // Store the file content
       result[path] = {
-        code: file.content,
-        active: file.path.endsWith(".html") // Make HTML files active by default
+        code: file.content
       };
     });
-    
-    // If no files were made active, make the first one active
-    const hasActive = Object.values(result).some(file => 
-      typeof file === 'object' && file !== null && 'active' in file && file.active === true
-    );
-    
-    if (!hasActive && Object.keys(result).length > 0) {
-      const firstKey = Object.keys(result)[0];
-      if (result[firstKey] && typeof result[firstKey] === 'object') {
-        (result[firstKey] as { active?: boolean }).active = true;
-      }
-    }
     
     console.log("Processed files for Sandpack:", Object.keys(result).length);
     return result;
@@ -182,38 +149,13 @@ document.addEventListener("DOMContentLoaded", function() {
 
   // Determine template based on files
   const template = React.useMemo(() => {
-    // Check for package.json to determine if it's a React project
-    const isReact = files.some(file => 
-      file.path.includes("package.json") && 
-      file.content.includes("react")
-    );
-    
-    // Check for Vue files
-    const isVue = files.some(file => file.path.endsWith(".vue"));
-    
-    // Check if it's just HTML/CSS/JS
-    const hasHTML = files.some(file => file.path.endsWith(".html"));
-    
-    if (isReact) {
-      console.log("Detected React project");
-      return "react";
-    }
-    if (isVue) {
-      console.log("Detected Vue project");
-      return "vue";
-    }
-    if (hasHTML) {
-      console.log("Detected HTML project");
-      return "vanilla";
-    }
-    
-    // Default to vanilla
-    console.log("Using default vanilla template");
+    // Default to vanilla template for most reliable rendering
+    console.log("Using vanilla template");
     return "vanilla";
-  }, [files]);
+  }, []);
   
   useEffect(() => {
-    // Simulate loading to ensure everything renders properly
+    // Simulate loading for better UX
     console.log("ArtifactPreview mounted, loading preview...");
     const timer = setTimeout(() => {
       setIsLoading(false);
@@ -267,7 +209,20 @@ document.addEventListener("DOMContentLoaded", function() {
           recompileMode: "immediate",
           recompileDelay: 300,
           autorun: true,
-          bundlerURL: "https://sandpack-bundler.pages.dev"
+          externalResources: [
+            "https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css"
+          ],
+          classes: {
+            "sp-wrapper": "h-full !important",
+            "sp-stack": "h-full !important",
+            "sp-preview-container": "h-full !important bg-white !important",
+            "sp-preview": "h-full !important",
+            "sp-preview-iframe": "h-full !important bg-white !important"
+          }
+        }}
+        customSetup={{
+          dependencies: {},
+          entry: "/index.js"
         }}
       >
         <Tabs 
@@ -292,13 +247,13 @@ document.addEventListener("DOMContentLoaded", function() {
           </div>
           
           <TabsContent value="preview" className="border-none p-0 m-0 h-full">
-            <SandpackLayout className="h-full">
-              <SandpackStack className="h-full">
+            <SandpackLayout className="h-full w-full">
+              <SandpackStack className="h-full w-full">
                 <SandpackPreview 
-                  showOpenInCodeSandbox={false}
-                  className="h-full"
+                  showNavigator={true}
                   showRefreshButton={true}
                   showRestartButton={true}
+                  className="!h-full !w-full sp-preview-force"
                 />
               </SandpackStack>
             </SandpackLayout>

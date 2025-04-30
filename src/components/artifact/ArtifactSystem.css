@@ -206,6 +206,8 @@
   flex: 1 !important;
   min-height: 400px !important;
   display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .sp-console {
@@ -278,10 +280,16 @@
   color: white !important;
 }
 
-/* Ensure iframe is visible with correct background */
+/* Critical fix for the iframe visibility */
 iframe.sp-preview-iframe {
   background-color: #ffffff !important;
   display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: static !important;
+  transform: none !important;
+  height: 100% !important;
+  width: 100% !important;
 }
 
 /* Additional fixes for preview display issues */
@@ -297,11 +305,16 @@ iframe.sp-preview-iframe {
   overflow: auto !important;
 }
 
-/* Force iframe visibility */
-iframe.sp-preview-iframe {
+/* Special class to force iframe visibility */
+.sp-preview-force {
+  height: 100% !important;
+}
+
+.sp-preview-force iframe {
+  display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
-  transform: none !important;
+  height: 100% !important;
 }
 
 /* Fix CORS security issues with iframe */
