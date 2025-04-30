@@ -11,8 +11,10 @@ export class WebContainerManager {
   private packages: Map<string, string> = new Map();
   private fileSystem: any = {};
   private initializationAttempts: number = 0;
-  private readonly MAX_INITIALIZATION_ATTEMPTS = 2;
+  private readonly MAX_INITIALIZATION_ATTEMPTS = 3;
   private crossOriginIsolationDetected: boolean = false;
+  private instanceLimitReached: boolean = false;
+  private bootTimeoutMs: number = 15000; // 15 seconds timeout
 
   // Initialize the WebContainer
   async initialize() {
@@ -33,6 +35,11 @@ export class WebContainerManager {
         throw new Error('Max initialization attempts exceeded. Please refresh the page and try again.');
       }
 
+      // Check if we've already detected instance limit issues
+      if (this.instanceLimitReached) {
+        throw new Error('WebContainer instance limit reached. Please close other tabs or refresh the page.');
+      }
+
       // Check if we've already detected cross-origin isolation issues
       if (this.crossOriginIsolationDetected) {
         throw new Error('Cross-origin isolation required but not available in this environment.');
@@ -42,10 +49,22 @@ export class WebContainerManager {
       this.isBooting = true;
       console.log('Initializing WebContainer... (Attempt ' + this.initializationAttempts + ')');
       
-      // Boot the WebContainer
+      // Boot the WebContainer with timeout
       try {
-        this.webcontainer = await WebContainer.boot();
+        this.webcontainer = await Promise.race([
+          WebContainer.boot(),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('WebContainer boot timeout after ' + this.bootTimeoutMs + 'ms')), 
+            this.bootTimeoutMs)
+          )
+        ]);
       } catch (error: any) {
+        // Check for instance limit errors
+        if (error.message && error.message.includes('Unable to create more instances')) {
+          this.instanceLimitReached = true;
+          throw new Error('WebContainer instance limit reached. Please close other tabs or refresh the page.');
+        }
+        
         // Check specifically for SharedArrayBuffer/cross-origin isolation errors
         if (error.message && (
           error.message.includes('SharedArrayBuffer') || 
@@ -73,8 +92,19 @@ export class WebContainerManager {
       this.isBooting = false;
       console.error('Failed to initialize WebContainer:', error);
       
+      // Handle specific error cases
+      if (error.message && error.message.includes('Unable to create more instances')) {
+        this.instanceLimitReached = true;
+        console.log('WebContainer instance limit reached. Please close other tabs or refresh the page.');
+        
+        toast({
+          title: "WebContainer Error",
+          description: "Unable to create more WebContainer instances. Please refresh the page or close other tabs.",
+          variant: "destructive"
+        });
+      } 
       // Check for cross-origin isolation errors
-      if (error.message && (
+      else if (error.message && (
         error.message.includes('SharedArrayBuffer') || 
         error.message.includes('crossOriginIsolated')
       )) {
@@ -87,16 +117,7 @@ export class WebContainerManager {
           variant: "destructive"
         });
       } 
-      // Check for the "Unable to create more instances" error
-      else if (error.message && error.message.includes('Unable to create more instances')) {
-        console.log('WebContainer instance limit reached. Please close other tabs or refresh the page.');
-        
-        toast({
-          title: "WebContainer Error",
-          description: "Unable to create more WebContainer instances. Please refresh the page or close other tabs.",
-          variant: "destructive"
-        });
-      } else {
+      else {
         toast({
           title: "WebContainer Error",
           description: `Failed to initialize: ${error.message || 'Unknown error'}`,
@@ -108,7 +129,8 @@ export class WebContainerManager {
         detail: { 
           error, 
           recoverable: this.initializationAttempts < this.MAX_INITIALIZATION_ATTEMPTS,
-          isCrossOriginError: this.crossOriginIsolationDetected
+          isCrossOriginError: this.crossOriginIsolationDetected,
+          isInstanceLimitError: this.instanceLimitReached
         } 
       }));
       
@@ -176,14 +198,15 @@ export class WebContainerManager {
             description: 'Generated project by AI',
             type: "module",
             scripts: {
-              dev: 'vite --port 3000',
+              dev: 'vite --port 3000 --host',
               build: 'vite build'
             },
             dependencies: {},
             devDependencies: {
               vite: '^4.3.9',
               "react": "^18.2.0",
-              "react-dom": "^18.2.0"
+              "react-dom": "^18.2.0",
+              "@vitejs/plugin-react": "^4.0.0"
             }
           }, null, 2)
         }
@@ -519,8 +542,9 @@ h1 {
     this.fileSystem = {};
     this.previewUrl = null;
     
-    // Reset cross-origin detection on reset to allow trying again
+    // Reset error detection flags on reset to allow trying again
     this.crossOriginIsolationDetected = false;
+    this.instanceLimitReached = false;
     
     try {
       // Try to terminate the existing instance if possible

@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { webContainerIntegration } from '@/utils/WebContainerManager';
-import { Loader2, AlertTriangle, ExternalLink, RefreshCw } from 'lucide-react';
+import { Loader2, AlertTriangle, ExternalLink, RefreshCw, Monitor } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface ArtifactPreviewProps {
@@ -21,6 +21,9 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
   const [status, setStatus] = useState("Initializing...");
   const [error, setError] = useState<string | null>(null);
   const [isCrossOriginError, setIsCrossOriginError] = useState(false);
+  const [isInstanceLimitError, setIsInstanceLimitError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [showStaticPreview, setShowStaticPreview] = useState(false);
   
   // Set up preview when files change
   useEffect(() => {
@@ -35,6 +38,8 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
       setIsProcessing(true);
       setError(null);
       setIsCrossOriginError(false);
+      setIsInstanceLimitError(false);
+      setShowStaticPreview(false);
       setStatus("Setting up the preview environment...");
       
       try {
@@ -79,15 +84,31 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
           const errorMessage = errorDetail?.message || "Something went wrong";
           
           // Check for cross-origin isolation errors
-          if (errorMessage.includes("SharedArrayBuffer") || 
+          if (errorDetail?.isCrossOriginError || 
+              errorMessage.includes("SharedArrayBuffer") || 
               errorMessage.includes("crossOriginIsolated")) {
             setIsCrossOriginError(true);
+          }
+          
+          // Check for instance limit errors
+          if (errorDetail?.isInstanceLimitError || 
+              errorMessage.includes("Unable to create more instances")) {
+            setIsInstanceLimitError(true);
           }
           
           setError(errorMessage);
           setStatus("Error: " + errorMessage);
           setIsLoading(false);
           setIsProcessing(false);
+          
+          // Automatically show static preview after 3 seconds if there's an error
+          const timer = setTimeout(() => {
+            if (!showStaticPreview) {
+              setShowStaticPreview(true);
+            }
+          }, 3000);
+          
+          return () => clearTimeout(timer);
         };
         
         // Add event listeners
@@ -124,24 +145,41 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
           setIsCrossOriginError(true);
         }
         
+        // Check for instance limit errors
+        if (error instanceof Error && 
+            error.message.includes("Unable to create more instances")) {
+          setIsInstanceLimitError(true);
+        }
+        
         setError(error instanceof Error ? error.message : "Failed to set up preview environment");
         setStatus("Failed to set up preview environment");
         setIsLoading(false);
         setIsProcessing(false);
+        
+        // Show static preview after error
+        setTimeout(() => {
+          setShowStaticPreview(true);
+        }, 2000);
       }
     };
     
     setupPreview();
-  }, [files]);
+  }, [files, retryCount]);
   
   const handleRetry = async () => {
+    setRetryCount(prev => prev + 1);
     await webContainerIntegration.containerManager.reset();
     setIsLoading(true);
     setIsProcessing(true);
     setError(null);
     setIsCrossOriginError(false);
+    setIsInstanceLimitError(false);
+    setShowStaticPreview(false);
     setStatus("Retrying...");
-    await webContainerIntegration.processArtifactFiles(files);
+  };
+
+  const handleShowStaticPreview = () => {
+    setShowStaticPreview(true);
   };
 
   // Function to render a static code preview when WebContainer fails
@@ -201,8 +239,8 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
 
   return (
     <div className="artifact-preview-container h-full flex flex-col">
-      {isLoading && (
-        <div className="flex flex-col items-center justify-center p-8 h-full">
+      {isLoading && !showStaticPreview && (
+        <div className="preview-loading-indicator p-8">
           <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
           <div className="text-center">
             <p className="font-medium text-gray-200">{status}</p>
@@ -213,13 +251,29 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
         </div>
       )}
       
-      {error && (
+      {error && !showStaticPreview && (
         <div className="webcontainer-error-container">
           <AlertTriangle className="webcontainer-error-icon h-12 w-12" />
           <h3 className="webcontainer-error-title">WebContainer Error</h3>
           <p className="webcontainer-error-message">{error}</p>
           
-          {isCrossOriginError ? (
+          {isInstanceLimitError ? (
+            <div className="max-w-md mx-auto text-center">
+              <p className="text-sm text-gray-300 mb-4">
+                WebContainer has reached its instance limit. This often happens when there are too many 
+                WebContainer instances running in other tabs or the environment is limited.
+              </p>
+              
+              <div className="bg-zinc-800 p-4 rounded-lg mb-4 text-left">
+                <h4 className="text-sm font-semibold text-gray-200 mb-2">Try these solutions:</h4>
+                <ul className="text-sm text-gray-400 list-disc pl-5 space-y-2">
+                  <li>Close other tabs with WebContainer instances</li>
+                  <li>Refresh this page to reset the WebContainer</li>
+                  <li>View the static code preview instead</li>
+                </ul>
+              </div>
+            </div>
+          ) : isCrossOriginError ? (
             <div className="max-w-md mx-auto text-center">
               <p className="text-sm text-gray-300 mb-4">
                 The WebContainer requires special browser settings to work properly. This error occurs due to 
@@ -229,58 +283,54 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
               <div className="bg-zinc-800 p-4 rounded-lg mb-4 text-left">
                 <h4 className="text-sm font-semibold text-gray-200 mb-2">Alternative options:</h4>
                 <ul className="text-sm text-gray-400 list-disc pl-5 space-y-2">
-                  <li>View the static code preview below</li>
+                  <li>View the static code preview instead</li>
                   <li>Switch to the "Code" tab to view the source code</li>
                   <li>Try using a different browser or device</li>
                 </ul>
               </div>
-              
-              <div className="flex justify-center space-x-3 mb-6">
-                <Button 
-                  onClick={handleRetry} 
-                  variant="outline"
-                  className="flex items-center gap-2"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Retry
-                </Button>
-              </div>
-              
-              <h4 className="text-sm font-semibold text-gray-200 mb-2">Static Preview</h4>
-              <div className="h-64 border border-gray-700 rounded-lg overflow-hidden bg-white">
-                {renderStaticPreview()}
-              </div>
             </div>
           ) : (
-            <div className="webcontainer-error-actions">
-              <Button 
-                onClick={handleRetry} 
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Retry
-              </Button>
+            <div className="max-w-md mx-auto text-center">
+              <p className="text-sm text-gray-300 mb-4">
+                There was a problem initializing the WebContainer preview environment.
+              </p>
             </div>
           )}
           
-          <div className="mt-8 p-4 bg-zinc-800 rounded-lg w-full max-w-lg overflow-auto">
-            <h4 className="text-sm font-semibold text-gray-200 mb-2">Files List:</h4>
-            <pre className="text-xs text-gray-300 whitespace-pre-wrap">
-              <code>
-                {JSON.stringify(files.map(f => ({path: f.path, size: f.content.length})), null, 2)}
-              </code>
-            </pre>
+          <div className="webcontainer-error-actions">
+            <Button 
+              onClick={handleRetry} 
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Retry
+            </Button>
+            
+            <Button 
+              onClick={handleShowStaticPreview} 
+              variant="outline"
+              className="flex items-center gap-2 ml-3"
+            >
+              <Monitor className="h-4 w-4" />
+              View Static Preview
+            </Button>
           </div>
         </div>
       )}
       
-      <iframe 
-        ref={iframeRef}
-        className={`w-full h-full border-none flex-1 ${isLoading || error ? 'hidden' : 'block'}`}
-        title="Code Preview"
-        sandbox="allow-scripts allow-modals allow-forms allow-same-origin allow-popups allow-top-navigation-by-user-activation"
-      />
+      {showStaticPreview ? (
+        <div className="static-preview-container h-full">
+          {renderStaticPreview()}
+        </div>
+      ) : (
+        <iframe 
+          ref={iframeRef}
+          className={`w-full h-full border-none flex-1 ${isLoading || error ? 'hidden' : 'block'}`}
+          title="Code Preview"
+          sandbox="allow-scripts allow-modals allow-forms allow-same-origin allow-popups allow-top-navigation-by-user-activation"
+        />
+      )}
     </div>
   );
 };
