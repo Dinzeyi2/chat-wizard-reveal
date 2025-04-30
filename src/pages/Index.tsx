@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -17,6 +18,7 @@ interface ChatHistoryItem {
   title: string;
   lastMessage: string;
   timestamp: string;
+  messages?: Message[]; // Add messages array to store full conversation
 }
 
 const Index = () => {
@@ -108,25 +110,37 @@ const Index = () => {
     const selectedChat = localChatHistory.find((chat: ChatHistoryItem) => chat.id === chatId);
     
     if (selectedChat) {
-      // Simulate loading previous messages based on the chat title
-      const userMessage: Message = {
-        id: "user-" + Date.now().toString(),
-        role: "user",
-        content: selectedChat.title,
-        timestamp: new Date(Date.now() - 3600000) // 1 hour ago
-      };
-      
-      const assistantMessage: Message = {
-        id: "assistant-" + Date.now().toString(),
-        role: "assistant",
-        content: `This is a previous conversation about "${selectedChat.title}". I'm here to continue helping you with this topic.`,
-        timestamp: new Date(Date.now() - 3500000) // A bit less than 1 hour ago
-      };
-      
-      setMessages([userMessage, assistantMessage]);
-      
-      // If this chat had a project ID, we would restore it here
-      // setCurrentProjectId(mockProjectId);
+      if (selectedChat.messages && selectedChat.messages.length > 0) {
+        // Use stored message history if available
+        console.log("Loading saved conversation with", selectedChat.messages.length, "messages");
+        setMessages(selectedChat.messages);
+        
+        // If this chat had a project ID, restore it
+        if (selectedChat.messages.some(msg => msg.metadata?.projectId)) {
+          const projectMsg = selectedChat.messages.find(msg => msg.metadata?.projectId);
+          if (projectMsg && projectMsg.metadata?.projectId) {
+            setCurrentProjectId(projectMsg.metadata.projectId);
+          }
+        }
+      } else {
+        // Fallback to creating placeholder messages if no saved messages
+        console.log("No stored messages found, creating placeholder messages");
+        const userMessage: Message = {
+          id: "user-" + Date.now().toString(),
+          role: "user",
+          content: selectedChat.title,
+          timestamp: new Date(Date.now() - 3600000) // 1 hour ago
+        };
+        
+        const assistantMessage: Message = {
+          id: "assistant-" + Date.now().toString(),
+          role: "assistant",
+          content: `This is a previous conversation about "${selectedChat.title}". I'm here to continue helping you with this topic.`,
+          timestamp: new Date(Date.now() - 3500000) // A bit less than 1 hour ago
+        };
+        
+        setMessages([userMessage, assistantMessage]);
+      }
     }
   };
 
@@ -148,8 +162,28 @@ const Index = () => {
       id: currentChatId || Date.now().toString(),
       title: chatTitle,
       lastMessage: `Last message ${timeString}`,
-      timestamp: timeString
+      timestamp: timeString,
+      messages: [...messages] // Save current messages array
     };
+    
+    // Add new messages to the history
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content,
+      timestamp: now
+    };
+    
+    const assistantMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      role: "assistant",
+      content: responseContent,
+      timestamp: now,
+      metadata: currentProjectId ? { projectId: currentProjectId } : undefined
+    };
+    
+    // Add the new messages to the saved history
+    newChat.messages = [...newChat.messages, userMessage, assistantMessage];
     
     // Get existing history or initialize empty array
     const storedHistory = localStorage.getItem('chatHistory');
@@ -169,6 +203,7 @@ const Index = () => {
       if (existingIndex >= 0) {
         chatHistoryArray[existingIndex].lastMessage = `Last message ${timeString}`;
         chatHistoryArray[existingIndex].timestamp = timeString;
+        chatHistoryArray[existingIndex].messages = newChat.messages;
       } else {
         chatHistoryArray.unshift(newChat);
       }
@@ -297,7 +332,7 @@ You can explore the file structure and content in the panel above. This is a sta
         
         // Save this conversation to chat history
         if (data && data.response) {
-          saveToHistory(content, data.response);
+          saveToHistory(content, formattedResponse);
         }
       } catch (error) {
         console.error('Error calling function:', error);
@@ -456,6 +491,12 @@ If you were trying to generate an app, this might be due to limits with our AI m
       }
     }
   };
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
 
   return (
     <ArtifactProvider>

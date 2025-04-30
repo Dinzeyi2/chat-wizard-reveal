@@ -30,12 +30,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
+import { Message } from "@/types/chat";
 
 interface ChatHistoryItem {
   id: string;
   title: string;
   lastMessage: string;
   timestamp: string;
+  messages?: Message[]; // Add messages array to store full conversation
 }
 
 const ChatHistory = () => {
@@ -212,6 +214,11 @@ const ChatHistory = () => {
               <div>
                 <h2 className="font-medium text-gray-800">{chat.title}</h2>
                 <p className="text-sm text-gray-500">{chat.lastMessage}</p>
+                {chat.messages && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    {chat.messages.length} messages
+                  </p>
+                )}
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
