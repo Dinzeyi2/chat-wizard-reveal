@@ -5,14 +5,15 @@ import { toast } from "@/hooks/use-toast";
 // Get the appropriate redirect URI
 const getRedirectUri = () => {
   const hostname = window.location.hostname;
+  const protocol = window.location.protocol;
   
   // For production domains, use the production URL
   if (hostname === 'i-blue.dev' || hostname === 'www.i-blue.dev') {
-    return `https://i-blue.dev/callback/github`;
+    return `https://${hostname}/callback/github`;
   }
   
   // For local development or other environments
-  return `${window.location.origin}/callback/github`;
+  return `${protocol}//${hostname}${window.location.port ? `:${window.location.port}` : ''}/callback/github`;
 };
 
 export const initiateGithubAuth = async () => {

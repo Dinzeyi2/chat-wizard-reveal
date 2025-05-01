@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -10,6 +10,7 @@ const GitHubCallback = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const params = useParams();
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
@@ -18,84 +19,98 @@ const GitHubCallback = () => {
       console.log("Full URL:", window.location.href);
       console.log("Current pathname:", location.pathname);
       console.log("Current search params:", location.search);
-      
-      // Extract URL parameters - handling both standard format and malformed URLs
-      let searchParams: URLSearchParams;
-      
-      if (location.search) {
-        // Standard URL format with query string
-        searchParams = new URLSearchParams(location.search);
-      } else {
-        // Handling malformed URL where parameters might be part of the pathname
-        const fullUrl = window.location.href;
-        const questionMarkIndex = fullUrl.indexOf('?');
-        
-        if (questionMarkIndex > -1) {
-          // Extract query string properly
-          const queryString = fullUrl.substring(questionMarkIndex);
-          searchParams = new URLSearchParams(queryString);
-        } else if (fullUrl.includes('code=')) {
-          // Fallback for completely malformed URL with no question mark
-          const paramsString = fullUrl.substring(fullUrl.indexOf('code='));
-          searchParams = new URLSearchParams('?' + paramsString);
-        } else {
-          searchParams = new URLSearchParams();
-        }
-      }
-      
-      // Check authentication status
-      const { data } = await supabase.auth.getSession();
-      setIsAuthenticated(!!data.session);
-      
-      if (!data.session) {
-        setError("You must be signed in to connect your GitHub account");
-        toast({
-          description: "You must be signed in to connect your GitHub account"
-        });
-        return;
-      }
-      
-      const code = searchParams.get("code");
-      const state = searchParams.get("state");
-      
-      // Log for debugging
-      console.log("Extracted code:", code ? code.substring(0, 5) + "..." : "null");
-      console.log("Extracted state:", state);
-      
-      if (!code) {
-        console.error("No authorization code received from GitHub");
-        setError("No authorization code received from GitHub");
-        toast({
-          description: "No authorization code received from GitHub"
-        });
-        return;
-      }
+      console.log("URL params from router:", params);
       
       try {
+        // Check authentication status first
+        const { data } = await supabase.auth.getSession();
+        const isAuthed = !!data.session;
+        setIsAuthenticated(isAuthed);
+        
+        if (!isAuthed) {
+          setError("You must be signed in to connect your GitHub account");
+          toast({
+            description: "You must be signed in to connect your GitHub account"
+          });
+          return;
+        }
+        
+        // Extract GitHub code from URL - handling multiple possible formats
+        let code: string | null = null;
+        
+        // Method 1: Standard query parameter
+        if (location.search) {
+          const urlParams = new URLSearchParams(location.search);
+          code = urlParams.get("code");
+        }
+        
+        // Method 2: Path parameter (fallback)
+        if (!code && params.params && params.params.includes("code=")) {
+          const codeMatch = params.params.match(/code=([^&]+)/);
+          if (codeMatch && codeMatch[1]) {
+            code = codeMatch[1];
+          }
+        }
+        
+        // Method 3: Complete URL parsing fallback
+        if (!code) {
+          const fullUrl = window.location.href;
+          const codeMatch = fullUrl.match(/code=([^&]+)/);
+          if (codeMatch && codeMatch[1]) {
+            code = codeMatch[1];
+          }
+        }
+        
+        // Log for debugging
+        console.log("Extracted GitHub code:", code ? `${code.substring(0, 5)}...` : "null");
+        
+        if (!code) {
+          console.error("No authorization code received from GitHub");
+          setError("No authorization code received from GitHub");
+          toast({
+            description: "No authorization code received from GitHub"
+          });
+          return;
+        }
+        
         console.log("Processing GitHub callback with code:", code.substring(0, 5) + "...");
         
+        // Get the appropriate redirect URI - must match what was sent to GitHub
+        const redirectUri = (() => {
+          const hostname = window.location.hostname;
+          const protocol = window.location.protocol;
+          
+          if (hostname === 'i-blue.dev' || hostname === 'www.i-blue.dev') {
+            return `https://${hostname}/callback/github`;
+          }
+          
+          return `${protocol}//${hostname}${window.location.port ? `:${window.location.port}` : ''}/callback/github`;
+        })();
+        
+        console.log("Using redirect URI:", redirectUri);
+        
         // Call our Supabase edge function to exchange the code for a token
-        const { data, error } = await supabase.functions.invoke('github-auth', {
+        const { data: authData, error: authError } = await supabase.functions.invoke('github-auth', {
           body: { 
             code,
-            redirect_uri: `${window.location.origin}/callback/github`
+            redirect_uri: redirectUri
           }
         });
         
-        if (error) throw error;
+        if (authError) throw authError;
         
-        if (data) {
+        if (authData) {
           // Successfully connected GitHub account
           console.log("GitHub connection successful");
           toast({
             title: "GitHub Connected",
-            description: `Successfully connected to GitHub as ${data.user?.login || 'user'}`
+            description: `Successfully connected to GitHub as ${authData.user?.login || 'user'}`
           });
           
           // Add a small delay to ensure toast is shown
           setTimeout(() => {
             navigate("/");
-          }, 1000);
+          }, 1500);
         } else {
           console.error("Failed to connect GitHub account - null result returned");
           setError("Failed to connect GitHub account");
@@ -114,7 +129,7 @@ const GitHubCallback = () => {
     };
     
     handleOAuthCallback();
-  }, [location, navigate]);
+  }, [location, navigate, params]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4">

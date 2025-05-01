@@ -27,13 +27,12 @@ const App = () => {
             <Route path="/auth" element={<Auth />} />
             <Route path="/history" element={<ChatHistory />} />
             
-            {/* GitHub callback routes - ensure we have the correct paths */}
+            {/* GitHub callback routes - ensure we handle all possible formats */}
             <Route path="/callback/github" element={<GitHubCallback />} />
-            
-            {/* Handle any URL with github callback parameters */}
             <Route path="/callback/github/:params" element={<GitHubCallback />} />
+            <Route path="/auth/callback/github" element={<GitHubCallback />} />
             
-            {/* Legacy routes for backward compatibility */}
+            {/* Catch for direct github callback requests with parameters in URL */}
             <Route path="/github-callback" element={<Navigate to="/callback/github" />} />
             
             {/* Catch-all route for 404s */}
