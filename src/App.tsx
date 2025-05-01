@@ -8,6 +8,7 @@ import { useState } from "react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ChatHistory from "./pages/ChatHistory";
+import GitHubCallback from "./pages/GitHubCallback";
 import "./components/artifact/ArtifactSystem.css";
 
 const App = () => {
@@ -23,6 +24,7 @@ const App = () => {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/history" element={<ChatHistory />} />
+            <Route path="/github-callback" element={<GitHubCallback />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

@@ -1,4 +1,5 @@
 
+import { useState, useEffect } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -20,13 +21,44 @@ import {
   User,
   UserPlus,
   Users,
+  Github,
 } from "lucide-react";
+import { initiateGithubAuth, isGithubConnected, disconnectGithub } from "@/utils/githubAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 interface UserProfileMenuProps {
   username?: string;
 }
 
 export function UserProfileMenu({ username = "O" }: UserProfileMenuProps) {
+  const [githubConnected, setGithubConnected] = useState(false);
+  
+  useEffect(() => {
+    const checkGithubConnection = async () => {
+      const connected = await isGithubConnected();
+      setGithubConnected(connected);
+    };
+    
+    checkGithubConnection();
+    
+    // Set up auth state change listener to recheck GitHub connection
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      checkGithubConnection();
+    });
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleGithubConnection = () => {
+    if (githubConnected) {
+      disconnectGithub();
+    } else {
+      initiateGithubAuth();
+    }
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="cursor-pointer focus:outline-none">
@@ -59,6 +91,14 @@ export function UserProfileMenu({ username = "O" }: UserProfileMenuProps) {
         <DropdownMenuItem className="hover:bg-[#2A2A2A] cursor-pointer">
           <Share2 className="mr-2 size-4" />
           View Shared Bookmarks
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-[#2A2A2A]" />
+        <DropdownMenuItem 
+          onClick={handleGithubConnection}
+          className="hover:bg-[#2A2A2A] cursor-pointer"
+        >
+          <Github className="mr-2 size-4" />
+          {githubConnected ? "Disconnect GitHub" : "Connect GitHub"}
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-[#2A2A2A]" />
         <DropdownMenuItem className="hover:bg-[#2A2A2A] cursor-pointer">
