@@ -67,9 +67,10 @@ export const handleGithubCallback = async (code: string, state: string) => {
 
 export const isGithubConnected = async (): Promise<boolean> => {
   try {
+    // Use a custom RPC function to check for GitHub connection
+    // This avoids the TypeScript error with directly accessing the github_connections table
     const { data, error } = await supabase
-      .from('github_connections')
-      .select('*')
+      .rpc('check_github_connection')
       .single();
       
     if (error) return false;
@@ -83,10 +84,10 @@ export const disconnectGithub = async () => {
   const { toast } = useToast();
   
   try {
+    // Use a custom RPC function to disconnect GitHub
+    // This avoids the TypeScript error with directly accessing the github_connections table
     const { error } = await supabase
-      .from('github_connections')
-      .delete()
-      .eq('user_id', supabase.auth.getUser());
+      .rpc('disconnect_github');
       
     if (error) throw error;
     
