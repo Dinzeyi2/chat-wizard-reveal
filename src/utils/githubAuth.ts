@@ -67,11 +67,18 @@ export const handleGithubCallback = async (code: string, state: string) => {
 
 export const isGithubConnected = async (): Promise<boolean> => {
   try {
-    // Use a custom RPC function to check for GitHub connection
-    // This avoids the TypeScript error with directly accessing the github_connections table
+    // Access the github_connections table directly to check if current user has a connection
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    
+    if (!user) return false;
+    
     const { data, error } = await supabase
-      .rpc('check_github_connection')
-      .single();
+      .from("github_connections")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
       
     if (error) return false;
     return !!data;
@@ -84,10 +91,18 @@ export const disconnectGithub = async () => {
   const { toast } = useToast();
   
   try {
-    // Use a custom RPC function to disconnect GitHub
-    // This avoids the TypeScript error with directly accessing the github_connections table
+    // Get current user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    
+    if (!user) throw new Error("Not authenticated");
+    
+    // Delete the connection directly from the github_connections table
     const { error } = await supabase
-      .rpc('disconnect_github');
+      .from("github_connections")
+      .delete()
+      .eq("user_id", user.id);
       
     if (error) throw error;
     
