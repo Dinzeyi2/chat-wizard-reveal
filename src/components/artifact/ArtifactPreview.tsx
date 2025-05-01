@@ -45,10 +45,10 @@ const AutoRefreshPreview = () => {
         
         // Reset status after a delay
         setTimeout(() => setRefreshStatus(null), 2000);
-      } else if (msg.type === 'status' && msg.status === 'error') {
-        // Fix: Check for status type with error status instead of direct error type
+      } else if (msg.type === 'status' && msg.status === 'error-compilation') {
+        // Fixed: Use the correct status value from Sandpack
         setRefreshStatus('error');
-        console.error('Hot reload error:', msg.status);
+        console.error('Hot reload compilation error:', msg.status);
         
         // Display error toast for better user feedback
         toast({
