@@ -317,28 +317,17 @@ Based on this design, please ${message}
               </PromptInputAction>
             </TooltipProvider>
             
-            {!isAuthenticated ? (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="rounded-full"
-                onClick={() => navigate('/auth')}
-              >
-                <LogIn className="mr-1 size-4" />
-                Sign In
-              </Button>
-            ) : (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="rounded-full"
-                onClick={handleGithubClick}
-                disabled={isLoadingRepos}
-              >
-                <Github className="mr-1 size-4" />
-                {isConnectedToGithub ? "GitHub Repos" : "Connect GitHub"}
-              </Button>
-            )}
+            {/* Fix: Always show the GitHub button */}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="rounded-full"
+              onClick={handleGithubClick}
+              disabled={isLoadingRepos}
+            >
+              <Github className="mr-1 size-4" />
+              {isConnectedToGithub ? "GitHub Repos" : "Connect GitHub"}
+            </Button>
             <Button variant="outline" size="sm" className="rounded-full">Reason</Button>
             <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Deep research</Button>
             <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Create image</Button>
