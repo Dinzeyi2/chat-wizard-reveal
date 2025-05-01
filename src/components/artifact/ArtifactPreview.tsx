@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   SandpackProvider, 
@@ -45,10 +44,10 @@ const AutoRefreshPreview = () => {
         
         // Reset status after a delay
         setTimeout(() => setRefreshStatus(null), 2000);
-      } else if (msg.type === 'status' && msg.status === 'error-compilation') {
-        // Fixed: Use the correct status value from Sandpack
+      } else if (msg.type === 'status' && msg.status === 'error') {
+        // Fixed: Use the correct error status check
         setRefreshStatus('error');
-        console.error('Hot reload compilation error:', msg.status);
+        console.error('Hot reload compilation error:', msg);
         
         // Display error toast for better user feedback
         toast({
