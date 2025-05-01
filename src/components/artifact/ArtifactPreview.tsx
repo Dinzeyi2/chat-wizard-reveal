@@ -44,10 +44,10 @@ const AutoRefreshPreview = () => {
         
         // Reset status after a delay
         setTimeout(() => setRefreshStatus(null), 2000);
-      } else if (msg.type === 'status' && msg.status === 'error') {
-        // Fixed: Use the correct error status check
+      } else if (msg.type === 'error') {
+        // Fixed: Changed the condition to check for error type directly
         setRefreshStatus('error');
-        console.error('Hot reload compilation error:', msg);
+        console.error('Hot reload error:', msg);
         
         // Display error toast for better user feedback
         toast({
@@ -338,6 +338,22 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
         
         console.log("Created fallback index.html for React/Vite app");
         hasHtml = true;
+      }
+      
+      // Fix for the @shadcn/ui import error
+      // Add correct import path for shadcn components
+      if (Object.keys(result).length > 0) {
+        // Check if any file has imports from @shadcn/ui
+        for (const path in result) {
+          if (result[path].code.includes('@shadcn/ui')) {
+            console.log(`Found @shadcn/ui import in ${path}, fixing it`);
+            // Replace @shadcn/ui imports with the correct path
+            result[path].code = result[path].code.replace(
+              /from ['"]@shadcn\/ui['"]/g, 
+              'from "@/components/ui"'
+            );
+          }
+        }
       }
       
       // If it's a vanilla app with no HTML, create a basic setup
