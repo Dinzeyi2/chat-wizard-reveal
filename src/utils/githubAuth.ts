@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -8,10 +7,10 @@ const getRedirectUri = () => {
   // Check if we're on the production domain
   const hostname = window.location.hostname;
   
-  // For production domains, use the full URL with path
+  // For production domains, always use the format without www
+  // This must match EXACTLY what's configured in the GitHub app settings
   if (hostname === 'i-blue.dev' || hostname === 'www.i-blue.dev') {
-    // Ensure we're using the main domain format in production
-    return `https://${hostname}/github-callback`;
+    return `https://i-blue.dev/github-callback`;
   }
   
   // For local development or other environments
