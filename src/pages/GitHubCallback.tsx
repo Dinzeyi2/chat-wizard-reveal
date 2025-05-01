@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { handleGithubCallback } from "@/utils/githubAuth";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 const GitHubCallback = () => {
   const [error, setError] = useState<string | null>(null);
@@ -18,6 +19,7 @@ const GitHubCallback = () => {
       
       if (!data.session) {
         setError("You must be signed in to connect your GitHub account");
+        toast("You must be signed in to connect your GitHub account");
         return false;
       }
       
@@ -43,6 +45,7 @@ const GitHubCallback = () => {
       if (!code) {
         console.error("No authorization code received from GitHub");
         setError("No authorization code received from GitHub");
+        toast("No authorization code received from GitHub");
         return;
       }
       
@@ -52,14 +55,19 @@ const GitHubCallback = () => {
         if (result) {
           // Successfully connected GitHub account
           console.log("GitHub connection successful, redirecting to home page");
-          navigate("/");
+          // Add a small delay to ensure toast is shown
+          setTimeout(() => {
+            navigate("/");
+          }, 1000);
         } else {
           console.error("Failed to connect GitHub account - null result returned");
           setError("Failed to connect GitHub account");
+          toast("Failed to connect GitHub account");
         }
       } catch (error: any) {
         console.error("Error during GitHub callback:", error);
         setError(error.message || "An unexpected error occurred");
+        toast("Error during GitHub callback: " + (error.message || "An unexpected error occurred"));
       }
     };
     
