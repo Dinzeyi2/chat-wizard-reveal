@@ -46,10 +46,11 @@ const AutoRefreshPreview = () => {
         // Reset status after a delay
         setTimeout(() => setRefreshStatus(null), 2000);
       } else if (msg.type === 'status') {
-        // Check for error in status type messages
-        if (msg.status && msg.status === 'error') {
+        // Properly handle status messages with type checking
+        const statusMsg = msg;
+        if (statusMsg.status === 'error') {
           setRefreshStatus('error');
-          console.error('Hot reload error:', msg);
+          console.error('Hot reload error:', statusMsg);
           
           // Display error toast for better user feedback
           toast({
@@ -58,16 +59,19 @@ const AutoRefreshPreview = () => {
             description: "Error rendering code preview. Check console for details."
           });
         }
-      } else if (msg.type === 'error') {
-        // Also check for direct error messages
-        setRefreshStatus('error');
-        console.error('Hot reload error (direct):', msg);
-        
-        toast({
-          variant: "destructive",
-          title: "Preview Error",
-          description: "Error rendering code preview. Check console for details."
-        });
+      } else {
+        // Handle any other message types that might indicate errors
+        if (msg.hasOwnProperty('error') || 
+            (msg.hasOwnProperty('type') && msg.type.toString().includes('error'))) {
+          setRefreshStatus('error');
+          console.error('Hot reload error (other):', msg);
+          
+          toast({
+            variant: "destructive",
+            title: "Preview Error",
+            description: "Error rendering code preview. Check console for details."
+          });
+        }
       }
     });
     
@@ -360,9 +364,10 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
         const fileContent = result[path];
         // Type check - ensure fileContent is an object with code property
         if (typeof fileContent === 'object' && fileContent !== null) {
-          if (typeof fileContent.code === 'string') {
+          const fileContentObj = fileContent as { code: string };
+          if (typeof fileContentObj.code === 'string') {
             // Check for any shadcn imports
-            const originalCode = fileContent.code;
+            const originalCode = fileContentObj.code;
             
             // Replace all shadcn import patterns
             let updatedCode = originalCode
@@ -388,11 +393,13 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
       
       for (const path in result) {
         const fileContent = result[path];
-        if (typeof fileContent === 'object' && fileContent !== null && 
-            typeof fileContent.code === 'string' && 
-            (fileContent.code.includes('@shadcn/ui') || fileContent.code.includes('shadcn/ui'))) {
-          needsShadcnHelper = true;
-          break;
+        if (typeof fileContent === 'object' && fileContent !== null) {
+          const fileContentObj = fileContent as { code: string };
+          if (typeof fileContentObj.code === 'string' && 
+              (fileContentObj.code.includes('@shadcn/ui') || fileContentObj.code.includes('shadcn/ui'))) {
+            needsShadcnHelper = true;
+            break;
+          }
         }
       }
       
