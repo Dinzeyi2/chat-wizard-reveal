@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { handleGithubCallback } from "@/utils/githubAuth";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ const GitHubCallback = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -36,8 +37,7 @@ const GitHubCallback = () => {
       const authStatus = await checkAuth();
       if (!authStatus) return;
       
-      // Extract code from query parameters
-      const searchParams = new URLSearchParams(location.search);
+      // Extract code from query parameters using useSearchParams
       const code = searchParams.get("code");
       const state = searchParams.get("state");
       
@@ -49,7 +49,10 @@ const GitHubCallback = () => {
       
       try {
         console.log("Processing GitHub callback with code:", code.substring(0, 5) + "...");
+        console.log("State parameter:", state);
+        
         const result = await handleGithubCallback(code, state || "");
+        
         if (result) {
           // Successfully connected GitHub account, redirect to home
           console.log("GitHub connection successful, redirecting to home page");
@@ -65,7 +68,7 @@ const GitHubCallback = () => {
     };
     
     handleOAuthCallback();
-  }, [location, navigate]);
+  }, [location, navigate, searchParams]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4">

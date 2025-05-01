@@ -1,25 +1,28 @@
 
-import { useLocation, Link } from "react-router-dom";
+import { useLocation, Link, useSearchParams } from "react-router-dom";
 import { useEffect } from "react";
 
 const NotFound = () => {
   const location = useLocation();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     console.error(
       "404 Error: User attempted to access non-existent route:",
-      location.pathname
+      location.pathname,
+      "with search params:",
+      location.search
     );
     
     // Special handling for GitHub callback failures
-    if (location.pathname.includes('github-callback') || location.search.includes('code=')) {
+    if (location.pathname.includes('github-callback') || searchParams.has('code')) {
       console.error("GitHub callback failed - current URL:", window.location.href);
     }
-  }, [location]);
+  }, [location, searchParams]);
 
   // Check if this appears to be a GitHub callback
   const isGithubCallback = location.pathname.includes('github-callback') || 
-                           location.search.includes('code=');
+                           searchParams.has('code');
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">

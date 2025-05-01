@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -80,6 +79,8 @@ export const handleGithubCallback = async (code: string, state: string) => {
   try {
     // Verify the state parameter to prevent CSRF attacks
     const storedState = sessionStorage.getItem("githubOAuthState");
+    console.log("Comparing state parameters:", { received: state, stored: storedState });
+    
     if (state !== storedState) {
       console.error("State mismatch:", { received: state, stored: storedState });
       toast({

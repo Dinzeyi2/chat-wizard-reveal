@@ -27,11 +27,8 @@ const App = () => {
             <Route path="/auth" element={<Auth />} />
             <Route path="/history" element={<ChatHistory />} />
             
-            {/* GitHub callback routes - ensure ALL possible path formats are covered */}
+            {/* GitHub callback routes - single route that handles query parameters */}
             <Route path="/github-callback" element={<GitHubCallback />} />
-            <Route path="github-callback" element={<GitHubCallback />} />
-            {/* Also handle the exact domain.com/github-callback?code=XYZ format */}
-            <Route path="/github-callback/:rest" element={<GitHubCallback />} />
             
             {/* Catch-all route for 404s */}
             <Route path="*" element={<NotFound />} />
