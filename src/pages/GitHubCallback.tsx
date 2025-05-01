@@ -25,6 +25,7 @@ const GitHubCallback = () => {
     };
     
     const handleOAuthCallback = async () => {
+      console.log("GitHub callback initiated");
       const authStatus = await checkAuth();
       if (!authStatus) return;
       
@@ -38,14 +39,17 @@ const GitHubCallback = () => {
       }
       
       try {
+        console.log("Processing GitHub callback with code:", code.substring(0, 5) + "...");
         const result = await handleGithubCallback(code, state || "");
         if (result) {
           // Successfully connected GitHub account
+          console.log("GitHub connection successful, redirecting to home page");
           navigate("/");
         } else {
           setError("Failed to connect GitHub account");
         }
       } catch (error: any) {
+        console.error("Error during GitHub callback:", error);
         setError(error.message || "An unexpected error occurred");
       }
     };

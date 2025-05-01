@@ -35,7 +35,7 @@ file_size_limit = "50MiB"
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["https://localhost:3000", "http://localhost:5173", "https://localhost:5173"]
+additional_redirect_urls = ["https://localhost:3000", "http://localhost:5173", "https://localhost:5173", "https://i-blue.dev", "http://i-blue.dev", "https://www.i-blue.dev", "http://www.i-blue.dev"]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
@@ -63,10 +63,10 @@ secret = ""
 redirect_uri = ""
 
 [auth.external.github]
-enabled = false
+enabled = true
 client_id = ""
 secret = ""
-redirect_uri = ""
+redirect_uri = "https://i-blue.dev/github-callback"
 
 [functions]
 enabled = true
