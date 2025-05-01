@@ -59,7 +59,7 @@ export const initiateGithubAuth = async () => {
     authUrl.searchParams.append("scope", "repo user");
     
     // Log the redirect URI for debugging
-    console.log("Redirecting to GitHub with redirect URI:", REDIRECT_URI);
+    console.log("GitHub Auth - Redirecting with redirect URI:", REDIRECT_URI);
     
     // Redirect the user to GitHub's authorization page
     window.location.href = authUrl.toString();
@@ -77,60 +77,70 @@ export const initiateGithubAuth = async () => {
 export const handleGithubCallback = async (code: string, state: string) => {
   const { toast } = useToast();
   
-  // Verify the state parameter to prevent CSRF attacks
-  const storedState = sessionStorage.getItem("githubOAuthState");
-  if (state !== storedState) {
-    console.error("State mismatch:", { received: state, stored: storedState });
-    toast({
-      variant: "destructive",
-      title: "Authentication Error",
-      description: "Invalid state parameter. Please try again.",
-    });
-    return null;
-  }
-  
-  // Clean up the stored state
-  sessionStorage.removeItem("githubOAuthState");
-  
-  // Check if user is authenticated
-  const { data: sessionData } = await supabase.auth.getSession();
-    
-  if (!sessionData.session) {
-    toast({
-      variant: "destructive",
-      title: "Authentication Error",
-      description: "You must be signed in to connect your GitHub account.",
-    });
-    return null;
-  }
-  
   try {
-    // Get the appropriate redirect URI - must match the one used in initiateGithubAuth
-    const REDIRECT_URI = getRedirectUri();
-    console.log("Using callback URI for token exchange:", REDIRECT_URI);
+    // Verify the state parameter to prevent CSRF attacks
+    const storedState = sessionStorage.getItem("githubOAuthState");
+    if (state !== storedState) {
+      console.error("State mismatch:", { received: state, stored: storedState });
+      toast({
+        variant: "destructive",
+        title: "Authentication Error",
+        description: "Invalid state parameter. Please try again.",
+      });
+      return null;
+    }
     
-    // Exchange the authorization code for an access token
-    const { data, error } = await supabase.functions.invoke('github-auth', {
-      body: { 
-        code,
-        redirect_uri: REDIRECT_URI
-      }
-    });
+    // Clean up the stored state
+    sessionStorage.removeItem("githubOAuthState");
     
-    if (error) throw error;
+    // Check if user is authenticated
+    const { data: sessionData } = await supabase.auth.getSession();
+      
+    if (!sessionData.session) {
+      toast({
+        variant: "destructive",
+        title: "Authentication Error",
+        description: "You must be signed in to connect your GitHub account.",
+      });
+      return null;
+    }
     
-    toast({
-      title: "GitHub Connected",
-      description: `Successfully connected to GitHub as ${data.user.login}`,
-    });
-    
-    return data;
+    try {
+      // Get the appropriate redirect URI - must match the one used in initiateGithubAuth
+      const REDIRECT_URI = getRedirectUri();
+      console.log("Using callback URI for token exchange:", REDIRECT_URI);
+      
+      // Exchange the authorization code for an access token
+      const { data, error } = await supabase.functions.invoke('github-auth', {
+        body: { 
+          code,
+          redirect_uri: REDIRECT_URI
+        }
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "GitHub Connected",
+        description: `Successfully connected to GitHub as ${data.user.login}`,
+      });
+      
+      return data;
+    } catch (error: any) {
+      console.error("GitHub connection error:", error);
+      toast({
+        variant: "destructive",
+        title: "Connection Failed",
+        description: error.message || "Failed to connect GitHub account",
+      });
+      return null;
+    }
   } catch (error: any) {
-    console.error("GitHub connection error:", error);
+    console.error("Error in GitHub callback handler:", error);
     toast({
       variant: "destructive",
       title: "Connection Failed",
-      description: error.message || "Failed to connect GitHub account",
+      description: "An unexpected error occurred while connecting to GitHub",
     });
     return null;
   }

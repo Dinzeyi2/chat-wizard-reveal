@@ -36,6 +36,7 @@ const GitHubCallback = () => {
       const authStatus = await checkAuth();
       if (!authStatus) return;
       
+      // Extract code from query parameters
       const searchParams = new URLSearchParams(location.search);
       const code = searchParams.get("code");
       const state = searchParams.get("state");
