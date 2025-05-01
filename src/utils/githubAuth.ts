@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -10,11 +11,11 @@ const getRedirectUri = () => {
   // For production domains, always use the format without www
   // This must match EXACTLY what's configured in the GitHub app settings
   if (hostname === 'i-blue.dev' || hostname === 'www.i-blue.dev') {
-    return `https://i-blue.dev/github-callback`;
+    return `https://i-blue.dev/callback/github`;
   }
   
   // For local development or other environments
-  return `${window.location.origin}/github-callback`;
+  return `${window.location.origin}/callback/github`;
 };
 
 export const initiateGithubAuth = async () => {

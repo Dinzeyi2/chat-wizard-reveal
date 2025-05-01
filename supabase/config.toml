@@ -35,7 +35,7 @@ file_size_limit = "50MiB"
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["https://localhost:3000", "http://localhost:5173", "https://localhost:5173", "https://i-blue.dev", "http://i-blue.dev", "https://www.i-blue.dev", "http://www.i-blue.dev", "https://i-blue.dev/github-callback", "https://www.i-blue.dev/github-callback"]
+additional_redirect_urls = ["https://localhost:3000", "http://localhost:5173", "https://localhost:5173", "https://i-blue.dev", "http://i-blue.dev", "https://www.i-blue.dev", "http://www.i-blue.dev", "https://i-blue.dev/github-callback", "https://www.i-blue.dev/github-callback", "https://i-blue.dev/callback/github", "https://www.i-blue.dev/callback/github"]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
@@ -66,7 +66,7 @@ redirect_uri = ""
 enabled = true
 client_id = ""
 secret = ""
-redirect_uri = "https://i-blue.dev/github-callback"
+redirect_uri = "https://i-blue.dev/callback/github"
 
 [functions]
 enabled = true
