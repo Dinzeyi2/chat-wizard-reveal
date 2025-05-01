@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ArrowUp, Paperclip, X, Palette, Code, Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,15 +63,16 @@ Based on this design, please ${message}
     }
   });
 
-  // Check GitHub connection status on component mount
-  useState(() => {
-    checkGithubConnection();
-  });
-
+  // Define the checkGithubConnection function before using it
   const checkGithubConnection = async () => {
     const connected = await isGithubConnected();
     setIsConnectedToGithub(connected);
   };
+
+  // Now use it in useEffect hook
+  useEffect(() => {
+    checkGithubConnection();
+  }, []);
 
   const handleSubmit = async () => {
     if (message.trim() || files.length > 0) {
