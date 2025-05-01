@@ -50,10 +50,10 @@ const GitHubCallback = () => {
           
           if (result) {
             toast("GitHub account successfully connected");
-            // Ensure we navigate to home page with a small delay to allow toast to show
+            // Ensure we navigate to home page with a delay to allow toast to show
             setTimeout(() => {
               navigate("/");
-            }, 100);
+            }, 1000);
           } else {
             setError("Failed to connect GitHub account. Please try again.");
           }

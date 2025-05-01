@@ -51,11 +51,7 @@ export const initiateGithubAuth = async () => {
     window.location.href = authUrl.toString();
   } catch (error) {
     console.error("Failed to initiate GitHub auth:", error);
-    toast({
-      variant: "destructive",
-      title: "Authentication Error",
-      description: "Failed to start GitHub authentication process. Please try again.",
-    });
+    toast("Authentication Error: Failed to start GitHub authentication process. Please try again.");
   }
 };
 
@@ -65,11 +61,7 @@ export const handleGithubCallback = async (code: string, state: string) => {
     const storedState = sessionStorage.getItem("githubOAuthState");
     if (state !== storedState) {
       console.error("State mismatch:", { received: state, stored: storedState });
-      toast({
-        variant: "destructive",
-        title: "Authentication Error",
-        description: "Invalid state parameter. Please try again.",
-      });
+      toast("Authentication Error: Invalid state parameter. Please try again.");
       return null;
     }
     
@@ -81,11 +73,7 @@ export const handleGithubCallback = async (code: string, state: string) => {
       
     if (!sessionData.session) {
       console.error("User not authenticated during callback");
-      toast({
-        variant: "destructive",
-        title: "Authentication Error",
-        description: "You must be signed in to connect your GitHub account.",
-      });
+      toast("Authentication Error: You must be signed in to connect your GitHub account.");
       return null;
     }
     
@@ -106,19 +94,12 @@ export const handleGithubCallback = async (code: string, state: string) => {
     }
     
     console.log("GitHub connection successful:", data.user?.login);
-    toast({
-      title: "GitHub Connected",
-      description: `Successfully connected to GitHub as ${data.user?.login}`,
-    });
+    toast(`GitHub Connected: Successfully connected to GitHub as ${data.user?.login}`);
     
     return data;
   } catch (error: any) {
     console.error("handleGithubCallback error:", error);
-    toast({
-      variant: "destructive",
-      title: "Connection Failed",
-      description: error.message || "Failed to connect GitHub account",
-    });
+    toast(`Connection Failed: ${error.message || "Failed to connect GitHub account"}`);
     return null;
   }
 };
@@ -170,19 +151,12 @@ export const disconnectGithub = async () => {
       
     if (error) throw error;
     
-    toast({
-      title: "GitHub Disconnected",
-      description: "Your GitHub account has been disconnected",
-    });
+    toast("GitHub Disconnected: Your GitHub account has been disconnected");
     
     return true;
   } catch (error) {
     console.error("disconnectGithub error:", error);
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: "Failed to disconnect GitHub account",
-    });
+    toast("Error: Failed to disconnect GitHub account");
     return false;
   }
 };
