@@ -27,6 +27,8 @@ const App = () => {
             <Route path="/auth" element={<Auth />} />
             <Route path="/history" element={<ChatHistory />} />
             <Route path="/github-callback" element={<GitHubCallback />} />
+            {/* Add a special route to catch the domain without www */}
+            <Route path="github-callback" element={<GitHubCallback />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

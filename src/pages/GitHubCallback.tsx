@@ -26,6 +26,9 @@ const GitHubCallback = () => {
     
     const handleOAuthCallback = async () => {
       console.log("GitHub callback initiated");
+      console.log("Current path:", location.pathname);
+      console.log("Current search params:", location.search);
+      
       const authStatus = await checkAuth();
       if (!authStatus) return;
       

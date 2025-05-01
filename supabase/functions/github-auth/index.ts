@@ -55,6 +55,7 @@ serve(async (req) => {
     // Only include redirect_uri if provided
     if (redirect_uri) {
       tokenRequestBody.redirect_uri = redirect_uri;
+      console.log("Including redirect_uri in token request:", redirect_uri);
     }
 
     const tokenResponse = await fetch(
