@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   SandpackProvider, 
@@ -8,7 +7,8 @@ import {
   SandpackFiles,
   SandpackStack,
   SandpackCodeEditor,
-  useSandpack
+  useSandpack,
+  ListenerFunction
 } from '@codesandbox/sandpack-react';
 import { nightOwl } from '@codesandbox/sandpack-themes';
 import { Loader2, TerminalSquare, FileCode, RefreshCw } from 'lucide-react';
@@ -22,15 +22,15 @@ const AutoRefreshPreview = () => {
   
   useEffect(() => {
     // Listen for file changes and auto-refresh
-    const unsubscribe = sandpack.listen(state => {
+    const unsubscribe = sandpack.listen((state) => {
       if (state.eventName === "file-update") {
         // Small delay before refresh to allow bundling
         setTimeout(() => {
-          sandpack.refresh();
+          sandpack.dispatch({ type: "refresh" });
           console.log("Preview auto-refreshed due to file update");
         }, 300);
       }
-    });
+    }) as () => void;
     
     return () => {
       unsubscribe();
@@ -273,10 +273,10 @@ ${template === "react-ts" ? "export default function App(): JSX.Element {" : "ex
               variant="ghost"
               size="sm"
               onClick={() => {
-                const sandpack = document.querySelector('iframe.sp-preview-iframe')?.contentWindow;
-                if (sandpack) {
-                  // @ts-ignore
-                  document.querySelector('.sp-refactor-button')?.click();
+                const sandpackIframe = document.querySelector('iframe.sp-preview-iframe');
+                if (sandpackIframe) {
+                  const { sandpack } = useSandpack();
+                  sandpack.dispatch({ type: "refresh" });
                   toast({
                     title: "Preview refreshed",
                     description: "The preview has been manually refreshed.",
