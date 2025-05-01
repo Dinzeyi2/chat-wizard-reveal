@@ -44,8 +44,8 @@ const AutoRefreshPreview = () => {
         
         // Reset status after a delay
         setTimeout(() => setRefreshStatus(null), 2000);
-      } else if (msg.type === 'error') {
-        // Fixed: Changed the condition to check for error type directly
+      } else if (msg.type === 'status' && msg.status === 'error') {
+        // Fixed: Using the correct error status check with proper type
         setRefreshStatus('error');
         console.error('Hot reload error:', msg);
         
@@ -345,13 +345,17 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
       if (Object.keys(result).length > 0) {
         // Check if any file has imports from @shadcn/ui
         for (const path in result) {
-          if (result[path].code.includes('@shadcn/ui')) {
+          const fileContent = result[path];
+          if (typeof fileContent === 'object' && fileContent.code && fileContent.code.includes('@shadcn/ui')) {
             console.log(`Found @shadcn/ui import in ${path}, fixing it`);
             // Replace @shadcn/ui imports with the correct path
-            result[path].code = result[path].code.replace(
-              /from ['"]@shadcn\/ui['"]/g, 
-              'from "@/components/ui"'
-            );
+            result[path] = {
+              ...fileContent,
+              code: fileContent.code.replace(
+                /from ['"]@shadcn\/ui['"]/g, 
+                'from "@/components/ui"'
+              )
+            };
           }
         }
       }
