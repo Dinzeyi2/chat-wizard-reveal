@@ -1,27 +1,49 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 // GitHub OAuth configuration
-const GITHUB_CLIENT_ID = "YOUR_GITHUB_CLIENT_ID"; // This should be configured in your environment
+const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || ""; // This will be configured in your environment
 const REDIRECT_URI = `${window.location.origin}/github-callback`;
 
-export const initiateGithubAuth = () => {
-  // Generate a random state value for security
-  const state = Math.random().toString(36).substring(2, 15);
-  
-  // Store the state in sessionStorage for verification after redirect
-  sessionStorage.setItem("githubOAuthState", state);
-  
-  // Construct the GitHub authorization URL
-  const authUrl = new URL("https://github.com/login/oauth/authorize");
-  authUrl.searchParams.append("client_id", GITHUB_CLIENT_ID);
-  authUrl.searchParams.append("redirect_uri", REDIRECT_URI);
-  authUrl.searchParams.append("state", state);
-  authUrl.searchParams.append("scope", "repo user");
-  
-  // Redirect the user to GitHub's authorization page
-  window.location.href = authUrl.toString();
+export const initiateGithubAuth = async () => {
+  try {
+    // Get the client ID from Supabase secrets
+    const { data, error } = await supabase.functions.invoke('get-env', {
+      body: { key: "GITHUB_CLIENT_ID" }
+    });
+    
+    if (error) throw error;
+    
+    const clientId = data.value;
+    
+    if (!clientId) {
+      throw new Error("GitHub Client ID not configured");
+    }
+    
+    // Generate a random state value for security
+    const state = Math.random().toString(36).substring(2, 15);
+    
+    // Store the state in sessionStorage for verification after redirect
+    sessionStorage.setItem("githubOAuthState", state);
+    
+    // Construct the GitHub authorization URL
+    const authUrl = new URL("https://github.com/login/oauth/authorize");
+    authUrl.searchParams.append("client_id", clientId);
+    authUrl.searchParams.append("redirect_uri", REDIRECT_URI);
+    authUrl.searchParams.append("state", state);
+    authUrl.searchParams.append("scope", "repo user");
+    
+    // Redirect the user to GitHub's authorization page
+    window.location.href = authUrl.toString();
+  } catch (error) {
+    console.error("Failed to initiate GitHub auth:", error);
+    const { toast } = useToast();
+    toast({
+      variant: "destructive",
+      title: "Authentication Error",
+      description: "Failed to start GitHub authentication process. Please try again.",
+    });
+  }
 };
 
 export const handleGithubCallback = async (code: string, state: string) => {

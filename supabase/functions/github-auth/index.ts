@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { corsHeaders } from "../_shared/cors.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -10,17 +11,38 @@ const githubClientSecret = Deno.env.get("GITHUB_CLIENT_SECRET")!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 serve(async (req) => {
-  const { searchParams } = new URL(req.url);
-  const code = searchParams.get("code");
-  
-  if (!code) {
-    return new Response(JSON.stringify({ error: "No code provided" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Parse request body
+    const { code } = await req.json();
+    
+    if (!code) {
+      return new Response(
+        JSON.stringify({ error: "No code provided" }), 
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+
+    // Extract user ID from request headers
+    const userId = req.headers.get("x-supabase-auth-user-id");
+    
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: "Not authenticated" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     // Exchange code for access token
     const tokenResponse = await fetch(
       "https://github.com/login/oauth/access_token",
@@ -56,7 +78,7 @@ serve(async (req) => {
 
     // Store GitHub data in Supabase
     const { data, error } = await supabase.from("github_connections").upsert({
-      user_id: req.headers.get("x-supabase-auth-user-id"),
+      user_id: userId,
       github_id: userData.id,
       github_username: userData.login,
       github_avatar: userData.avatar_url,
@@ -70,7 +92,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ success: true, user: userData }),
       {
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   } catch (error) {
@@ -78,7 +100,7 @@ serve(async (req) => {
       JSON.stringify({ error: error.message }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   }

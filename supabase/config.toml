@@ -71,5 +71,8 @@ redirect_uri = ""
 [functions]
 enabled = true
 
-[functions.design-code]
-verify_jwt = false
+[functions.github-auth]
+verify_jwt = true
+
+[functions.get-env]
+verify_jwt = true
