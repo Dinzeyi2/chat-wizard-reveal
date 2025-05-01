@@ -80,7 +80,8 @@ redirect_uri = ""
 enabled = true
 client_id = ""
 secret = ""
-redirect_uri = "https://i-blue.dev/callback/github"
+# Using a placeholder that will be replaced by the actual URL during auth
+redirect_uri = ""
 
 [functions]
 enabled = true
