@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from "react";
-import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -10,17 +10,9 @@ const GitHubCallback = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const params = useParams();
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
-      // Detailed logging for debugging
-      console.log("GitHub callback initiated");
-      console.log("Full URL:", window.location.href);
-      console.log("Current pathname:", location.pathname);
-      console.log("Current search params:", location.search);
-      console.log("URL params from router:", params);
-      
       try {
         // Check authentication status first
         const { data } = await supabase.auth.getSession();
@@ -35,34 +27,9 @@ const GitHubCallback = () => {
           return;
         }
         
-        // Extract GitHub code from URL - handling multiple possible formats
-        let code: string | null = null;
-        
-        // Method 1: Standard query parameter
-        if (location.search) {
-          const urlParams = new URLSearchParams(location.search);
-          code = urlParams.get("code");
-        }
-        
-        // Method 2: Path parameter (fallback)
-        if (!code && params.params && params.params.includes("code=")) {
-          const codeMatch = params.params.match(/code=([^&]+)/);
-          if (codeMatch && codeMatch[1]) {
-            code = codeMatch[1];
-          }
-        }
-        
-        // Method 3: Complete URL parsing fallback
-        if (!code) {
-          const fullUrl = window.location.href;
-          const codeMatch = fullUrl.match(/code=([^&]+)/);
-          if (codeMatch && codeMatch[1]) {
-            code = codeMatch[1];
-          }
-        }
-        
-        // Log for debugging
-        console.log("Extracted GitHub code:", code ? `${code.substring(0, 5)}...` : "null");
+        // Get code from URL
+        const params = new URLSearchParams(location.search);
+        const code = params.get('code');
         
         if (!code) {
           console.error("No authorization code received from GitHub");
@@ -73,21 +40,10 @@ const GitHubCallback = () => {
           return;
         }
         
-        console.log("Processing GitHub callback with code:", code.substring(0, 5) + "...");
-        
-        // Get the appropriate redirect URI - must match what was sent to GitHub
-        const redirectUri = (() => {
-          const hostname = window.location.hostname;
-          const protocol = window.location.protocol;
-          
-          if (hostname === 'i-blue.dev' || hostname === 'www.i-blue.dev') {
-            return `https://${hostname}/callback/github`;
-          }
-          
-          return `${protocol}//${hostname}${window.location.port ? `:${window.location.port}` : ''}/callback/github`;
-        })();
-        
-        console.log("Using redirect URI:", redirectUri);
+        // Get redirect URI - must match what was sent to GitHub
+        const hostname = window.location.hostname;
+        const protocol = window.location.protocol;
+        const redirectUri = `${protocol}//${hostname}${window.location.port ? `:${window.location.port}` : ''}/callback/github`;
         
         // Call our Supabase edge function to exchange the code for a token
         const { data: authData, error: authError } = await supabase.functions.invoke('github-auth', {
@@ -101,7 +57,6 @@ const GitHubCallback = () => {
         
         if (authData) {
           // Successfully connected GitHub account
-          console.log("GitHub connection successful");
           toast({
             title: "GitHub Connected",
             description: `Successfully connected to GitHub as ${authData.user?.login || 'user'}`
@@ -112,7 +67,6 @@ const GitHubCallback = () => {
             navigate("/");
           }, 1500);
         } else {
-          console.error("Failed to connect GitHub account - null result returned");
           setError("Failed to connect GitHub account");
           toast({
             description: "Failed to connect GitHub account"
@@ -129,7 +83,7 @@ const GitHubCallback = () => {
     };
     
     handleOAuthCallback();
-  }, [location, navigate, params]);
+  }, [location, navigate]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4">
