@@ -1,5 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
 const gitHubApiUrl = "https://api.github.com";
@@ -39,11 +40,38 @@ serve(async (req) => {
     
     console.log(`Fetching repository: ${owner}/${repo}`);
 
+    // Get Supabase client and GitHub token
+    const { supabaseUrl, supabaseKey } = Deno.env.toObject();
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error("Supabase environment variables are not set");
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // Retrieve GitHub token from Supabase secrets
+    const { data: secretData, error: secretError } = await supabase.rpc(
+      'get_secret',
+      { secret_name: 'GITHUB_ACCESS_TOKEN' }
+    );
+    
+    if (secretError) {
+      console.error("Error fetching GitHub token:", secretError);
+      throw new Error("Could not retrieve GitHub token");
+    }
+    
+    const githubToken = secretData;
+    console.log("GitHub token retrieved successfully");
+    
+    // Set up headers for GitHub API calls with the token
+    const githubHeaders = {
+      "Accept": "application/vnd.github.v3+json",
+      "Authorization": `token ${githubToken}`
+    };
+
     // Get repository contents structure
     const repoResponse = await fetch(`${gitHubApiUrl}/repos/${owner}/${repo}/contents`, {
-      headers: {
-        "Accept": "application/vnd.github.v3+json"
-      }
+      headers: githubHeaders
     });
     
     if (!repoResponse.ok) {
@@ -56,9 +84,7 @@ serve(async (req) => {
     // Function to recursively fetch directory contents
     async function fetchDirectoryContents(path) {
       const dirResponse = await fetch(`${gitHubApiUrl}/repos/${owner}/${repo}/contents/${path}`, {
-        headers: {
-          "Accept": "application/vnd.github.v3+json"
-        }
+        headers: githubHeaders
       });
       
       if (!dirResponse.ok) {
@@ -72,9 +98,7 @@ serve(async (req) => {
     // Function to fetch file content
     async function fetchFileContent(path) {
       const fileResponse = await fetch(`${gitHubApiUrl}/repos/${owner}/${repo}/contents/${path}`, {
-        headers: {
-          "Accept": "application/vnd.github.v3+json"
-        }
+        headers: githubHeaders
       });
       
       if (!fileResponse.ok) {
@@ -127,15 +151,6 @@ serve(async (req) => {
     // Limit the depth and number of files to avoid timeouts
     const MAX_FILES = 100;
     const processedFiles = (await processContents(contents)).slice(0, MAX_FILES);
-    
-    // Store the repository files in Supabase
-    const { supabaseUrl, supabaseKey } = Deno.env.toObject();
-    
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error("Supabase environment variables are not set");
-    }
-    
-    const supabase = createClient(supabaseUrl, supabaseKey);
     
     // Handle user authentication and repository storage
     const userId = req.headers.get("x-supabase-auth-user-id");
@@ -194,15 +209,3 @@ serve(async (req) => {
     );
   }
 });
-
-// Helper to create Supabase client (simplified for Edge Function)
-function createClient(supabaseUrl, supabaseKey) {
-  return {
-    from: (table) => ({
-      insert: (data) => {
-        console.log(`Inserting into ${table}:`, data);
-        return Promise.resolve({ data: {}, error: null });
-      }
-    })
-  };
-}
