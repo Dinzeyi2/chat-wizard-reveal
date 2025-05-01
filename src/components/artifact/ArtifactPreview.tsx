@@ -7,9 +7,7 @@ import {
   SandpackFiles,
   SandpackStack,
   useSandpack,
-  useActiveCode,
-  SandpackClient,
-  ListenerType
+  useActiveCode
 } from '@codesandbox/sandpack-react';
 import { nightOwl } from '@codesandbox/sandpack-themes';
 import { Loader2, TerminalSquare, AlertCircle } from 'lucide-react';
@@ -21,15 +19,15 @@ const AutoRefreshPreview = () => {
   const { sandpack } = useSandpack();
   
   useEffect(() => {
-    // Create a client to listen to events
-    const sandpackClient = sandpack.clients[0];
+    // Get the first client from the clients array
+    const client = sandpack.clients[0];
     
-    // Only proceed if the client exists
-    if (!sandpackClient) return;
+    // Only proceed if client exists
+    if (!client) return;
     
-    // Register listener for Sandpack events
-    const unsubscribe = sandpackClient.listen((message: any) => {
-      if (message.type === 'done') {
+    // Register listener for Sandpack events using the client object
+    const unsubscribe = client.listen((msg) => {
+      if (msg.type === 'done') {
         // Refresh complete - any additional actions can go here
         console.log('Hot reload complete');
       }
