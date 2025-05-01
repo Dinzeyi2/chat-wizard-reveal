@@ -1,5 +1,6 @@
+
 import { useState, useRef } from "react";
-import { ArrowUp, Paperclip, X, Palette, Code } from "lucide-react";
+import { ArrowUp, Paperclip, X, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   PromptInput,
@@ -217,17 +218,7 @@ Based on this design, please ${message}
               </PromptInputAction>
             </TooltipProvider>
             
-            <TooltipProvider>
-              <PromptInputAction tooltip="Search UI Designs with Perplexity AI">
-                <button 
-                  onClick={handleSearchDesigns}
-                  className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl"
-                  disabled={loading || isScraperLoading}
-                >
-                  <Palette className="text-primary size-5" />
-                </button>
-              </PromptInputAction>
-            </TooltipProvider>
+            {/* Removed Palette icon button here */}
             
             <Button variant="outline" size="sm" className="rounded-full">Search</Button>
             <Button variant="outline" size="sm" className="rounded-full">Reason</Button>
@@ -317,7 +308,7 @@ Based on this design, please ${message}
                   </>
                 ) : (
                   <>
-                    <Palette className="mr-2 size-4" />
+                    {/* Removed Palette icon here */}
                     Find UI Designs
                   </>
                 )}
