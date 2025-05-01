@@ -7,8 +7,7 @@ import {
   SandpackFiles,
   SandpackStack,
   useSandpack,
-  useActiveCode,
-  ListenerStatus
+  useActiveCode
 } from '@codesandbox/sandpack-react';
 import { nightOwl } from '@codesandbox/sandpack-themes';
 import { Loader2, TerminalSquare, AlertCircle, RefreshCw } from 'lucide-react';
@@ -35,7 +34,7 @@ const AutoRefreshPreview = () => {
     console.log("AutoRefreshPreview: Registering listener for hot reload");
     
     // Register listener for Sandpack events using the client object
-    const unsubscribe = client.listen((msg) => {
+    const unsubscribe = client.listen((msg: any) => {
       if (msg.type === 'start') {
         setRefreshStatus('compiling');
         console.log('Hot reload started: Compiling code');
@@ -46,11 +45,10 @@ const AutoRefreshPreview = () => {
         // Reset status after a delay
         setTimeout(() => setRefreshStatus(null), 2000);
       } else if (msg.type === 'status') {
-        // Cast to any to safely check the status property
-        const statusMsg = msg as any;
-        if (statusMsg.status === 'error') {
+        // Check the status property safely
+        if (msg.status === 'error') {
           setRefreshStatus('error');
-          console.error('Hot reload error:', statusMsg);
+          console.error('Hot reload error:', msg);
           
           // Display error toast for better user feedback
           toast({
