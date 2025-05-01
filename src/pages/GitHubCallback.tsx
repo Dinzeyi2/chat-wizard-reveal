@@ -19,6 +19,30 @@ const GitHubCallback = () => {
       console.log("Current pathname:", location.pathname);
       console.log("Current search params:", location.search);
       
+      // Extract URL parameters - handling both standard format and malformed URLs
+      let searchParams: URLSearchParams;
+      
+      if (location.search) {
+        // Standard URL format with query string
+        searchParams = new URLSearchParams(location.search);
+      } else {
+        // Handling malformed URL where parameters might be part of the pathname
+        const fullUrl = window.location.href;
+        const questionMarkIndex = fullUrl.indexOf('?');
+        
+        if (questionMarkIndex > -1) {
+          // Extract query string properly
+          const queryString = fullUrl.substring(questionMarkIndex);
+          searchParams = new URLSearchParams(queryString);
+        } else if (fullUrl.includes('code=')) {
+          // Fallback for completely malformed URL with no question mark
+          const paramsString = fullUrl.substring(fullUrl.indexOf('code='));
+          searchParams = new URLSearchParams('?' + paramsString);
+        } else {
+          searchParams = new URLSearchParams();
+        }
+      }
+      
       // Check authentication status
       const { data } = await supabase.auth.getSession();
       setIsAuthenticated(!!data.session);
@@ -31,9 +55,12 @@ const GitHubCallback = () => {
         return;
       }
       
-      const searchParams = new URLSearchParams(location.search);
       const code = searchParams.get("code");
       const state = searchParams.get("state");
+      
+      // Log for debugging
+      console.log("Extracted code:", code ? code.substring(0, 5) + "..." : "null");
+      console.log("Extracted state:", state);
       
       if (!code) {
         console.error("No authorization code received from GitHub");
