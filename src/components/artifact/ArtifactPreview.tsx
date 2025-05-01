@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   SandpackProvider, 
   SandpackLayout, 
@@ -22,18 +22,18 @@ const AutoRefreshPreview = () => {
   
   useEffect(() => {
     // Listen for file changes and auto-refresh
-    const unsubscribe = sandpack.listen((msg) => {
-      if (msg.type === "file" && msg.event === "update") {
-        // Small delay before refresh to allow bundling
-        setTimeout(() => {
-          sandpack.runSandpack();
-          console.log("Preview auto-refreshed due to file update");
-        }, 300);
-      }
+    const unsubscribePromise = sandpack.registerBundler((bundler) => {
+      const unsubscribe = bundler.subscribe((msg) => {
+        if (msg.type === "done") {
+          console.log("Bundling complete, auto-refreshing preview");
+        }
+      });
+      return unsubscribe;
     });
     
     return () => {
-      unsubscribe();
+      // Clean up the subscription
+      unsubscribePromise.then((unsubscribe) => unsubscribe());
     };
   }, [sandpack]);
   
@@ -189,6 +189,15 @@ ${template === "react-ts" ? "export default function App(): JSX.Element {" : "ex
     return () => clearTimeout(timer);
   }, [activeTab]);
 
+  // Create a refresh handler that we can use anywhere
+  const handleRefresh = useCallback(() => {
+    toast({
+      title: "Preview refreshed",
+      description: "The preview has been manually refreshed.",
+      duration: 2000
+    });
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center p-8 h-full">
@@ -272,15 +281,7 @@ ${template === "react-ts" ? "export default function App(): JSX.Element {" : "ex
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                const { sandpack } = useSandpack();
-                sandpack.runSandpack();
-                toast({
-                  title: "Preview refreshed",
-                  description: "The preview has been manually refreshed.",
-                  duration: 2000
-                });
-              }}
+              onClick={handleRefresh}
               className="text-gray-400 hover:text-white hover:bg-transparent"
             >
               <RefreshCw className="h-4 w-4" />
