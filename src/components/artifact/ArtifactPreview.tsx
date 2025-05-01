@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   SandpackProvider, 
@@ -19,6 +18,7 @@ const AutoRefreshPreview = () => {
   const { sandpack } = useSandpack();
   
   useEffect(() => {
+    // Using the correct method to listen to Sandpack events
     const unsubscribe = sandpack.listen((message) => {
       if (message.type === 'done') {
         // Refresh complete - any additional actions can go here
@@ -27,9 +27,7 @@ const AutoRefreshPreview = () => {
     });
     
     return () => {
-      if (typeof unsubscribe === 'function') {
-        unsubscribe();
-      }
+      unsubscribe();
     };
   }, [sandpack]);
   
