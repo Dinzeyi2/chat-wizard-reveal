@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 // GitHub OAuth configuration
 const REDIRECT_URI = `${window.location.origin}/github-callback`;
@@ -21,7 +21,10 @@ export const initiateGithubAuth = async () => {
       body: { key: "GITHUB_CLIENT_ID" }
     });
     
-    if (error) throw error;
+    if (error) {
+      console.error("Error fetching GitHub client ID:", error);
+      throw error;
+    }
     
     const clientId = data.value;
     
@@ -42,11 +45,12 @@ export const initiateGithubAuth = async () => {
     authUrl.searchParams.append("state", state);
     authUrl.searchParams.append("scope", "repo user");
     
+    console.log("Redirecting to GitHub auth URL:", authUrl.toString());
+    
     // Redirect the user to GitHub's authorization page
     window.location.href = authUrl.toString();
   } catch (error) {
     console.error("Failed to initiate GitHub auth:", error);
-    const { toast } = useToast();
     toast({
       variant: "destructive",
       title: "Authentication Error",
@@ -56,49 +60,60 @@ export const initiateGithubAuth = async () => {
 };
 
 export const handleGithubCallback = async (code: string, state: string) => {
-  const { toast } = useToast();
-  
-  // Verify the state parameter to prevent CSRF attacks
-  const storedState = sessionStorage.getItem("githubOAuthState");
-  if (state !== storedState) {
-    toast({
-      variant: "destructive",
-      title: "Authentication Error",
-      description: "Invalid state parameter. Please try again.",
-    });
-    return null;
-  }
-  
-  // Clean up the stored state
-  sessionStorage.removeItem("githubOAuthState");
-  
-  // Check if user is authenticated
-  const { data: sessionData } = await supabase.auth.getSession();
-    
-  if (!sessionData.session) {
-    toast({
-      variant: "destructive",
-      title: "Authentication Error",
-      description: "You must be signed in to connect your GitHub account.",
-    });
-    return null;
-  }
-  
   try {
+    // Verify the state parameter to prevent CSRF attacks
+    const storedState = sessionStorage.getItem("githubOAuthState");
+    if (state !== storedState) {
+      console.error("State mismatch:", { received: state, stored: storedState });
+      toast({
+        variant: "destructive",
+        title: "Authentication Error",
+        description: "Invalid state parameter. Please try again.",
+      });
+      return null;
+    }
+    
+    // Clean up the stored state
+    sessionStorage.removeItem("githubOAuthState");
+    
+    // Check if user is authenticated
+    const { data: sessionData } = await supabase.auth.getSession();
+      
+    if (!sessionData.session) {
+      console.error("User not authenticated during callback");
+      toast({
+        variant: "destructive",
+        title: "Authentication Error",
+        description: "You must be signed in to connect your GitHub account.",
+      });
+      return null;
+    }
+    
+    console.log("Exchanging code for access token via edge function");
     // Exchange the authorization code for an access token
     const { data, error } = await supabase.functions.invoke('github-auth', {
       body: { code }
     });
     
-    if (error) throw error;
+    if (error) {
+      console.error("Edge function error:", error);
+      throw error;
+    }
     
+    if (!data || !data.success) {
+      console.error("Invalid response from edge function:", data);
+      throw new Error("Invalid response from server");
+    }
+    
+    console.log("GitHub connection successful:", data.user?.login);
     toast({
       title: "GitHub Connected",
-      description: `Successfully connected to GitHub as ${data.user.login}`,
+      description: `Successfully connected to GitHub as ${data.user?.login}`,
     });
     
     return data;
   } catch (error: any) {
+    console.error("handleGithubCallback error:", error);
     toast({
       variant: "destructive",
       title: "Connection Failed",
@@ -133,13 +148,12 @@ export const isGithubConnected = async (): Promise<boolean> => {
     if (error) return false;
     return !!data;
   } catch (error) {
+    console.error("isGithubConnected error:", error);
     return false;
   }
 };
 
 export const disconnectGithub = async () => {
-  const { toast } = useToast();
-  
   try {
     // Get current user
     const {
@@ -163,6 +177,7 @@ export const disconnectGithub = async () => {
     
     return true;
   } catch (error) {
+    console.error("disconnectGithub error:", error);
     toast({
       variant: "destructive",
       title: "Error",

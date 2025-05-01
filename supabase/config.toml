@@ -35,7 +35,7 @@ file_size_limit = "50MiB"
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["https://localhost:3000", "http://localhost:5173", "https://localhost:5173"]
+additional_redirect_urls = ["https://localhost:3000", "http://localhost:5173", "https://localhost:5173", "https://i-blue.dev"]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
@@ -79,3 +79,4 @@ verify_jwt = true
 
 [functions.get-env]
 verify_jwt = true
+
