@@ -1,6 +1,6 @@
 
 import { useState, useRef, useEffect } from "react";
-import { ArrowUp, Paperclip, X, Palette, Code, Github, LogIn } from "lucide-react";
+import { ArrowUp, Paperclip, X, Palette, Code, Github, LogIn, Database, Folder } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   PromptInput,
@@ -17,12 +17,12 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { Link, useNavigate } from "react-router-dom";
-import { isGithubConnected, initiateGithubAuth } from "@/utils/githubAuth";
 
 interface InputAreaProps {
   onSendMessage: (message: string) => void;
@@ -35,35 +35,26 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
   const [perplexityApiKey, setPerplexityApiKey] = useState("");
   const [showPerplexityDialog, setShowPerplexityDialog] = useState(false);
-  const [showGithubReposDialog, setShowGithubReposDialog] = useState(false);
-  const [githubRepos, setGithubRepos] = useState<any[]>([]);
-  const [isLoadingRepos, setIsLoadingRepos] = useState(false);
-  const [isConnectedToGithub, setIsConnectedToGithub] = useState(false);
+  const [showGithubRepoDialog, setShowGithubRepoDialog] = useState(false);
+  const [repoUrl, setRepoUrl] = useState("");
+  const [isLoadingRepo, setIsLoadingRepo] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [repoFiles, setRepoFiles] = useState<any[]>([]);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // Define the checkGithubConnection function before using it
-  const checkGithubConnection = async () => {
-    const connected = await isGithubConnected();
-    console.log("GitHub connection status:", connected);
-    setIsConnectedToGithub(connected);
-  };
-
   const checkAuthStatus = async () => {
     const { data } = await supabase.auth.getSession();
     setIsAuthenticated(!!data.session);
   };
 
-  // Use effects to check auth and GitHub connection status
+  // Use effects to check auth status
   useEffect(() => {
     checkAuthStatus();
-    checkGithubConnection();
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
       checkAuthStatus();
-      checkGithubConnection();
     });
     
     return () => {
@@ -201,41 +192,81 @@ Based on this design, please ${message}
     }
   };
 
-  const handleGithubClick = async () => {
+  const handleGithubRepoClick = () => {
     if (!isAuthenticated) {
       // If not authenticated, redirect to auth page
       navigate('/auth');
       return;
     }
 
-    if (!isConnectedToGithub) {
-      // If not connected to GitHub, initiate auth flow
-      await initiateGithubAuth();
-    } else {
-      // If connected, load repositories and show dialog
-      setIsLoadingRepos(true);
-      setShowGithubReposDialog(true);
+    // Show the GitHub repository dialog
+    setShowGithubRepoDialog(true);
+  };
+  
+  const handleFetchRepository = async () => {
+    if (!repoUrl) {
+      toast({
+        variant: "destructive",
+        title: "Repository URL Required",
+        description: "Please enter a valid GitHub repository URL."
+      });
+      return;
+    }
+    
+    // Validate GitHub URL format
+    const githubUrlPattern = /^https?:\/\/github\.com\/[\w-]+\/[\w.-]+\/?$/;
+    if (!githubUrlPattern.test(repoUrl)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid GitHub URL",
+        description: "Please enter a valid GitHub repository URL (e.g., https://github.com/username/repo)."
+      });
+      return;
+    }
+    
+    setIsLoadingRepo(true);
+    
+    try {
+      // Generate a session ID for this particular fetch
+      const sessionId = `repo-${Date.now()}`;
       
-      try {
-        const { data, error } = await supabase.functions.invoke('github-repos', {
-          body: {}
-        });
-        
-        if (error) {
-          throw error;
+      const { data, error } = await supabase.functions.invoke('fetch-github-repo', {
+        body: { 
+          repoUrl,
+          sessionId
         }
-        
-        setGithubRepos(data.repos || []);
-      } catch (error) {
-        console.error("Failed to load GitHub repos:", error);
-        toast({
-          variant: "destructive",
-          title: "Failed to load repositories",
-          description: "Could not fetch your GitHub repositories. Please try again."
-        });
-      } finally {
-        setIsLoadingRepos(false);
+      });
+      
+      if (error) {
+        throw error;
       }
+      
+      toast({
+        title: "Repository Fetched",
+        description: `Successfully fetched ${data.storedFiles} files from ${data.repository}`
+      });
+      
+      // Store the repository information in state
+      setRepoFiles(data.files || []);
+      
+      // Update the message to include context about the repository
+      setMessage((prevMessage) => {
+        const repoContext = `Using the code from GitHub repository ${data.repository} as reference, please ${prevMessage}`;
+        return prevMessage ? repoContext : `I've imported the GitHub repository ${data.repository}. Please help me with this code.`;
+      });
+      
+      // Close the dialog
+      setShowGithubRepoDialog(false);
+      
+    } catch (error) {
+      console.error("Failed to fetch repository:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to fetch repository",
+        description: "Could not fetch the repository content. Please check the URL and try again."
+      });
+    } finally {
+      setIsLoadingRepo(false);
     }
   };
 
@@ -244,7 +275,7 @@ Based on this design, please ${message}
       <PromptInput
         value={message}
         onValueChange={setMessage}
-        isLoading={loading || isScraperLoading}
+        isLoading={loading || isScraperLoading || isLoadingRepo}
         onSubmit={handleSubmit}
         className="w-full"
       >
@@ -311,7 +342,7 @@ Based on this design, please ${message}
                 if (!isAuthenticated) {
                   navigate('/auth');
                 } else {
-                  handleGithubClick();
+                  handleGithubRepoClick();
                 }
               }}
             >
@@ -322,8 +353,8 @@ Based on this design, please ${message}
                 </>
               ) : (
                 <>
-                  <Github className="mr-1 size-4" />
-                  GitHub
+                  <Folder className="mr-1 size-4" />
+                  Import Repo
                 </>
               )}
             </Button>
@@ -431,55 +462,69 @@ Based on this design, please ${message}
         </DialogContent>
       </Dialog>
       
-      {/* GitHub Repositories Dialog */}
-      <Dialog open={showGithubReposDialog} onOpenChange={setShowGithubReposDialog}>
+      {/* GitHub Repository Dialog */}
+      <Dialog open={showGithubRepoDialog} onOpenChange={setShowGithubRepoDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Your GitHub Repositories</DialogTitle>
+            <DialogTitle>Import GitHub Repository</DialogTitle>
             <DialogDescription>
-              Select a repository to use with this project.
+              Enter a GitHub repository URL to import its code for this conversation.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            {isLoadingRepos ? (
-              <div className="flex items-center justify-center py-8">
-                <Code className="size-6 animate-spin mr-2" />
-                <span>Loading repositories...</span>
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="repo-url">Repository URL</Label>
+                <Input
+                  id="repo-url"
+                  type="text"
+                  placeholder="https://github.com/username/repository"
+                  value={repoUrl}
+                  onChange={(e) => setRepoUrl(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  The repository code will be stored in Supabase for use in this conversation.
+                </p>
               </div>
-            ) : (
-              <div className="max-h-72 overflow-y-auto space-y-2">
-                {githubRepos.length > 0 ? (
-                  githubRepos.map((repo) => (
-                    <Button 
-                      key={repo.id}
-                      variant="outline" 
-                      className="w-full justify-start text-left"
-                      onClick={() => {
-                        toast({
-                          title: "Repository selected",
-                          description: `Selected ${repo.name}`
-                        });
-                        setShowGithubReposDialog(false);
-                      }}
-                    >
-                      {repo.name}
-                    </Button>
-                  ))
-                ) : (
-                  <div className="text-center py-4 text-gray-500">
-                    No repositories found
+              
+              {repoFiles.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium mb-2">Imported Files ({repoFiles.length})</h4>
+                  <div className="max-h-40 overflow-y-auto border rounded p-2">
+                    {repoFiles.map((file, index) => (
+                      <div key={index} className="text-xs py-1 flex items-center">
+                        <Database className="size-3 mr-1" />
+                        {file}
+                      </div>
+                    ))}
                   </div>
-                )}
-              </div>
-            )}
-            <div className="mt-4 flex justify-end">
+                </div>
+              )}
+            </div>
+            
+            <DialogFooter className="mt-6">
               <Button 
                 variant="outline" 
-                onClick={() => setShowGithubReposDialog(false)}
+                onClick={() => setShowGithubRepoDialog(false)}
               >
                 Cancel
               </Button>
-            </div>
+              <Button 
+                onClick={handleFetchRepository}
+                disabled={isLoadingRepo || !repoUrl}
+              >
+                {isLoadingRepo ? (
+                  <>
+                    <span className="animate-spin mr-2">
+                      <Code className="size-4" />
+                    </span>
+                    Importing...
+                  </>
+                ) : (
+                  'Import Repository'
+                )}
+              </Button>
+            </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>
