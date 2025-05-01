@@ -2,14 +2,11 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
-// GitHub OAuth configuration
-// Use the current origin to build the redirect URI dynamically
+// Get the appropriate redirect URI
 const getRedirectUri = () => {
-  // Check if we're on the production domain
   const hostname = window.location.hostname;
   
-  // For production domains, always use the format without www
-  // This must match EXACTLY what's configured in the GitHub app settings
+  // For production domains, use the production URL
   if (hostname === 'i-blue.dev' || hostname === 'www.i-blue.dev') {
     return `https://i-blue.dev/callback/github`;
   }
@@ -68,61 +65,6 @@ export const initiateGithubAuth = async () => {
     toast({
       description: "Failed to start GitHub authentication process. Please try again."
     });
-  }
-};
-
-export const handleGithubCallback = async (code: string, state: string) => {
-  // Verify the state parameter to prevent CSRF attacks
-  const storedState = sessionStorage.getItem("githubOAuthState");
-  if (state !== storedState) {
-    console.error("State mismatch:", { received: state, stored: storedState });
-    toast({
-      description: "Invalid state parameter. Please try again."
-    });
-    return null;
-  }
-  
-  // Clean up the stored state
-  sessionStorage.removeItem("githubOAuthState");
-  
-  // Check if user is authenticated
-  const { data: sessionData } = await supabase.auth.getSession();
-    
-  if (!sessionData.session) {
-    toast({
-      description: "You must be signed in to connect your GitHub account."
-    });
-    return null;
-  }
-  
-  try {
-    // Get the appropriate redirect URI - must match the one used in initiateGithubAuth
-    const REDIRECT_URI = getRedirectUri();
-    console.log("Using callback URI for token exchange:", REDIRECT_URI);
-    
-    // Exchange the authorization code for an access token
-    const { data, error } = await supabase.functions.invoke('github-auth', {
-      body: { 
-        code,
-        redirect_uri: REDIRECT_URI
-      }
-    });
-    
-    if (error) throw error;
-    
-    toast({
-      title: "GitHub Connected",
-      description: `Successfully connected to GitHub as ${data.user.login}`
-    });
-    
-    return data;
-  } catch (error: any) {
-    console.error("GitHub connection error:", error);
-    toast({
-      variant: "destructive",
-      description: "Failed to connect GitHub account: " + (error.message || "Unknown error")
-    });
-    return null;
   }
 };
 

@@ -1,7 +1,6 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { handleGithubCallback } from "@/utils/githubAuth";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -13,7 +12,14 @@ const GitHubCallback = () => {
   const location = useLocation();
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const handleOAuthCallback = async () => {
+      // Detailed logging for debugging
+      console.log("GitHub callback initiated");
+      console.log("Full URL:", window.location.href);
+      console.log("Current pathname:", location.pathname);
+      console.log("Current search params:", location.search);
+      
+      // Check authentication status
       const { data } = await supabase.auth.getSession();
       setIsAuthenticated(!!data.session);
       
@@ -22,23 +28,8 @@ const GitHubCallback = () => {
         toast({
           description: "You must be signed in to connect your GitHub account"
         });
-        return false;
+        return;
       }
-      
-      return true;
-    };
-    
-    const handleOAuthCallback = async () => {
-      // Detailed logging for debugging
-      console.log("GitHub callback initiated");
-      console.log("Full URL:", window.location.href);
-      console.log("Current pathname:", location.pathname);
-      console.log("Current search params:", location.search);
-      console.log("Host:", window.location.host);
-      console.log("Origin:", window.location.origin);
-      
-      const authStatus = await checkAuth();
-      if (!authStatus) return;
       
       const searchParams = new URLSearchParams(location.search);
       const code = searchParams.get("code");
@@ -55,10 +46,25 @@ const GitHubCallback = () => {
       
       try {
         console.log("Processing GitHub callback with code:", code.substring(0, 5) + "...");
-        const result = await handleGithubCallback(code, state || "");
-        if (result) {
+        
+        // Call our Supabase edge function to exchange the code for a token
+        const { data, error } = await supabase.functions.invoke('github-auth', {
+          body: { 
+            code,
+            redirect_uri: `${window.location.origin}/callback/github`
+          }
+        });
+        
+        if (error) throw error;
+        
+        if (data) {
           // Successfully connected GitHub account
-          console.log("GitHub connection successful, redirecting to home page");
+          console.log("GitHub connection successful");
+          toast({
+            title: "GitHub Connected",
+            description: `Successfully connected to GitHub as ${data.user?.login || 'user'}`
+          });
+          
           // Add a small delay to ensure toast is shown
           setTimeout(() => {
             navigate("/");
@@ -74,6 +80,7 @@ const GitHubCallback = () => {
         console.error("Error during GitHub callback:", error);
         setError(error.message || "An unexpected error occurred");
         toast({
+          variant: "destructive",
           description: error.message || "An unexpected error occurred during GitHub callback"
         });
       }
