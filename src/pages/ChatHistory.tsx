@@ -31,6 +31,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { Message } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 
 interface ChatHistoryItem {
   id: string;
@@ -45,6 +46,7 @@ const ChatHistory = () => {
   const [chatHistory, setChatHistory] = useState<ChatHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user } = useAuth(); // Use the auth context to get the current user
   
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -56,54 +58,47 @@ const ChatHistory = () => {
     const fetchChatHistory = async () => {
       setLoading(true);
       try {
-        const { data: session } = await supabase.auth.getSession();
+        console.log("Fetching chat history for user:", user?.id);
         
-        if (!session.session) {
-          // If no session (user not logged in), try to get from localStorage as fallback
-          const storedHistory = localStorage.getItem('chatHistory');
-          if (storedHistory) {
-            try {
-              setChatHistory(JSON.parse(storedHistory));
-            } catch (error) {
-              console.error("Error parsing chat history from localStorage:", error);
-            }
-          }
-        } else {
-          // User is logged in, fetch from Supabase
-          const { data, error } = await supabase
-            .from('chat_history')
-            .select('*')
-            .order('updated_at', { ascending: false });
+        if (!user) {
+          console.log("No user found in auth context, trying to get session from Supabase");
+          const { data: sessionData } = await supabase.auth.getSession();
           
-          if (error) {
-            console.error("Error fetching chat history:", error);
-            toast({
-              variant: "destructive",
-              title: "Error",
-              description: `Failed to load chat history: ${error.message}`,
-            });
-            
-            // Try fallback to localStorage
-            const storedHistory = localStorage.getItem('chatHistory');
-            if (storedHistory) {
-              try {
-                setChatHistory(JSON.parse(storedHistory));
-              } catch (error) {
-                console.error("Error parsing chat history from localStorage:", error);
-              }
-            }
-          } else if (data) {
-            // Format data from Supabase to match our ChatHistoryItem interface
-            const formattedHistory = data.map((item: any) => ({
-              id: item.id,
-              title: item.title,
-              lastMessage: item.last_message || "No messages",
-              timestamp: formatTimestamp(item.updated_at || item.created_at),
-              messages: item.messages || []
-            }));
-            
-            setChatHistory(formattedHistory);
+          if (!sessionData.session) {
+            console.log("No session found in Supabase");
+            setLoading(false);
+            return;
           }
+          
+          console.log("Session found, user ID:", sessionData.session.user.id);
+        }
+        
+        // User is logged in, fetch from Supabase
+        const { data, error } = await supabase
+          .from('chat_history')
+          .select('*')
+          .order('updated_at', { ascending: false });
+        
+        if (error) {
+          console.error("Error fetching chat history:", error);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: `Failed to load chat history: ${error.message}`,
+          });
+        } else if (data) {
+          console.log("Chat history data received:", data.length, "items");
+          
+          // Format data from Supabase to match our ChatHistoryItem interface
+          const formattedHistory = data.map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            last_message: item.last_message || "No messages",
+            timestamp: formatTimestamp(item.updated_at || item.created_at),
+            messages: item.messages || []
+          }));
+          
+          setChatHistory(formattedHistory);
         }
       } catch (error) {
         console.error("Error loading chat history:", error);
@@ -112,8 +107,12 @@ const ChatHistory = () => {
       }
     };
     
-    fetchChatHistory();
-  }, []);
+    if (user) {
+      fetchChatHistory();
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
 
   const formatTimestamp = (timestamp: string) => {
     try {
@@ -301,73 +300,84 @@ const ChatHistory = () => {
         />
       </div>
       
-      <p className="text-gray-600 mb-6">
-        You have {filteredChats.length} previous chats with Claude. <span className="text-blue-500 cursor-pointer">Select</span>
-      </p>
-      
-      {loading ? (
-        <div className="flex justify-center items-center h-40">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-        </div>
-      ) : filteredChats.length === 0 ? (
+      {!user ? (
         <div className="text-center py-10">
-          <p className="text-gray-500">No chat history found.</p>
-          <Button onClick={handleNewChat} variant="link" className="text-blue-500 mt-2">
-            Start a new chat
+          <p className="text-gray-500">Please sign in to view your chat history.</p>
+          <Button onClick={() => navigate('/signin')} variant="link" className="text-blue-500 mt-2">
+            Sign in
           </Button>
         </div>
       ) : (
-        <div className="space-y-4">
-          {filteredChats.map(chat => (
-            <Card 
-              key={chat.id}
-              className="cursor-pointer hover:bg-gray-50 p-4 transition-colors relative"
-              onClick={() => handleChatSelection(chat.id)}
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <h2 className="font-medium text-gray-800">{chat.title}</h2>
-                  <p className="text-sm text-gray-500">{chat.last_message || "No messages"}</p>
-                  {chat.messages && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      {chat.messages.length} messages
-                    </p>
-                  )}
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 rounded-full"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <span className="sr-only">Open menu</span>
-                      <svg width="15" height="3" viewBox="0 0 15 3" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-gray-600">
-                        <path d="M2.5 2.5C3.32843 2.5 4 1.82843 4 1C4 0.171573 3.32843 -0.5 2.5 -0.5C1.67157 -0.5 1 0.171573 1 1C1 1.82843 1.67157 2.5 2.5 2.5Z" fill="currentColor"/>
-                        <path d="M7.5 2.5C8.32843 2.5 9 1.82843 9 1C9 0.171573 8.32843 -0.5 7.5 -0.5C6.67157 -0.5 6 0.171573 6 1C6 1.82843 6.67157 2.5 7.5 2.5Z" fill="currentColor"/>
-                        <path d="M14 1C14 1.82843 13.3284 2.5 12.5 2.5C11.6716 2.5 11 1.82843 11 1C11 0.171573 11.6716 -0.5 12.5 -0.5C13.3284 -0.5 14 0.171573 14 1Z" fill="currentColor"/>
-                      </svg>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={(e) => openRenameDialog(chat, e)}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      Rename
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                      onClick={(e) => openDeleteDialog(chat, e)}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </Card>
-          ))}
-        </div>
+        <>
+          <p className="text-gray-600 mb-6">
+            You have {filteredChats.length} previous chats with Claude. <span className="text-blue-500 cursor-pointer">Select</span>
+          </p>
+          
+          {loading ? (
+            <div className="flex justify-center items-center h-40">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            </div>
+          ) : filteredChats.length === 0 ? (
+            <div className="text-center py-10">
+              <p className="text-gray-500">No chat history found.</p>
+              <Button onClick={handleNewChat} variant="link" className="text-blue-500 mt-2">
+                Start a new chat
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredChats.map(chat => (
+                <Card 
+                  key={chat.id}
+                  className="cursor-pointer hover:bg-gray-50 p-4 transition-colors relative"
+                  onClick={() => handleChatSelection(chat.id)}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h2 className="font-medium text-gray-800">{chat.title}</h2>
+                      <p className="text-sm text-gray-500">{chat.last_message || "No messages"}</p>
+                      {chat.messages && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          {chat.messages.length} messages
+                        </p>
+                      )}
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 rounded-full"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <span className="sr-only">Open menu</span>
+                          <svg width="15" height="3" viewBox="0 0 15 3" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-gray-600">
+                            <path d="M2.5 2.5C3.32843 2.5 4 1.82843 4 1C4 0.171573 3.32843 -0.5 2.5 -0.5C1.67157 -0.5 1 0.171573 1 1C1 1.82843 1.67157 2.5 2.5 2.5Z" fill="currentColor"/>
+                            <path d="M7.5 2.5C8.32843 2.5 9 1.82843 9 1C9 0.171573 8.32843 -0.5 7.5 -0.5C6.67157 -0.5 6 0.171573 6 1C6 1.82843 6.67157 2.5 7.5 2.5Z" fill="currentColor"/>
+                            <path d="M14 1C14 1.82843 13.3284 2.5 12.5 2.5C11.6716 2.5 11 1.82843 11 1C11 0.171573 11.6716 -0.5 12.5 -0.5C13.3284 -0.5 14 0.171573 14 1Z" fill="currentColor"/>
+                          </svg>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => openRenameDialog(chat, e)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                          onClick={(e) => openDeleteDialog(chat, e)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
       )}
       
       {/* Rename Dialog */}
