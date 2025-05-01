@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   SandpackProvider, 
@@ -44,12 +45,24 @@ const AutoRefreshPreview = () => {
         
         // Reset status after a delay
         setTimeout(() => setRefreshStatus(null), 2000);
-      } else if (msg.type === 'status' && msg.status === 'error') {
-        // Fixed: Using the correct error status check with proper type
+      } else if (msg.type === 'status') {
+        // Check for error in status type messages
+        if (msg.status && msg.status === 'error') {
+          setRefreshStatus('error');
+          console.error('Hot reload error:', msg);
+          
+          // Display error toast for better user feedback
+          toast({
+            variant: "destructive",
+            title: "Preview Error",
+            description: "Error rendering code preview. Check console for details."
+          });
+        }
+      } else if (msg.type === 'error') {
+        // Also check for direct error messages
         setRefreshStatus('error');
-        console.error('Hot reload error:', msg);
+        console.error('Hot reload error (direct):', msg);
         
-        // Display error toast for better user feedback
         toast({
           variant: "destructive",
           title: "Preview Error",
@@ -340,24 +353,58 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
         hasHtml = true;
       }
       
-      // Fix for the @shadcn/ui import error
-      // Add correct import path for shadcn components
-      if (Object.keys(result).length > 0) {
-        // Check if any file has imports from @shadcn/ui
-        for (const path in result) {
-          const fileContent = result[path];
-          if (typeof fileContent === 'object' && fileContent.code && fileContent.code.includes('@shadcn/ui')) {
-            console.log(`Found @shadcn/ui import in ${path}, fixing it`);
-            // Replace @shadcn/ui imports with the correct path
-            result[path] = {
-              ...fileContent,
-              code: fileContent.code.replace(
-                /from ['"]@shadcn\/ui['"]/g, 
-                'from "@/components/ui"'
-              )
-            };
+      // Comprehensive fix for the @shadcn/ui import error
+      // Process ALL files with any shadcn import patterns
+      console.log("Checking for shadcn/ui imports to fix...");
+      for (const path in result) {
+        const fileContent = result[path];
+        // Type check - ensure fileContent is an object with code property
+        if (typeof fileContent === 'object' && fileContent !== null) {
+          if (typeof fileContent.code === 'string') {
+            // Check for any shadcn imports
+            const originalCode = fileContent.code;
+            
+            // Replace all shadcn import patterns
+            let updatedCode = originalCode
+              .replace(/@shadcn\/ui/g, '@/components/ui')
+              .replace(/["']@\/shadcn\/ui["']/g, '"@/components/ui"')
+              .replace(/from ["']@ui\/([^"']+)["']/g, 'from "@/components/ui/$1"')
+              .replace(/from ["']shadcn\/ui["']/g, 'from "@/components/ui"');
+            
+            // Only update if changes were actually made
+            if (updatedCode !== originalCode) {
+              console.log(`Fixed shadcn import in ${path}`);
+              result[path] = {
+                ...fileContent,
+                code: updatedCode
+              };
+            }
           }
         }
+      }
+      
+      // Additional fallback - add a helper file to mock shadcn/ui imports if detected
+      let needsShadcnHelper = false;
+      
+      for (const path in result) {
+        const fileContent = result[path];
+        if (typeof fileContent === 'object' && fileContent !== null && 
+            typeof fileContent.code === 'string' && 
+            (fileContent.code.includes('@shadcn/ui') || fileContent.code.includes('shadcn/ui'))) {
+          needsShadcnHelper = true;
+          break;
+        }
+      }
+      
+      if (needsShadcnHelper) {
+        console.log("Adding shadcn helper module for compatibility");
+        // Add a shadcn helper module
+        result['/node_modules/@shadcn/ui/index.js'] = {
+          code: `
+// Shadcn helper module
+export * from "@/components/ui";
+          `
+        };
       }
       
       // If it's a vanilla app with no HTML, create a basic setup
