@@ -18,8 +18,8 @@ const AutoRefreshPreview = () => {
   const { sandpack } = useSandpack();
   
   useEffect(() => {
-    // Using the correct method to listen to Sandpack events
-    const unsubscribe = sandpack.listen((message) => {
+    // The correct way to listen to Sandpack events
+    const unsubscribe = sandpack.listen(message => {
       if (message.type === 'done') {
         // Refresh complete - any additional actions can go here
         console.log('Hot reload complete');
