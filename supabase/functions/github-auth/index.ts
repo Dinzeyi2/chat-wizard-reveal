@@ -18,7 +18,7 @@ serve(async (req) => {
 
   try {
     // Parse request body
-    const { code, redirect_uri } = await req.json();
+    const { code } = await req.json();
     
     if (!code) {
       return new Response(
@@ -43,21 +43,7 @@ serve(async (req) => {
       );
     }
 
-    console.log("Exchanging GitHub code for access token with redirect URI:", redirect_uri || "No redirect URI provided");
-
     // Exchange code for access token
-    const tokenRequestBody: any = {
-      client_id: githubClientId,
-      client_secret: githubClientSecret,
-      code: code
-    };
-    
-    // Only include redirect_uri if provided
-    if (redirect_uri) {
-      tokenRequestBody.redirect_uri = redirect_uri;
-      console.log("Including redirect_uri in token request:", redirect_uri);
-    }
-
     const tokenResponse = await fetch(
       "https://github.com/login/oauth/access_token",
       {
@@ -66,17 +52,15 @@ serve(async (req) => {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify(tokenRequestBody),
+        body: JSON.stringify({
+          client_id: githubClientId,
+          client_secret: githubClientSecret,
+          code: code,
+        }),
       }
     );
 
     const tokenData = await tokenResponse.json();
-    
-    if (tokenData.error) {
-      console.error("GitHub token error:", tokenData);
-      throw new Error(`GitHub API error: ${tokenData.error_description || tokenData.error}`);
-    }
-    
     const accessToken = tokenData.access_token;
 
     if (!accessToken) {
@@ -112,7 +96,6 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error("Error processing GitHub auth:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {

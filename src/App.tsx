@@ -26,12 +26,7 @@ const App = () => {
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/history" element={<ChatHistory />} />
-            
-            {/* GitHub callback routes - handle with and without leading slash */}
             <Route path="/github-callback" element={<GitHubCallback />} />
-            <Route path="github-callback" element={<GitHubCallback />} />
-            
-            {/* Catch-all route for 404s */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

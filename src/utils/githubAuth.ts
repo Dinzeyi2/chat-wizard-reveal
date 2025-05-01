@@ -1,21 +1,9 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 // GitHub OAuth configuration
-// Use the current origin to build the redirect URI dynamically
-const getRedirectUri = () => {
-  // Check if we're on the production domain
-  const hostname = window.location.hostname;
-  
-  // For production domains, always use the format without www
-  // This must match EXACTLY what's configured in the GitHub app settings
-  if (hostname === 'i-blue.dev' || hostname === 'www.i-blue.dev') {
-    return `https://i-blue.dev/github-callback`;
-  }
-  
-  // For local development or other environments
-  return `${window.location.origin}/github-callback`;
-};
+const REDIRECT_URI = `${window.location.origin}/github-callback`;
 
 export const initiateGithubAuth = async () => {
   try {
@@ -47,18 +35,12 @@ export const initiateGithubAuth = async () => {
     // Store the state in sessionStorage for verification after redirect
     sessionStorage.setItem("githubOAuthState", state);
     
-    // Get the appropriate redirect URI
-    const REDIRECT_URI = getRedirectUri();
-    
     // Construct the GitHub authorization URL
     const authUrl = new URL("https://github.com/login/oauth/authorize");
     authUrl.searchParams.append("client_id", clientId);
     authUrl.searchParams.append("redirect_uri", REDIRECT_URI);
     authUrl.searchParams.append("state", state);
     authUrl.searchParams.append("scope", "repo user");
-    
-    // Log the redirect URI for debugging
-    console.log("Redirecting to GitHub with redirect URI:", REDIRECT_URI);
     
     // Redirect the user to GitHub's authorization page
     window.location.href = authUrl.toString();
@@ -79,7 +61,6 @@ export const handleGithubCallback = async (code: string, state: string) => {
   // Verify the state parameter to prevent CSRF attacks
   const storedState = sessionStorage.getItem("githubOAuthState");
   if (state !== storedState) {
-    console.error("State mismatch:", { received: state, stored: storedState });
     toast({
       variant: "destructive",
       title: "Authentication Error",
@@ -104,16 +85,9 @@ export const handleGithubCallback = async (code: string, state: string) => {
   }
   
   try {
-    // Get the appropriate redirect URI - must match the one used in initiateGithubAuth
-    const REDIRECT_URI = getRedirectUri();
-    console.log("Using callback URI for token exchange:", REDIRECT_URI);
-    
     // Exchange the authorization code for an access token
     const { data, error } = await supabase.functions.invoke('github-auth', {
-      body: { 
-        code,
-        redirect_uri: REDIRECT_URI
-      }
+      body: { code }
     });
     
     if (error) throw error;
@@ -125,7 +99,6 @@ export const handleGithubCallback = async (code: string, state: string) => {
     
     return data;
   } catch (error: any) {
-    console.error("GitHub connection error:", error);
     toast({
       variant: "destructive",
       title: "Connection Failed",

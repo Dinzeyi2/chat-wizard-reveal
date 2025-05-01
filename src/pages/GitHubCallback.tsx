@@ -25,14 +25,6 @@ const GitHubCallback = () => {
     };
     
     const handleOAuthCallback = async () => {
-      // Detailed logging for debugging
-      console.log("GitHub callback initiated");
-      console.log("Full URL:", window.location.href);
-      console.log("Current pathname:", location.pathname);
-      console.log("Current search params:", location.search);
-      console.log("Host:", window.location.host);
-      console.log("Origin:", window.location.origin);
-      
       const authStatus = await checkAuth();
       if (!authStatus) return;
       
@@ -41,24 +33,19 @@ const GitHubCallback = () => {
       const state = searchParams.get("state");
       
       if (!code) {
-        console.error("No authorization code received from GitHub");
         setError("No authorization code received from GitHub");
         return;
       }
       
       try {
-        console.log("Processing GitHub callback with code:", code.substring(0, 5) + "...");
         const result = await handleGithubCallback(code, state || "");
         if (result) {
           // Successfully connected GitHub account
-          console.log("GitHub connection successful, redirecting to home page");
           navigate("/");
         } else {
-          console.error("Failed to connect GitHub account - null result returned");
           setError("Failed to connect GitHub account");
         }
       } catch (error: any) {
-        console.error("Error during GitHub callback:", error);
         setError(error.message || "An unexpected error occurred");
       }
     };
