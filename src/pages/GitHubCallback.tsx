@@ -52,6 +52,7 @@ const GitHubCallback = () => {
         if (result) {
           // Successfully connected GitHub account
           console.log("GitHub connection successful, redirecting to home page");
+          // Automatically navigate back to the home page after successful connection
           navigate("/");
         } else {
           console.error("Failed to connect GitHub account - null result returned");

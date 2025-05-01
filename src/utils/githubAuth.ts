@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -141,6 +142,7 @@ export const isGithubConnected = async (): Promise<boolean> => {
     const { data: sessionData } = await supabase.auth.getSession();
     
     if (!sessionData.session) {
+      console.log("User not authenticated, GitHub not connected");
       return false;
     }
     
@@ -149,7 +151,10 @@ export const isGithubConnected = async (): Promise<boolean> => {
       data: { user },
     } = await supabase.auth.getUser();
     
-    if (!user) return false;
+    if (!user) {
+      console.log("No user data available, GitHub not connected");
+      return false;
+    }
     
     const { data, error } = await supabase
       .from("github_connections")
@@ -157,9 +162,16 @@ export const isGithubConnected = async (): Promise<boolean> => {
       .eq("user_id", user.id)
       .maybeSingle();
       
-    if (error) return false;
-    return !!data;
+    if (error) {
+      console.error("Error checking GitHub connection:", error);
+      return false;
+    }
+    
+    const isConnected = !!data;
+    console.log("GitHub connection status:", isConnected ? "Connected" : "Not connected");
+    return isConnected;
   } catch (error) {
+    console.error("Error in isGithubConnected:", error);
     return false;
   }
 };

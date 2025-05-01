@@ -46,22 +46,29 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
   // Define the checkGithubConnection function before using it
   const checkGithubConnection = async () => {
     const connected = await isGithubConnected();
+    console.log("GitHub connection status:", connected);
     setIsConnectedToGithub(connected);
+    return connected;
   };
 
   const checkAuthStatus = async () => {
     const { data } = await supabase.auth.getSession();
     setIsAuthenticated(!!data.session);
+    return !!data.session;
   };
 
   // Use effects to check auth and GitHub connection status
   useEffect(() => {
-    checkAuthStatus();
-    checkGithubConnection();
+    const checkStatuses = async () => {
+      await checkAuthStatus();
+      await checkGithubConnection();
+    };
     
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      checkAuthStatus();
-      checkGithubConnection();
+    checkStatuses();
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async () => {
+      await checkAuthStatus();
+      await checkGithubConnection();
     });
     
     return () => {
@@ -199,38 +206,50 @@ Based on this design, please ${message}
     }
   };
 
+  const loadGithubRepositories = async () => {
+    setIsLoadingRepos(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('github-repos', {
+        body: {}
+      });
+      
+      if (error) {
+        console.error("Error fetching GitHub repositories:", error);
+        throw error;
+      }
+      
+      console.log("GitHub repos loaded:", data.repos);
+      setGithubRepos(data.repos || []);
+      setShowGithubReposDialog(true);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Failed to load repositories",
+        description: "Could not fetch your GitHub repositories. Please try again."
+      });
+    } finally {
+      setIsLoadingRepos(false);
+    }
+  };
+
   const handleGithubClick = async () => {
-    if (!isAuthenticated) {
+    const isUserAuthenticated = await checkAuthStatus();
+    
+    if (!isUserAuthenticated) {
       // If not authenticated, redirect to auth page
       navigate('/auth');
       return;
     }
 
-    if (!isConnectedToGithub) {
+    const isConnected = await checkGithubConnection();
+    
+    if (!isConnected) {
       // If not connected to GitHub, initiate auth flow
       await initiateGithubAuth();
     } else {
       // If connected, load repositories and show dialog
-      setIsLoadingRepos(true);
-      setShowGithubReposDialog(true);
-      
-      try {
-        const { data, error } = await supabase.functions.invoke('github-repos', {
-          body: {}
-        });
-        
-        if (error) throw error;
-        
-        setGithubRepos(data.repos || []);
-      } catch (error) {
-        toast({
-          variant: "destructive",
-          title: "Failed to load repositories",
-          description: "Could not fetch your GitHub repositories. Please try again."
-        });
-      } finally {
-        setIsLoadingRepos(false);
-      }
+      await loadGithubRepositories();
     }
   };
 
@@ -314,9 +333,10 @@ Based on this design, please ${message}
                 size="sm" 
                 className="rounded-full"
                 onClick={handleGithubClick}
+                disabled={isLoadingRepos}
               >
                 <Github className="mr-1 size-4" />
-                GitHub
+                {isConnectedToGithub ? "GitHub Repos" : "Connect GitHub"}
               </Button>
             )}
             <Button variant="outline" size="sm" className="rounded-full">Reason</Button>
