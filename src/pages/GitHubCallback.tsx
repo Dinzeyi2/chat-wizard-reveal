@@ -1,32 +1,22 @@
 
 import { useEffect, useState } from "react";
-import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { handleGithubCallback } from "@/utils/githubAuth";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 const GitHubCallback = () => {
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    // Log all available info for debugging
-    console.log("GitHubCallback component mounted");
-    console.log("Full URL:", window.location.href);
-    console.log("Pathname:", location.pathname);
-    console.log("Search string:", location.search);
-    console.log("Search params entries:", Array.from(searchParams.entries()));
-
     const checkAuth = async () => {
       const { data } = await supabase.auth.getSession();
-      const isLoggedIn = !!data.session;
-      setIsAuthenticated(isLoggedIn);
+      setIsAuthenticated(!!data.session);
       
-      if (!isLoggedIn) {
+      if (!data.session) {
         setError("You must be signed in to connect your GitHub account");
         return false;
       }
@@ -35,7 +25,18 @@ const GitHubCallback = () => {
     };
     
     const handleOAuthCallback = async () => {
-      // Extract code from query parameters
+      // Detailed logging for debugging
+      console.log("GitHub callback initiated");
+      console.log("Full URL:", window.location.href);
+      console.log("Current pathname:", location.pathname);
+      console.log("Current search params:", location.search);
+      console.log("Host:", window.location.host);
+      console.log("Origin:", window.location.origin);
+      
+      const authStatus = await checkAuth();
+      if (!authStatus) return;
+      
+      const searchParams = new URLSearchParams(location.search);
       const code = searchParams.get("code");
       const state = searchParams.get("state");
       
@@ -45,33 +46,25 @@ const GitHubCallback = () => {
         return;
       }
       
-      const authStatus = await checkAuth();
-      if (!authStatus) return;
-      
       try {
         console.log("Processing GitHub callback with code:", code.substring(0, 5) + "...");
-        console.log("State parameter:", state);
-        
         const result = await handleGithubCallback(code, state || "");
-        
         if (result) {
           // Successfully connected GitHub account
-          toast.success("GitHub account connected successfully");
+          console.log("GitHub connection successful, redirecting to home page");
           navigate("/");
         } else {
           console.error("Failed to connect GitHub account - null result returned");
           setError("Failed to connect GitHub account");
-          toast.error("Failed to connect GitHub account");
         }
       } catch (error: any) {
         console.error("Error during GitHub callback:", error);
         setError(error.message || "An unexpected error occurred");
-        toast.error(error.message || "An unexpected error occurred");
       }
     };
     
     handleOAuthCallback();
-  }, [location, navigate, searchParams]);
+  }, [location, navigate]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4">
