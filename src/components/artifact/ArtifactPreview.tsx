@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   SandpackProvider, 
@@ -10,37 +11,79 @@ import {
   useActiveCode
 } from '@codesandbox/sandpack-react';
 import { nightOwl } from '@codesandbox/sandpack-themes';
-import { Loader2, TerminalSquare, AlertCircle } from 'lucide-react';
+import { Loader2, TerminalSquare, AlertCircle, RefreshCw } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { toast } from "@/hooks/use-toast";
 
 // Auto-refresh component that handles hot-reloading
 const AutoRefreshPreview = () => {
   const { sandpack } = useSandpack();
+  const [refreshStatus, setRefreshStatus] = useState<string | null>(null);
   
   useEffect(() => {
     // Get the first client from the clients array
     const client = sandpack.clients[0];
     
     // Only proceed if client exists
-    if (!client) return;
+    if (!client) {
+      console.warn("AutoRefreshPreview: No Sandpack client available");
+      return;
+    }
+    
+    console.log("AutoRefreshPreview: Registering listener for hot reload");
     
     // Register listener for Sandpack events using the client object
     const unsubscribe = client.listen((msg) => {
-      if (msg.type === 'done') {
-        // Refresh complete - any additional actions can go here
-        console.log('Hot reload complete');
+      if (msg.type === 'start') {
+        setRefreshStatus('compiling');
+        console.log('Hot reload started: Compiling code');
+      } else if (msg.type === 'done') {
+        setRefreshStatus('complete');
+        console.log('Hot reload complete: Preview updated');
+        
+        // Reset status after a delay
+        setTimeout(() => setRefreshStatus(null), 2000);
+      } else if (msg.type === 'error') {
+        setRefreshStatus('error');
+        console.error('Hot reload error:', msg.error);
+        
+        // Display error toast for better user feedback
+        toast({
+          variant: "destructive",
+          title: "Preview Error",
+          description: "Error rendering code preview. Check console for details."
+        });
       }
     });
     
     return () => {
       if (typeof unsubscribe === 'function') {
         unsubscribe();
+        console.log("AutoRefreshPreview: Unregistered hot reload listener");
       }
     };
   }, [sandpack]);
   
-  return null;
+  if (!refreshStatus) return null;
+  
+  return (
+    <div className="fixed bottom-4 right-4 z-50">
+      <Alert variant="default" className="bg-zinc-800 border-green-600 text-white py-2 px-3 shadow-lg">
+        <div className="flex items-center space-x-2">
+          {refreshStatus === 'compiling' && (
+            <RefreshCw className="h-4 w-4 animate-spin text-yellow-400" />
+          )}
+          <AlertDescription className="text-xs">
+            {refreshStatus === 'compiling' && "Updating preview..."}
+            {refreshStatus === 'complete' && "Preview updated successfully!"}
+            {refreshStatus === 'error' && "Error updating preview"}
+          </AlertDescription>
+        </div>
+      </Alert>
+    </div>
+  );
 };
 
 interface ArtifactPreviewProps {
@@ -53,6 +96,123 @@ interface ArtifactPreviewProps {
   }>;
 }
 
+/**
+ * Formats file paths to be compatible with Sandpack
+ * Ensures all paths start with a / but don't have double slashes
+ */
+const normalizePath = (path: string): string => {
+  // Remove any leading/trailing whitespace
+  let normalized = path.trim();
+  
+  // Ensure path starts with a single /
+  if (!normalized.startsWith('/')) {
+    normalized = '/' + normalized;
+  }
+  
+  // Remove any double slashes
+  while (normalized.includes('//')) {
+    normalized = normalized.replace('//', '/');
+  }
+  
+  return normalized;
+};
+
+/**
+ * Detects the language/type of a file based on its extension and content
+ */
+const detectFileType = (file: { path: string, content: string }): {
+  extension: string,
+  isHtml: boolean,
+  isJs: boolean,
+  isTs: boolean,
+  isReact: boolean,
+  isJson: boolean,
+  isStyle: boolean
+} => {
+  const path = file.path.toLowerCase();
+  const content = file.content || '';
+  
+  const extension = path.split('.').pop() || '';
+  const isHtml = extension === 'html' || extension === 'htm';
+  const isJs = extension === 'js' || extension === 'jsx' || extension === 'mjs';
+  const isTs = extension === 'ts' || extension === 'tsx';
+  const isReact = extension === 'jsx' || extension === 'tsx' || 
+                  content.includes('import React') || 
+                  content.includes('from "react"') ||
+                  content.includes('from \'react\'');
+  const isJson = extension === 'json';
+  const isStyle = ['css', 'scss', 'less'].includes(extension);
+  
+  return { extension, isHtml, isJs, isTs, isReact, isJson, isStyle };
+};
+
+/**
+ * Determines the primary entry file for the application
+ */
+const detectEntryPoint = (files: ArtifactPreviewProps['files']): string | null => {
+  // Priority order for entry points
+  const entryPointCandidates = [
+    // Vite entry points
+    '/src/main.tsx',
+    '/src/main.jsx',
+    '/src/main.ts',
+    '/src/main.js',
+    
+    // React entry points
+    '/src/index.tsx',
+    '/src/index.jsx',
+    '/src/index.ts',
+    '/src/index.js',
+    '/index.tsx',
+    '/index.jsx', 
+    '/index.ts',
+    '/index.js',
+    
+    // HTML entry points
+    '/index.html',
+    '/public/index.html'
+  ];
+  
+  // Look for entry points in priority order
+  for (const candidate of entryPointCandidates) {
+    if (files.some(file => normalizePath(file.path) === candidate)) {
+      console.log(`Detected entry point: ${candidate}`);
+      return candidate;
+    }
+  }
+  
+  // If no standard entry points found, look for App components
+  const appCandidates = [
+    '/src/App.tsx',
+    '/src/App.jsx',
+    '/App.tsx',
+    '/App.jsx'
+  ];
+  
+  for (const candidate of appCandidates) {
+    if (files.some(file => normalizePath(file.path) === candidate)) {
+      console.log(`Using App component as entry point: ${candidate}`);
+      return candidate;
+    }
+  }
+  
+  // If no entry points found, fallback to first HTML, then first JS/TS file
+  const htmlFile = files.find(file => detectFileType(file).isHtml);
+  if (htmlFile) {
+    console.log(`Using fallback HTML entry point: ${htmlFile.path}`);
+    return normalizePath(htmlFile.path);
+  }
+  
+  const scriptFile = files.find(file => detectFileType(file).isJs || detectFileType(file).isTs);
+  if (scriptFile) {
+    console.log(`Using fallback script entry point: ${scriptFile.path}`);
+    return normalizePath(scriptFile.path);
+  }
+  
+  console.warn("No entry point detected - preview may not render correctly");
+  return null;
+};
+
 export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"preview" | "console">("preview");
@@ -61,60 +221,104 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
   
   // Auto-detect the application type based on files
   useEffect(() => {
-    // Default to vanilla
-    let detectedType: "vanilla" | "react" | "react-ts" | "vite" = "vanilla";
-    
-    // Check for package.json to detect app type
-    const packageJson = files.find(file => file.path.includes('package.json'));
-    const hasReactComponent = files.some(file => 
-      (file.path.endsWith('.jsx') || file.path.endsWith('.tsx')) && 
-      file.content.includes('import React') || file.content.includes('from "react"')
-    );
-    
-    const hasViteConfig = files.some(file => 
-      file.path.includes('vite.config') || 
-      (packageJson && packageJson.content.includes('"vite"'))
-    );
-    
-    const hasTypeScript = files.some(file => 
-      file.path.endsWith('.ts') || file.path.endsWith('.tsx')
-    );
-    
-    if (hasViteConfig) {
-      detectedType = "vite";
-      console.log("Detected Vite application");
-    } else if (hasReactComponent) {
-      detectedType = hasTypeScript ? "react-ts" : "react";
-      console.log(`Detected React ${hasTypeScript ? 'TypeScript' : 'JavaScript'} application`);
+    try {
+      // Default to vanilla
+      let detectedType: "vanilla" | "react" | "react-ts" | "vite" = "vanilla";
+      
+      console.log(`Analyzing ${files.length} files to detect application type...`);
+      
+      // Check for package.json to detect app type
+      const packageJson = files.find(file => file.path.includes('package.json'));
+      const packageContent = packageJson ? packageJson.content : '';
+      
+      // Check for React files
+      const reactComponents = files.filter(file => {
+        const fileType = detectFileType(file);
+        return fileType.isReact;
+      });
+      
+      // Check for TypeScript files
+      const tsFiles = files.filter(file => {
+        const fileType = detectFileType(file);
+        return fileType.isTs;
+      });
+      
+      // Check for Vite configuration
+      const hasViteConfig = files.some(file => 
+        file.path.includes('vite.config') || 
+        (packageContent && (
+          packageContent.includes('"vite"') || 
+          packageContent.includes("'vite'")
+        ))
+      );
+      
+      // Determine app type based on findings
+      if (hasViteConfig) {
+        detectedType = "vite";
+        console.log("Detected Vite application");
+      } else if (reactComponents.length > 0) {
+        detectedType = tsFiles.length > 0 ? "react-ts" : "react";
+        console.log(`Detected React ${tsFiles.length > 0 ? 'TypeScript' : 'JavaScript'} application`);
+      } else if (tsFiles.length > 0) {
+        detectedType = "react-ts"; // Fallback to react-ts for TypeScript files
+        console.log("Detected TypeScript files, using react-ts template");
+      } else {
+        console.log("Using vanilla template as fallback");
+      }
+      
+      setAppType(detectedType);
+    } catch (error) {
+      console.error("Error detecting app type:", error);
+      setAppType("vanilla"); // Fallback to vanilla
     }
-    
-    setAppType(detectedType);
   }, [files]);
   
   // Transform files to Sandpack format
   const sandpackFiles: SandpackFiles = React.useMemo(() => {
-    console.log(`Processing files for preview: ${files.length}, app type: ${appType}`);
-    const result: SandpackFiles = {};
-    
-    // Add all user's files
-    files.forEach(file => {
-      // Skip any path with node_modules
-      if (file.path.includes("node_modules")) return;
+    try {
+      console.log(`Processing ${files.length} files for preview as ${appType} application`);
+      const entryPoint = detectEntryPoint(files);
+      console.log(`Entry point determined as: ${entryPoint || 'none'}`);
       
-      // Ensure the path starts with /
-      const path = file.path.startsWith("/") ? file.path : `/${file.path}`;
+      const result: SandpackFiles = {};
+      let hasHtml = false;
+      let hasMainScript = false;
       
-      // Store the file content
-      result[path] = {
-        code: file.content,
-        active: file.path.endsWith('index.js') || file.path.endsWith('index.tsx') || file.path.endsWith('App.tsx')
-      };
-    });
-    
-    // If no index.html is provided and it's a React app, create one
-    if (!result['/index.html'] && (appType === 'react' || appType === 'react-ts')) {
-      result['/index.html'] = {
-        code: `
+      // Add all user's files
+      files.forEach(file => {
+        try {
+          // Skip any path with node_modules
+          if (file.path.includes("node_modules")) {
+            console.log(`Skipping node_modules file: ${file.path}`);
+            return;
+          }
+          
+          // Ensure the path is normalized
+          const path = normalizePath(file.path);
+          const fileType = detectFileType(file);
+          
+          // Track if we have HTML and main script files
+          if (fileType.isHtml) hasHtml = true;
+          if (path === entryPoint && (fileType.isJs || fileType.isTs)) hasMainScript = true;
+          
+          // Determine if this file should be active
+          const shouldBeActive = path === entryPoint;
+          
+          // Store the file content
+          result[path] = {
+            code: file.content,
+            active: shouldBeActive
+          };
+          
+          console.log(`Added ${path} to Sandpack files${shouldBeActive ? ' (active)' : ''}`);
+        } catch (error) {
+          console.error(`Error processing file ${file.path}:`, error);
+        }
+      });
+      
+      // If no index.html is provided and it's a React app, create one
+      if (!hasHtml && (appType === 'react' || appType === 'react-ts' || appType === 'vite')) {
+        const htmlContent = `
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -124,16 +328,23 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
   </head>
   <body>
     <div id="root"></div>
+    ${entryPoint && !hasMainScript ? `<script type="module" src="${entryPoint}"></script>` : ''}
   </body>
-</html>`,
-      };
-    }
-    
-    // If it's a vanilla app with no HTML, create a basic setup
-    if (Object.keys(result).length === 0 || (!result['/index.html'] && appType === 'vanilla')) {
-      // Create basic HTML file
-      result['/index.html'] = {
-        code: `
+</html>`;
+        
+        result['/index.html'] = {
+          code: htmlContent,
+        };
+        
+        console.log("Created fallback index.html for React/Vite app");
+        hasHtml = true;
+      }
+      
+      // If it's a vanilla app with no HTML, create a basic setup
+      if (Object.keys(result).length === 0 || (!hasHtml && appType === 'vanilla')) {
+        // Create basic HTML file
+        result['/index.html'] = {
+          code: `
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -180,11 +391,11 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
     <script src="/index.js"></script>
   </body>
 </html>`,
-      };
-      
-      // Create a basic JavaScript file to display the files
-      result['/index.js'] = {
-        code: `
+        };
+        
+        // Create a basic JavaScript file to display the files
+        result['/index.js'] = {
+          code: `
 // This script generates the preview display
 console.log("Preview initialized with files:", ${JSON.stringify(files.map(f => f.path))});
 
@@ -222,32 +433,127 @@ document.addEventListener("DOMContentLoaded", function() {
   
   console.log("Preview content displayed");
 });`,
+        };
+        
+        console.log("Created vanilla fallback files for preview");
+      }
+      
+      console.log(`Processed ${Object.keys(result).length} files for Sandpack preview`);
+      return result;
+    } catch (error) {
+      console.error("Error transforming files for preview:", error);
+      setPreviewError(`Error preparing files: ${error instanceof Error ? error.message : String(error)}`);
+      
+      // Return basic error display
+      return {
+        '/index.html': {
+          code: `
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Preview Error</title>
+    <style>
+      body { font-family: system-ui; padding: 2rem; color: #ff3333; background: #fff1f0; }
+      .error-box { border: 1px solid #ff9999; padding: 1rem; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <div class="error-box">
+      <h3>Error preparing preview</h3>
+      <p>${error instanceof Error ? error.message : String(error)}</p>
+      <p>Check the console for more details.</p>
+    </div>
+  </body>
+</html>`
+        }
       };
     }
-    
-    console.log("Processed files for Sandpack:", Object.keys(result).length);
-    return result;
   }, [files, appType]);
 
+  // Get proper dependencies based on app type
+  const getCustomSetup = React.useMemo(() => {
+    const dependencies: Record<string, string> = {};
+    
+    // Add dependencies based on app type
+    if (appType === "react" || appType === "react-ts") {
+      dependencies["react"] = "^18.2.0";
+      dependencies["react-dom"] = "^18.2.0";
+    }
+    
+    if (appType === "react-ts") {
+      dependencies["@types/react"] = "^18.2.0";
+      dependencies["@types/react-dom"] = "^18.2.0";
+    }
+    
+    if (appType === "vite") {
+      dependencies["vite"] = "^4.0.0";
+    }
+    
+    // Check if files include certain imports and add those dependencies
+    const allContent = files.map(file => file.content).join('\n');
+    
+    if (allContent.includes('@tanstack/react-query')) {
+      dependencies["@tanstack/react-query"] = "^5.0.0";
+    }
+    
+    if (allContent.includes('lucide-react')) {
+      dependencies["lucide-react"] = "^0.288.0";
+    }
+    
+    if (allContent.includes('tailwind') || allContent.includes('className=')) {
+      // Already included via external resources but good to note
+    }
+    
+    console.log("Set up dependencies for preview:", dependencies);
+    
+    const entryPath = appType === "vite" ? "/src/main.tsx" : "/index.js";
+    const customEntry = detectEntryPoint(files) || entryPath;
+    
+    return {
+      dependencies,
+      entry: customEntry
+    };
+  }, [files, appType]);
+
+  // Handle loading state and error recovery
   useEffect(() => {
     // Simulate loading for better UX
-    console.log("ArtifactPreview mounted, loading preview...");
+    console.log("ArtifactPreview mounting, preparing preview environment...");
+    
     const timer = setTimeout(() => {
       setIsLoading(false);
       console.log("Preview loading complete");
+      
+      // Reset any previous errors
+      setPreviewError(null);
     }, 1000);
     
-    return () => clearTimeout(timer);
-  }, []);
+    return () => {
+      clearTimeout(timer);
+      console.log("ArtifactPreview unmounting, cleaning up");
+    };
+  }, [files]);
 
   // Force resize on tab change to ensure preview renders properly
   useEffect(() => {
     const timer = setTimeout(() => {
       window.dispatchEvent(new Event('resize'));
-      console.log("Forced resize in ArtifactPreview for tab:", activeTab);
+      console.log(`ArtifactPreview: Forced resize for tab: ${activeTab}`);
     }, 100);
     
     return () => clearTimeout(timer);
+  }, [activeTab]);
+
+  // Force periodic resize to help with rendering issues
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (activeTab === 'preview') {
+        window.dispatchEvent(new Event('resize'));
+      }
+    }, 2000);
+    
+    return () => clearInterval(interval);
   }, [activeTab]);
 
   if (isLoading) {
@@ -274,6 +580,27 @@ document.addEventListener("DOMContentLoaded", function() {
     );
   }
 
+  // If preview error, show error message
+  if (previewError) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 h-full">
+        <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+        <div className="text-center">
+          <p className="font-medium text-gray-200">Preview Error</p>
+          <p className="text-sm text-gray-400 mt-1">{previewError}</p>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="mt-4" 
+            onClick={() => setPreviewError(null)}
+          >
+            Retry Preview
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="artifact-preview-container h-full flex flex-col">
       <SandpackProvider
@@ -289,27 +616,14 @@ document.addEventListener("DOMContentLoaded", function() {
             "https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css"
           ],
           classes: {
-            "sp-wrapper": "h-full !important",
+            "sp-wrapper": "h-full !bg-zinc-900 !important",
             "sp-stack": "h-full !important",
-            "sp-preview-container": "h-full !important bg-white !important",
+            "sp-preview-container": "h-full !bg-white !important",
             "sp-preview": "h-full !important",
-            "sp-preview-iframe": "h-full !important bg-white !important"
+            "sp-preview-iframe": "h-full !bg-white !important"
           }
         }}
-        customSetup={{
-          dependencies: {
-            ...(appType === "react" || appType === "react-ts" ? {
-              "react": "^18.2.0",
-              "react-dom": "^18.2.0",
-              "@types/react": "^18.2.0",
-              "@types/react-dom": "^18.2.0"
-            } : {}),
-            ...(appType === "vite" ? {
-              "vite": "^4.0.0"
-            } : {})
-          },
-          entry: appType === "vite" ? "/src/main.tsx" : "/index.js"
-        }}
+        customSetup={getCustomSetup}
       >
         <AutoRefreshPreview />
         <Tabs 
@@ -347,7 +661,10 @@ document.addEventListener("DOMContentLoaded", function() {
                       variant="ghost" 
                       size="sm" 
                       className="text-gray-400 hover:text-white hover:bg-transparent"
-                      onClick={() => window.dispatchEvent(new Event('resize'))}
+                      onClick={() => {
+                        window.dispatchEvent(new Event('resize'));
+                        console.log("Manual refresh triggered");
+                      }}
                     >
                       Refresh
                     </Button>
