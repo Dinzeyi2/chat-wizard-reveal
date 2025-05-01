@@ -13,11 +13,6 @@ const GitHubCallback = () => {
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
-      console.log("GitHub callback initiated");
-      console.log("Full URL:", window.location.href);
-      console.log("Current pathname:", location.pathname);
-      console.log("Current search params:", location.search);
-      
       try {
         // Check authentication status first
         const { data } = await supabase.auth.getSession();
@@ -32,23 +27,9 @@ const GitHubCallback = () => {
           return;
         }
         
-        // Get code from URL - try multiple methods to extract it
-        let code: string | null = null;
-        
-        // Method 1: Standard query parameter
+        // Get code from URL
         const params = new URLSearchParams(location.search);
-        code = params.get('code');
-        
-        // Method 2: Complete URL parsing fallback
-        if (!code) {
-          const fullUrl = window.location.href;
-          const codeMatch = fullUrl.match(/code=([^&]+)/);
-          if (codeMatch && codeMatch[1]) {
-            code = codeMatch[1];
-          }
-        }
-        
-        console.log("Extracted GitHub code:", code ? `${code.substring(0, 5)}...` : "null");
+        const code = params.get('code');
         
         if (!code) {
           console.error("No authorization code received from GitHub");
@@ -64,8 +45,6 @@ const GitHubCallback = () => {
         const protocol = window.location.protocol;
         const redirectUri = `${protocol}//${hostname}${window.location.port ? `:${window.location.port}` : ''}/callback/github`;
         
-        console.log("Using redirect URI:", redirectUri);
-        
         // Call our Supabase edge function to exchange the code for a token
         const { data: authData, error: authError } = await supabase.functions.invoke('github-auth', {
           body: { 
@@ -78,7 +57,6 @@ const GitHubCallback = () => {
         
         if (authData) {
           // Successfully connected GitHub account
-          console.log("GitHub connection successful:", authData);
           toast({
             title: "GitHub Connected",
             description: `Successfully connected to GitHub as ${authData.user?.login || 'user'}`
@@ -89,7 +67,6 @@ const GitHubCallback = () => {
             navigate("/");
           }, 1500);
         } else {
-          console.error("Failed to connect GitHub account - null result returned");
           setError("Failed to connect GitHub account");
           toast({
             description: "Failed to connect GitHub account"
