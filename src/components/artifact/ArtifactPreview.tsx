@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   SandpackProvider, 
@@ -8,7 +7,8 @@ import {
   SandpackFiles,
   SandpackStack,
   SandpackCodeEditor,
-  useSandpack
+  useSandpack,
+  SandpackMessage
 } from '@codesandbox/sandpack-react';
 import { nightOwl } from '@codesandbox/sandpack-themes';
 import { Loader2, TerminalSquare, FileCode, RefreshCw } from 'lucide-react';
@@ -21,10 +21,10 @@ const AutoRefreshPreview = () => {
   const { sandpack } = useSandpack();
   
   useEffect(() => {
-    // Listen for file changes and auto-refresh
+    // Subscribe to bundler messages
     const unsubscribePromise = sandpack.registerBundler((bundler) => {
-      const unsubscribe = bundler.subscribe((msg) => {
-        if (msg.type === "done") {
+      const unsubscribe = bundler.subscribe(message => {
+        if (message.type === "done") {
           console.log("Bundling complete, auto-refreshing preview");
         }
       });
@@ -33,7 +33,9 @@ const AutoRefreshPreview = () => {
     
     return () => {
       // Clean up the subscription
-      unsubscribePromise.then((unsubscribe) => unsubscribe());
+      unsubscribePromise.then(unsubscribe => {
+        if (unsubscribe) unsubscribe();
+      });
     };
   }, [sandpack]);
   
@@ -191,6 +193,8 @@ ${template === "react-ts" ? "export default function App(): JSX.Element {" : "ex
 
   // Create a refresh handler that we can use anywhere
   const handleRefresh = useCallback(() => {
+    // We'll implement the actual refresh by using the SandpackProvider's reset function
+    // The component will handle the refresh event internally
     toast({
       title: "Preview refreshed",
       description: "The preview has been manually refreshed.",
