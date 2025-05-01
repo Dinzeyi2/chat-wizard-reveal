@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -7,10 +8,9 @@ const getRedirectUri = () => {
   // Check if we're on the production domain
   const hostname = window.location.hostname;
   
-  // For production domains, always use the format without www
-  // This must match EXACTLY what's configured in the GitHub app settings
+  // For production domains, use the exact format that matches how GitHub redirects back
   if (hostname === 'i-blue.dev' || hostname === 'www.i-blue.dev') {
-    return `https://i-blue.dev/github-callback`;
+    return `https://${hostname}/github-callback`;
   }
   
   // For local development or other environments
@@ -50,15 +50,15 @@ export const initiateGithubAuth = async () => {
     // Get the appropriate redirect URI
     const REDIRECT_URI = getRedirectUri();
     
+    // Log the redirect URI for debugging
+    console.log("GitHub Auth - Using redirect URI:", REDIRECT_URI);
+    
     // Construct the GitHub authorization URL
     const authUrl = new URL("https://github.com/login/oauth/authorize");
     authUrl.searchParams.append("client_id", clientId);
     authUrl.searchParams.append("redirect_uri", REDIRECT_URI);
     authUrl.searchParams.append("state", state);
     authUrl.searchParams.append("scope", "repo user");
-    
-    // Log the redirect URI for debugging
-    console.log("GitHub Auth - Redirecting with redirect URI:", REDIRECT_URI);
     
     // Redirect the user to GitHub's authorization page
     window.location.href = authUrl.toString();
