@@ -17,13 +17,10 @@ serve(async (req) => {
   }
 
   try {
-    console.log("GitHub auth edge function invoked");
-    
     // Parse request body
-    const { code } = await req.json();
+    const { code, redirect_uri } = await req.json();
     
     if (!code) {
-      console.error("No code provided in request");
       return new Response(
         JSON.stringify({ error: "No code provided" }), 
         { 
@@ -37,7 +34,6 @@ serve(async (req) => {
     const userId = req.headers.get("x-supabase-auth-user-id");
     
     if (!userId) {
-      console.error("Not authenticated - missing user ID");
       return new Response(
         JSON.stringify({ error: "Not authenticated" }),
         {
@@ -46,11 +42,22 @@ serve(async (req) => {
         }
       );
     }
-    
-    console.log(`Processing GitHub auth for user: ${userId}`);
+
+    console.log("Exchanging GitHub code for access token with redirect URI:", redirect_uri || "No redirect URI provided");
 
     // Exchange code for access token
-    console.log("Exchanging code for GitHub access token");
+    const tokenRequestBody: any = {
+      client_id: githubClientId,
+      client_secret: githubClientSecret,
+      code: code
+    };
+    
+    // Only include redirect_uri if provided
+    if (redirect_uri) {
+      tokenRequestBody.redirect_uri = redirect_uri;
+      console.log("Including redirect_uri in token request:", redirect_uri);
+    }
+
     const tokenResponse = await fetch(
       "https://github.com/login/oauth/access_token",
       {
@@ -59,26 +66,24 @@ serve(async (req) => {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({
-          client_id: githubClientId,
-          client_secret: githubClientSecret,
-          code: code,
-        }),
+        body: JSON.stringify(tokenRequestBody),
       }
     );
 
     const tokenData = await tokenResponse.json();
+    
+    if (tokenData.error) {
+      console.error("GitHub token error:", tokenData);
+      throw new Error(`GitHub API error: ${tokenData.error_description || tokenData.error}`);
+    }
+    
     const accessToken = tokenData.access_token;
 
     if (!accessToken) {
-      console.error("Failed to get access token", tokenData);
       throw new Error("Failed to get access token");
     }
-    
-    console.log("Successfully obtained GitHub access token");
 
     // Get user data from GitHub
-    console.log("Fetching user data from GitHub API");
     const userResponse = await fetch("https://api.github.com/user", {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -86,10 +91,8 @@ serve(async (req) => {
     });
 
     const userData = await userResponse.json();
-    console.log(`GitHub user data retrieved for: ${userData.login}`);
 
     // Store GitHub data in Supabase
-    console.log("Storing GitHub connection data in Supabase");
     const { data, error } = await supabase.from("github_connections").upsert({
       user_id: userId,
       github_id: userData.id,
@@ -100,12 +103,7 @@ serve(async (req) => {
       connected_at: new Date().toISOString(),
     });
 
-    if (error) {
-      console.error("Error storing GitHub connection:", error);
-      throw error;
-    }
-    
-    console.log("GitHub connection successfully stored");
+    if (error) throw error;
 
     return new Response(
       JSON.stringify({ success: true, user: userData }),
@@ -114,7 +112,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error("GitHub auth edge function error:", error);
+    console.error("Error processing GitHub auth:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {

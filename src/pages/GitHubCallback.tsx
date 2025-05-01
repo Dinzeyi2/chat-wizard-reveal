@@ -4,7 +4,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { handleGithubCallback } from "@/utils/githubAuth";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 const GitHubCallback = () => {
   const [error, setError] = useState<string | null>(null);
@@ -26,44 +25,41 @@ const GitHubCallback = () => {
     };
     
     const handleOAuthCallback = async () => {
+      // Detailed logging for debugging
+      console.log("GitHub callback initiated");
+      console.log("Full URL:", window.location.href);
+      console.log("Current pathname:", location.pathname);
+      console.log("Current search params:", location.search);
+      console.log("Host:", window.location.host);
+      console.log("Origin:", window.location.origin);
+      
+      const authStatus = await checkAuth();
+      if (!authStatus) return;
+      
+      const searchParams = new URLSearchParams(location.search);
+      const code = searchParams.get("code");
+      const state = searchParams.get("state");
+      
+      if (!code) {
+        console.error("No authorization code received from GitHub");
+        setError("No authorization code received from GitHub");
+        return;
+      }
+      
       try {
-        console.log("Starting GitHub callback handling");
-        const authStatus = await checkAuth();
-        if (!authStatus) return;
-        
-        const searchParams = new URLSearchParams(location.search);
-        const code = searchParams.get("code");
-        const state = searchParams.get("state");
-        
-        console.log("Received GitHub callback with code:", !!code);
-        
-        if (!code) {
-          setError("No authorization code received from GitHub");
-          return;
+        console.log("Processing GitHub callback with code:", code.substring(0, 5) + "...");
+        const result = await handleGithubCallback(code, state || "");
+        if (result) {
+          // Successfully connected GitHub account
+          console.log("GitHub connection successful, redirecting to home page");
+          navigate("/");
+        } else {
+          console.error("Failed to connect GitHub account - null result returned");
+          setError("Failed to connect GitHub account");
         }
-        
-        try {
-          console.log("Calling handleGithubCallback function");
-          const result = await handleGithubCallback(code, state || "");
-          
-          console.log("GitHub callback result:", result ? "Success" : "Failed");
-          
-          if (result) {
-            toast("GitHub account successfully connected");
-            // Ensure we navigate to home page with a delay to allow toast to show
-            setTimeout(() => {
-              navigate("/");
-            }, 1000);
-          } else {
-            setError("Failed to connect GitHub account. Please try again.");
-          }
-        } catch (error: any) {
-          console.error("GitHub callback error:", error);
-          setError(error.message || "An unexpected error occurred");
-        }
-      } catch (mainError: any) {
-        console.error("Main error in handleOAuthCallback:", mainError);
-        setError("An unexpected error occurred during authentication");
+      } catch (error: any) {
+        console.error("Error during GitHub callback:", error);
+        setError(error.message || "An unexpected error occurred");
       }
     };
     
