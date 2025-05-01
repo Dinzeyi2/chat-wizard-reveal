@@ -50,7 +50,7 @@ const GitHubCallback = () => {
         console.log("Processing GitHub callback with code:", code.substring(0, 5) + "...");
         const result = await handleGithubCallback(code, state || "");
         if (result) {
-          // Successfully connected GitHub account
+          // Successfully connected GitHub account, redirect to home
           console.log("GitHub connection successful, redirecting to home page");
           navigate("/");
         } else {

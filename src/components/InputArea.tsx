@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { ArrowUp, Paperclip, X, Palette, Code, Github, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
   // Define the checkGithubConnection function before using it
   const checkGithubConnection = async () => {
     const connected = await isGithubConnected();
+    console.log("GitHub connection status:", connected);
     setIsConnectedToGithub(connected);
   };
 
@@ -219,10 +221,13 @@ Based on this design, please ${message}
           body: {}
         });
         
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
         
         setGithubRepos(data.repos || []);
       } catch (error) {
+        console.error("Failed to load GitHub repos:", error);
         toast({
           variant: "destructive",
           title: "Failed to load repositories",
@@ -298,27 +303,30 @@ Based on this design, please ${message}
               </PromptInputAction>
             </TooltipProvider>
             
-            {!isAuthenticated ? (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="rounded-full"
-                onClick={() => navigate('/auth')}
-              >
-                <LogIn className="mr-1 size-4" />
-                Sign In
-              </Button>
-            ) : (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="rounded-full"
-                onClick={handleGithubClick}
-              >
-                <Github className="mr-1 size-4" />
-                GitHub
-              </Button>
-            )}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="rounded-full"
+              onClick={() => {
+                if (!isAuthenticated) {
+                  navigate('/auth');
+                } else {
+                  handleGithubClick();
+                }
+              }}
+            >
+              {!isAuthenticated ? (
+                <>
+                  <LogIn className="mr-1 size-4" />
+                  Sign In
+                </>
+              ) : (
+                <>
+                  <Github className="mr-1 size-4" />
+                  GitHub
+                </>
+              )}
+            </Button>
             <Button variant="outline" size="sm" className="rounded-full">Reason</Button>
             <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Deep research</Button>
             <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Create image</Button>

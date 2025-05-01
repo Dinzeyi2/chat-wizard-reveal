@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -157,9 +158,13 @@ export const isGithubConnected = async (): Promise<boolean> => {
       .eq("user_id", user.id)
       .maybeSingle();
       
-    if (error) return false;
+    if (error) {
+      console.error("Error checking GitHub connection:", error);
+      return false;
+    }
     return !!data;
   } catch (error) {
+    console.error("Error in isGithubConnected:", error);
     return false;
   }
 };
