@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   SandpackProvider, 
@@ -8,7 +7,8 @@ import {
   SandpackFiles,
   SandpackStack,
   useSandpack,
-  useActiveCode
+  useActiveCode,
+  ListenerStatus
 } from '@codesandbox/sandpack-react';
 import { nightOwl } from '@codesandbox/sandpack-themes';
 import { Loader2, TerminalSquare, AlertCircle, RefreshCw } from 'lucide-react';
@@ -46,8 +46,8 @@ const AutoRefreshPreview = () => {
         // Reset status after a delay
         setTimeout(() => setRefreshStatus(null), 2000);
       } else if (msg.type === 'status') {
-        // Properly handle status messages with type checking
-        const statusMsg = msg;
+        // Cast to any to safely check the status property
+        const statusMsg = msg as any;
         if (statusMsg.status === 'error') {
           setRefreshStatus('error');
           console.error('Hot reload error:', statusMsg);
@@ -364,10 +364,10 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
         const fileContent = result[path];
         // Type check - ensure fileContent is an object with code property
         if (typeof fileContent === 'object' && fileContent !== null) {
-          const fileContentObj = fileContent as { code: string };
-          if (typeof fileContentObj.code === 'string') {
+          const sandpackFile = fileContent as { code: string; active?: boolean };
+          if (typeof sandpackFile.code === 'string') {
             // Check for any shadcn imports
-            const originalCode = fileContentObj.code;
+            const originalCode = sandpackFile.code;
             
             // Replace all shadcn import patterns
             let updatedCode = originalCode
@@ -394,9 +394,9 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
       for (const path in result) {
         const fileContent = result[path];
         if (typeof fileContent === 'object' && fileContent !== null) {
-          const fileContentObj = fileContent as { code: string };
-          if (typeof fileContentObj.code === 'string' && 
-              (fileContentObj.code.includes('@shadcn/ui') || fileContentObj.code.includes('shadcn/ui'))) {
+          const sandpackFile = fileContent as { code: string; active?: boolean };
+          if (typeof sandpackFile.code === 'string' && 
+              (sandpackFile.code.includes('@shadcn/ui') || sandpackFile.code.includes('shadcn/ui'))) {
             needsShadcnHelper = true;
             break;
           }
