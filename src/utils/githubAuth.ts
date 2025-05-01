@@ -2,7 +2,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 // GitHub OAuth configuration
-const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || ""; // This will be configured in your environment
 const REDIRECT_URI = `${window.location.origin}/github-callback`;
 
 export const initiateGithubAuth = async () => {
