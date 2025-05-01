@@ -51,8 +51,7 @@ serve(async (req) => {
 
     console.log("Exchanging GitHub code for access token with redirect URI:", redirect_uri || "No redirect URI provided");
 
-    // Exchange code for access token - NOTE: We only include redirect_uri if it's provided
-    // This is key to making OAuth work across different environments
+    // Exchange code for access token
     const tokenRequestBody: any = {
       client_id: githubClientId,
       client_secret: githubClientSecret,
@@ -78,9 +77,7 @@ serve(async (req) => {
     );
 
     const tokenData = await tokenResponse.json();
-    console.log("GitHub token response status:", tokenResponse.status);
-    console.log("GitHub token response type:", tokenData.token_type || "No token type");
-    console.log("GitHub error (if any):", tokenData.error || "No error");
+    console.log("GitHub token response:", JSON.stringify(tokenData));
     
     if (tokenData.error) {
       console.error("GitHub token error:", tokenData);

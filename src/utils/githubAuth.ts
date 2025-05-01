@@ -1,12 +1,19 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
-// Simplified redirect URI logic - use the current URL
+// Get the appropriate redirect URI
 const getRedirectUri = () => {
-  // Get the base URL (protocol + hostname)
-  const baseUrl = `${window.location.protocol}//${window.location.host}`;
-  // Always use the same path for consistency
-  return `${baseUrl}/callback/github`;
+  const hostname = window.location.hostname;
+  const protocol = window.location.protocol;
+  
+  // For production domains, use the production URL
+  if (hostname === 'i-blue.dev' || hostname === 'www.i-blue.dev') {
+    return `https://${hostname}/callback/github`;
+  }
+  
+  // For local development or other environments
+  return `${protocol}//${hostname}${window.location.port ? `:${window.location.port}` : ''}/callback/github`;
 };
 
 export const initiateGithubAuth = async () => {
@@ -39,7 +46,7 @@ export const initiateGithubAuth = async () => {
     // Store the state in sessionStorage for verification after redirect
     sessionStorage.setItem("githubOAuthState", state);
     
-    // Get the redirect URI
+    // Get the appropriate redirect URI
     const REDIRECT_URI = getRedirectUri();
     
     // Construct the GitHub authorization URL
