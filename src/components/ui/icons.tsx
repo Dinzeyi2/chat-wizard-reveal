@@ -1,5 +1,5 @@
 
-import { Github, Mail, X, User, Key, LogIn, UserPlus, Database, FolderGit } from "lucide-react";
+import { Github, Mail, X, User, Key, LogIn, UserPlus, Database } from "lucide-react";
 
 export const Icons = {
   gitHub: Github,
@@ -28,5 +28,4 @@ export const Icons = {
   login: LogIn,
   signup: UserPlus,
   database: Database,
-  folderGit: FolderGit,
 };

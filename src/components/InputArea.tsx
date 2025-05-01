@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { ArrowUp, Paperclip, X, Palette, Code, Github, LogIn, Database, Folder } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { Link, useNavigate } from "react-router-dom";
-import { Icons } from "@/components/icons";
 
 interface InputAreaProps {
   onSendMessage: (message: string) => void;
@@ -193,7 +193,13 @@ Based on this design, please ${message}
   };
 
   const handleGithubRepoClick = () => {
-    // Show the GitHub repository dialog regardless of authentication status
+    if (!isAuthenticated) {
+      // If not authenticated, redirect to auth page
+      navigate('/auth');
+      return;
+    }
+
+    // Show the GitHub repository dialog
     setShowGithubRepoDialog(true);
   };
   
@@ -332,10 +338,25 @@ Based on this design, please ${message}
               variant="outline" 
               size="sm" 
               className="rounded-full"
-              onClick={handleGithubRepoClick}
+              onClick={() => {
+                if (!isAuthenticated) {
+                  navigate('/auth');
+                } else {
+                  handleGithubRepoClick();
+                }
+              }}
             >
-              <Icons.folderGit className="mr-1 size-4" />
-              Import Repo
+              {!isAuthenticated ? (
+                <>
+                  <LogIn className="mr-1 size-4" />
+                  Sign In
+                </>
+              ) : (
+                <>
+                  <Folder className="mr-1 size-4" />
+                  Import Repo
+                </>
+              )}
             </Button>
             <Button variant="outline" size="sm" className="rounded-full">Reason</Button>
             <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Deep research</Button>
@@ -472,7 +493,7 @@ Based on this design, please ${message}
                   <div className="max-h-40 overflow-y-auto border rounded p-2">
                     {repoFiles.map((file, index) => (
                       <div key={index} className="text-xs py-1 flex items-center">
-                        <Icons.database className="size-3 mr-1" />
+                        <Database className="size-3 mr-1" />
                         {file}
                       </div>
                     ))}
@@ -495,7 +516,7 @@ Based on this design, please ${message}
                 {isLoadingRepo ? (
                   <>
                     <span className="animate-spin mr-2">
-                      <Icons.database className="size-4" />
+                      <Code className="size-4" />
                     </span>
                     Importing...
                   </>
