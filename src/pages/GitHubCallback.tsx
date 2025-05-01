@@ -3,14 +3,31 @@ import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { handleGithubCallback } from "@/utils/githubAuth";
 import { Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const GitHubCallback = () => {
   const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getSession();
+      setIsAuthenticated(!!data.session);
+      
+      if (!data.session) {
+        setError("You must be signed in to connect your GitHub account");
+        return false;
+      }
+      
+      return true;
+    };
+    
     const handleOAuthCallback = async () => {
+      const authStatus = await checkAuth();
+      if (!authStatus) return;
+      
       const searchParams = new URLSearchParams(location.search);
       const code = searchParams.get("code");
       const state = searchParams.get("state");
@@ -28,7 +45,7 @@ const GitHubCallback = () => {
         } else {
           setError("Failed to connect GitHub account");
         }
-      } catch (error) {
+      } catch (error: any) {
         setError(error.message || "An unexpected error occurred");
       }
     };
@@ -43,10 +60,10 @@ const GitHubCallback = () => {
           <h2 className="text-lg font-semibold text-red-700 mb-2">Authentication Error</h2>
           <p className="text-red-600">{error}</p>
           <button 
-            onClick={() => navigate("/")}
+            onClick={() => navigate(isAuthenticated ? "/" : "/auth")}
             className="mt-4 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-md transition-colors"
           >
-            Return to Home
+            {isAuthenticated ? "Return to Home" : "Sign In"}
           </button>
         </div>
       ) : (

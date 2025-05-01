@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -6,6 +7,15 @@ const REDIRECT_URI = `${window.location.origin}/github-callback`;
 
 export const initiateGithubAuth = async () => {
   try {
+    // Check if user is authenticated
+    const { data: sessionData } = await supabase.auth.getSession();
+    
+    if (!sessionData.session) {
+      // User is not authenticated, redirect to login
+      window.location.href = '/auth';
+      return;
+    }
+    
     // Get the client ID from Supabase secrets
     const { data, error } = await supabase.functions.invoke('get-env', {
       body: { key: "GITHUB_CLIENT_ID" }
@@ -62,6 +72,18 @@ export const handleGithubCallback = async (code: string, state: string) => {
   // Clean up the stored state
   sessionStorage.removeItem("githubOAuthState");
   
+  // Check if user is authenticated
+  const { data: sessionData } = await supabase.auth.getSession();
+    
+  if (!sessionData.session) {
+    toast({
+      variant: "destructive",
+      title: "Authentication Error",
+      description: "You must be signed in to connect your GitHub account.",
+    });
+    return null;
+  }
+  
   try {
     // Exchange the authorization code for an access token
     const { data, error } = await supabase.functions.invoke('github-auth', {
@@ -76,7 +98,7 @@ export const handleGithubCallback = async (code: string, state: string) => {
     });
     
     return data;
-  } catch (error) {
+  } catch (error: any) {
     toast({
       variant: "destructive",
       title: "Connection Failed",
@@ -88,6 +110,13 @@ export const handleGithubCallback = async (code: string, state: string) => {
 
 export const isGithubConnected = async (): Promise<boolean> => {
   try {
+    // Check if user is authenticated first
+    const { data: sessionData } = await supabase.auth.getSession();
+    
+    if (!sessionData.session) {
+      return false;
+    }
+    
     // Access the github_connections table directly to check if current user has a connection
     const {
       data: { user },

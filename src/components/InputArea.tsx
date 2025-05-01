@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ArrowUp, Paperclip, X, Palette, Code, Github } from "lucide-react";
+import { ArrowUp, Paperclip, X, Palette, Code, Github, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   PromptInput,
@@ -20,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { Link, useNavigate } from "react-router-dom";
 import { isGithubConnected, initiateGithubAuth } from "@/utils/githubAuth";
 
 interface InputAreaProps {
@@ -37,9 +38,37 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
   const [githubRepos, setGithubRepos] = useState<any[]>([]);
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
   const [isConnectedToGithub, setIsConnectedToGithub] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
   const { toast } = useToast();
   
+  // Define the checkGithubConnection function before using it
+  const checkGithubConnection = async () => {
+    const connected = await isGithubConnected();
+    setIsConnectedToGithub(connected);
+  };
+
+  const checkAuthStatus = async () => {
+    const { data } = await supabase.auth.getSession();
+    setIsAuthenticated(!!data.session);
+  };
+
+  // Use effects to check auth and GitHub connection status
+  useEffect(() => {
+    checkAuthStatus();
+    checkGithubConnection();
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      checkAuthStatus();
+      checkGithubConnection();
+    });
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   const { findDesignCode, isLoading: isScraperLoading } = useUiScraper({
     onSuccess: (data) => {
       if (data.code) {
@@ -62,17 +91,6 @@ Based on this design, please ${message}
       }
     }
   });
-
-  // Define the checkGithubConnection function before using it
-  const checkGithubConnection = async () => {
-    const connected = await isGithubConnected();
-    setIsConnectedToGithub(connected);
-  };
-
-  // Now use it in useEffect hook
-  useEffect(() => {
-    checkGithubConnection();
-  }, []);
 
   const handleSubmit = async () => {
     if (message.trim() || files.length > 0) {
@@ -182,6 +200,12 @@ Based on this design, please ${message}
   };
 
   const handleGithubClick = async () => {
+    if (!isAuthenticated) {
+      // If not authenticated, redirect to auth page
+      navigate('/auth');
+      return;
+    }
+
     if (!isConnectedToGithub) {
       // If not connected to GitHub, initiate auth flow
       await initiateGithubAuth();
@@ -274,15 +298,27 @@ Based on this design, please ${message}
               </PromptInputAction>
             </TooltipProvider>
             
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="rounded-full"
-              onClick={handleGithubClick}
-            >
-              <Github className="mr-1 size-4" />
-              GitHub
-            </Button>
+            {!isAuthenticated ? (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="rounded-full"
+                onClick={() => navigate('/auth')}
+              >
+                <LogIn className="mr-1 size-4" />
+                Sign In
+              </Button>
+            ) : (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="rounded-full"
+                onClick={handleGithubClick}
+              >
+                <Github className="mr-1 size-4" />
+                GitHub
+              </Button>
+            )}
             <Button variant="outline" size="sm" className="rounded-full">Reason</Button>
             <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Deep research</Button>
             <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Create image</Button>
