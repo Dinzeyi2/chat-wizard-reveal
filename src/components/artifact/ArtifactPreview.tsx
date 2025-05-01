@@ -1,17 +1,40 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   SandpackProvider, 
   SandpackLayout, 
   SandpackPreview, 
   SandpackConsole,
   SandpackFiles,
-  SandpackStack
+  SandpackStack,
+  useSandpack
 } from '@codesandbox/sandpack-react';
 import { nightOwl } from '@codesandbox/sandpack-themes';
 import { Loader2, TerminalSquare, AlertCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+
+// Auto-refresh component that handles hot-reloading
+const AutoRefreshPreview = () => {
+  const { sandpack } = useSandpack();
+  
+  useEffect(() => {
+    const unsubscribe = sandpack.listen((message) => {
+      if (message.type === 'done') {
+        // Refresh complete - any additional actions can go here
+        console.log('Hot reload complete');
+      }
+    });
+    
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, [sandpack]);
+  
+  return null;
+};
 
 interface ArtifactPreviewProps {
   files: Array<{
@@ -27,15 +50,83 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"preview" | "console">("preview");
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [appType, setAppType] = useState<"vanilla" | "react" | "react-ts" | "vite">("vanilla");
+  
+  // Auto-detect the application type based on files
+  useEffect(() => {
+    // Default to vanilla
+    let detectedType: "vanilla" | "react" | "react-ts" | "vite" = "vanilla";
+    
+    // Check for package.json to detect app type
+    const packageJson = files.find(file => file.path.includes('package.json'));
+    const hasReactComponent = files.some(file => 
+      (file.path.endsWith('.jsx') || file.path.endsWith('.tsx')) && 
+      file.content.includes('import React') || file.content.includes('from "react"')
+    );
+    
+    const hasViteConfig = files.some(file => 
+      file.path.includes('vite.config') || 
+      (packageJson && packageJson.content.includes('"vite"'))
+    );
+    
+    const hasTypeScript = files.some(file => 
+      file.path.endsWith('.ts') || file.path.endsWith('.tsx')
+    );
+    
+    if (hasViteConfig) {
+      detectedType = "vite";
+      console.log("Detected Vite application");
+    } else if (hasReactComponent) {
+      detectedType = hasTypeScript ? "react-ts" : "react";
+      console.log(`Detected React ${hasTypeScript ? 'TypeScript' : 'JavaScript'} application`);
+    }
+    
+    setAppType(detectedType);
+  }, [files]);
   
   // Transform files to Sandpack format
   const sandpackFiles: SandpackFiles = React.useMemo(() => {
-    console.log("Processing files for preview:", files.length);
+    console.log(`Processing files for preview: ${files.length}, app type: ${appType}`);
     const result: SandpackFiles = {};
     
-    // Always create an index.html file for better visibility
-    result["/index.html"] = {
-      code: `
+    // Add all user's files
+    files.forEach(file => {
+      // Skip any path with node_modules
+      if (file.path.includes("node_modules")) return;
+      
+      // Ensure the path starts with /
+      const path = file.path.startsWith("/") ? file.path : `/${file.path}`;
+      
+      // Store the file content
+      result[path] = {
+        code: file.content,
+        active: file.path.endsWith('index.js') || file.path.endsWith('index.tsx') || file.path.endsWith('App.tsx')
+      };
+    });
+    
+    // If no index.html is provided and it's a React app, create one
+    if (!result['/index.html'] && (appType === 'react' || appType === 'react-ts')) {
+      result['/index.html'] = {
+        code: `
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>React App Preview</title>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>`,
+      };
+    }
+    
+    // If it's a vanilla app with no HTML, create a basic setup
+    if (Object.keys(result).length === 0 || (!result['/index.html'] && appType === 'vanilla')) {
+      // Create basic HTML file
+      result['/index.html'] = {
+        code: `
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -78,17 +169,15 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
     </style>
   </head>
   <body>
-    <div id="root"></div>
     <div id="app"></div>
     <script src="/index.js"></script>
   </body>
 </html>`,
-      hidden: false
-    };
-    
-    // Always create an index.js file that will display files content
-    result["/index.js"] = {
-      code: `
+      };
+      
+      // Create a basic JavaScript file to display the files
+      result['/index.js'] = {
+        code: `
 // This script generates the preview display
 console.log("Preview initialized with files:", ${JSON.stringify(files.map(f => f.path))});
 
@@ -126,34 +215,13 @@ document.addEventListener("DOMContentLoaded", function() {
   
   console.log("Preview content displayed");
 });`,
-      hidden: false
-    };
-    
-    // Add all user's files
-    files.forEach(file => {
-      // Skip any path with node_modules
-      if (file.path.includes("node_modules")) return;
-      
-      // Ensure the path starts with /
-      const path = file.path.startsWith("/") ? file.path : `/${file.path}`;
-      
-      // Store the file content
-      result[path] = {
-        code: file.content
       };
-    });
+    }
     
     console.log("Processed files for Sandpack:", Object.keys(result).length);
     return result;
-  }, [files]);
+  }, [files, appType]);
 
-  // Use a properly typed template value
-  const template = React.useMemo((): "vanilla" | "react" | "react-ts" | "vite" => {
-    // Default to vanilla template for most reliable rendering
-    console.log("Using vanilla template");
-    return "vanilla";
-  }, []);
-  
   useEffect(() => {
     // Simulate loading for better UX
     console.log("ArtifactPreview mounted, loading preview...");
@@ -203,12 +271,13 @@ document.addEventListener("DOMContentLoaded", function() {
     <div className="artifact-preview-container h-full flex flex-col">
       <SandpackProvider
         theme={nightOwl}
-        template={template}
+        template={appType}
         files={sandpackFiles}
         options={{
-          recompileMode: "immediate",
+          recompileMode: "delayed",
           recompileDelay: 300,
           autorun: true,
+          bundlerURL: "https://sandpack-bundler.pages.dev",
           externalResources: [
             "https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css"
           ],
@@ -221,10 +290,21 @@ document.addEventListener("DOMContentLoaded", function() {
           }
         }}
         customSetup={{
-          dependencies: {},
-          entry: "/index.js"
+          dependencies: {
+            ...(appType === "react" || appType === "react-ts" ? {
+              "react": "^18.2.0",
+              "react-dom": "^18.2.0",
+              "@types/react": "^18.2.0",
+              "@types/react-dom": "^18.2.0"
+            } : {}),
+            ...(appType === "vite" ? {
+              "vite": "^4.0.0"
+            } : {})
+          },
+          entry: appType === "vite" ? "/src/main.tsx" : "/index.js"
         }}
       >
+        <AutoRefreshPreview />
         <Tabs 
           value={activeTab} 
           onValueChange={(value) => setActiveTab(value as "preview" | "console")} 
@@ -252,8 +332,19 @@ document.addEventListener("DOMContentLoaded", function() {
                 <SandpackPreview 
                   showNavigator={true}
                   showRefreshButton={true}
+                  showOpenInCodeSandbox={false}
                   showRestartButton={true}
                   className="!h-full !w-full sp-preview-force"
+                  actionsChildren={
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-gray-400 hover:text-white hover:bg-transparent"
+                      onClick={() => window.dispatchEvent(new Event('resize'))}
+                    >
+                      Refresh
+                    </Button>
+                  }
                 />
               </SandpackStack>
             </SandpackLayout>

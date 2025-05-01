@@ -326,3 +326,54 @@ iframe.sp-preview-iframe {
 .sp-wrapper {
   background-color: transparent !important;
 }
+
+/* Enhanced hot reloading styles */
+.sp-overlay {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+  color: white !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.sp-overlay-loading {
+  padding: 8px 16px !important;
+  border-radius: 4px !important;
+  background-color: #2a2a2a !important;
+  font-size: 14px !important;
+}
+
+/* Fix for hot module replacement flash */
+.sp-preview-container.refresh-triggered {
+  animation: flash-reload 0.3s;
+}
+
+@keyframes flash-reload {
+  0% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+/* Show indicators for live coding */
+.sp-live-indicator {
+  position: absolute !important;
+  top: 8px !important;
+  right: 8px !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  background-color: #4caf50 !important;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.3) !important;
+  animation: pulse-green 2s infinite !important;
+}
+
+@keyframes pulse-green {
+  0% {
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(76, 175, 80, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+  }
+}
