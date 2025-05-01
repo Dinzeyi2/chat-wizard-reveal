@@ -3,13 +3,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useState } from "react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ChatHistory from "./pages/ChatHistory";
-import GitHubCallback from "./pages/GitHubCallback";
-import Auth from "./pages/Auth";
 import "./components/artifact/ArtifactSystem.css";
 
 const App = () => {
@@ -24,13 +22,7 @@ const App = () => {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
             <Route path="/history" element={<ChatHistory />} />
-            
-            {/* GitHub callback - needs exact path match with the URL GitHub redirects to */}
-            <Route path="github-callback" element={<GitHubCallback />} />
-            
-            {/* Catch-all route for 404s */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
