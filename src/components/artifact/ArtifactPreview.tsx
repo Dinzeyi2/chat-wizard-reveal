@@ -1,49 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { 
   SandpackProvider, 
   SandpackLayout, 
   SandpackPreview, 
   SandpackConsole,
   SandpackFiles,
-  SandpackStack,
-  SandpackCodeEditor,
-  useSandpack
+  SandpackStack
 } from '@codesandbox/sandpack-react';
 import { nightOwl } from '@codesandbox/sandpack-themes';
-import { Loader2, TerminalSquare, FileCode, RefreshCw } from 'lucide-react';
+import { Loader2, TerminalSquare, AlertCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/hooks/use-toast";
-
-// This component auto-refreshes the preview when code changes
-const AutoRefreshPreview = () => {
-  const { sandpack } = useSandpack();
-  
-  useEffect(() => {
-    // Subscribe to bundler messages
-    const unsubscribePromise = sandpack.registerBundler((bundler) => {
-      const unsubscribe = bundler.subscribe((message) => {
-        if (message.type === "done") {
-          console.log("Bundling complete, auto-refreshing preview");
-        }
-      }, { status: true });
-      return unsubscribe;
-    });
-    
-    return () => {
-      // Clean up the subscription
-      unsubscribePromise.then((unsubscribe) => {
-        if (unsubscribe) {
-          unsubscribe();
-        }
-      }).catch(err => {
-        console.error("Error unsubscribing:", err);
-      });
-    };
-  }, [sandpack]);
-  
-  return null; // This is a utility component with no UI
-};
 
 interface ArtifactPreviewProps {
   files: Array<{
@@ -57,40 +25,111 @@ interface ArtifactPreviewProps {
 
 export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"preview" | "console" | "editor">("preview");
+  const [activeTab, setActiveTab] = useState<"preview" | "console">("preview");
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const [template, setTemplate] = useState<"vanilla" | "react" | "react-ts">("react");
   
   // Transform files to Sandpack format
   const sandpackFiles: SandpackFiles = React.useMemo(() => {
     console.log("Processing files for preview:", files.length);
     const result: SandpackFiles = {};
     
-    // Try to detect proper template based on files
-    const hasReactFiles = files.some(f => 
-      f.path.endsWith('.jsx') || 
-      f.path.endsWith('.tsx') || 
-      f.content.includes('import React') || 
-      f.content.includes('from "react"')
-    );
-    
-    const hasTypeScript = files.some(f => 
-      f.path.endsWith('.ts') || 
-      f.path.endsWith('.tsx')
-    );
-    
-    // Set appropriate template
-    if (hasReactFiles) {
-      if (hasTypeScript) {
-        setTemplate("react-ts");
-      } else {
-        setTemplate("react");
+    // Always create an index.html file for better visibility
+    result["/index.html"] = {
+      code: `
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Code Preview</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f5f5f5;
+        color: #333;
       }
-    } else {
-      setTemplate("vanilla");
-    }
+      h1 {
+        color: #2d3748;
+        margin-bottom: 10px;
+      }
+      p {
+        margin-bottom: 20px;
+      }
+      .content {
+        background-color: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+      }
+      pre {
+        background-color: #f0f0f0;
+        padding: 10px;
+        border-radius: 4px;
+        overflow: auto;
+      }
+      .file-name {
+        font-weight: bold;
+        margin-bottom: 5px;
+        color: #4a5568;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div id="app"></div>
+    <script src="/index.js"></script>
+  </body>
+</html>`,
+      hidden: false
+    };
     
-    // Process all files
+    // Always create an index.js file that will display files content
+    result["/index.js"] = {
+      code: `
+// This script generates the preview display
+console.log("Preview initialized with files:", ${JSON.stringify(files.map(f => f.path))});
+
+document.addEventListener("DOMContentLoaded", function() {
+  const container = document.createElement("div");
+  container.className = "content";
+  document.body.appendChild(container);
+  
+  const header = document.createElement("h1");
+  header.textContent = "Code Preview";
+  container.appendChild(header);
+  
+  const description = document.createElement("p");
+  description.textContent = "Files in this preview:";
+  container.appendChild(description);
+  
+  // Display each file
+  const filesList = ${JSON.stringify(files.map(f => ({ path: f.path, content: f.content.substring(0, 200) })))};
+  
+  filesList.forEach(file => {
+    const fileContainer = document.createElement("div");
+    fileContainer.className = "content";
+    
+    const fileName = document.createElement("div");
+    fileName.className = "file-name";
+    fileName.textContent = file.path;
+    fileContainer.appendChild(fileName);
+    
+    const contentPreview = document.createElement("pre");
+    contentPreview.textContent = file.content + (file.content.length > 200 ? "..." : "");
+    fileContainer.appendChild(contentPreview);
+    
+    container.appendChild(fileContainer);
+  });
+  
+  console.log("Preview content displayed");
+});`,
+      hidden: false
+    };
+    
+    // Add all user's files
     files.forEach(file => {
       // Skip any path with node_modules
       if (file.path.includes("node_modules")) return;
@@ -100,78 +139,20 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
       
       // Store the file content
       result[path] = {
-        code: file.content,
-        active: true // Make file active in editor
+        code: file.content
       };
     });
     
-    // Create essential files if they don't exist
-    if (!Object.keys(result).some(path => path.endsWith('index.html'))) {
-      result["/index.html"] = {
-        code: `
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>React Preview</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="./index.js"></script>
-  </body>
-</html>`,
-      };
-    }
-    
-    // Create a React entry point if template is react but no App or index files exist
-    if (template.includes('react') && 
-        !Object.keys(result).some(path => 
-          path.endsWith('App.jsx') || 
-          path.endsWith('App.tsx') || 
-          path.endsWith('index.jsx') || 
-          path.endsWith('index.tsx')
-        )) {
-      
-      // Add index.js if it doesn't exist
-      if (!Object.keys(result).some(path => path.endsWith('index.js'))) {
-        result["/index.js"] = {
-          code: `
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App';
-
-const root = createRoot(document.getElementById('root'));
-root.render(<App />);
-`,
-        };
-      }
-      
-      // Add App component if it doesn't exist
-      if (!Object.keys(result).some(path => path.includes('App.'))) {
-        const fileExt = template === "react-ts" ? "tsx" : "jsx";
-        result[`/App.${fileExt}`] = {
-          code: `
-import React from 'react';
-
-${template === "react-ts" ? "export default function App(): JSX.Element {" : "export default function App() {"}
-  return (
-    <div className="app-container">
-      <h1>React Preview</h1>
-      <p>This is a preview of your React application.</p>
-      <p>Edit files in the editor to see changes reflected here in real-time!</p>
-    </div>
-  );
-}
-`,
-        };
-      }
-    }
-    
     console.log("Processed files for Sandpack:", Object.keys(result).length);
-    console.log("Using template:", template);
     return result;
   }, [files]);
+
+  // Use a properly typed template value
+  const template = React.useMemo((): "vanilla" | "react" | "react-ts" | "vite" => {
+    // Default to vanilla template for most reliable rendering
+    console.log("Using vanilla template");
+    return "vanilla";
+  }, []);
   
   useEffect(() => {
     // Simulate loading for better UX
@@ -193,16 +174,6 @@ ${template === "react-ts" ? "export default function App(): JSX.Element {" : "ex
     
     return () => clearTimeout(timer);
   }, [activeTab]);
-
-  // Create a refresh handler that we can use anywhere
-  const handleRefresh = useCallback(() => {
-    // Notify user that refresh was triggered
-    toast({
-      title: "Preview refreshed",
-      description: "The preview has been manually refreshed.",
-      duration: 2000
-    });
-  }, []);
 
   if (isLoading) {
     return (
@@ -235,11 +206,11 @@ ${template === "react-ts" ? "export default function App(): JSX.Element {" : "ex
         template={template}
         files={sandpackFiles}
         options={{
-          autorun: true,
-          recompileDelay: 300,
           recompileMode: "immediate",
+          recompileDelay: 300,
+          autorun: true,
           externalResources: [
-            "https://cdn.tailwindcss.com"
+            "https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css"
           ],
           classes: {
             "sp-wrapper": "h-full !important",
@@ -250,17 +221,13 @@ ${template === "react-ts" ? "export default function App(): JSX.Element {" : "ex
           }
         }}
         customSetup={{
-          dependencies: {
-            "react": "^18.0.0",
-            "react-dom": "^18.0.0"
-          }
+          dependencies: {},
+          entry: "/index.js"
         }}
       >
-        <AutoRefreshPreview />
-        
         <Tabs 
           value={activeTab} 
-          onValueChange={(value) => setActiveTab(value as "preview" | "console" | "editor")} 
+          onValueChange={(value) => setActiveTab(value as "preview" | "console")} 
           className="w-full h-full"
         >
           <div className="flex justify-between items-center border-b border-zinc-800 px-2">
@@ -270,12 +237,6 @@ ${template === "react-ts" ? "export default function App(): JSX.Element {" : "ex
                   Preview
                 </div>
               </TabsTrigger>
-              <TabsTrigger value="editor" className="data-[state=active]:bg-zinc-800">
-                <div className="flex items-center gap-2">
-                  <FileCode className="h-4 w-4" />
-                  Editor
-                </div>
-              </TabsTrigger>
               <TabsTrigger value="console" className="data-[state=active]:bg-zinc-800">
                 <div className="flex items-center gap-2">
                   <TerminalSquare className="h-4 w-4" />
@@ -283,37 +244,16 @@ ${template === "react-ts" ? "export default function App(): JSX.Element {" : "ex
                 </div>
               </TabsTrigger>
             </TabsList>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleRefresh}
-              className="text-gray-400 hover:text-white hover:bg-transparent"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
           </div>
           
           <TabsContent value="preview" className="border-none p-0 m-0 h-full">
             <SandpackLayout className="h-full w-full">
               <SandpackStack className="h-full w-full">
                 <SandpackPreview 
+                  showNavigator={true}
                   showRefreshButton={true}
                   showRestartButton={true}
                   className="!h-full !w-full sp-preview-force"
-                />
-              </SandpackStack>
-            </SandpackLayout>
-          </TabsContent>
-          
-          <TabsContent value="editor" className="border-none p-0 m-0 h-full">
-            <SandpackLayout className="h-full w-full">
-              <SandpackStack className="h-full w-full">
-                <SandpackCodeEditor
-                  showLineNumbers={true}
-                  showInlineErrors={true}
-                  wrapContent={true}
-                  className="h-full"
                 />
               </SandpackStack>
             </SandpackLayout>
