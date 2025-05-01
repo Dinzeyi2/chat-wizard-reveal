@@ -4,12 +4,14 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { handleGithubCallback } from "@/utils/githubAuth";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const GitHubCallback = () => {
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -25,33 +27,52 @@ const GitHubCallback = () => {
     };
     
     const handleOAuthCallback = async () => {
-      const authStatus = await checkAuth();
-      if (!authStatus) return;
-      
-      const searchParams = new URLSearchParams(location.search);
-      const code = searchParams.get("code");
-      const state = searchParams.get("state");
-      
-      if (!code) {
-        setError("No authorization code received from GitHub");
-        return;
-      }
-      
       try {
+        console.log("GitHub callback started, processing OAuth response");
+        const authStatus = await checkAuth();
+        if (!authStatus) {
+          console.log("Authentication check failed, user not logged in");
+          return;
+        }
+        
+        const searchParams = new URLSearchParams(location.search);
+        const code = searchParams.get("code");
+        const state = searchParams.get("state");
+        
+        console.log("Received code:", !!code, "state:", !!state);
+        
+        if (!code) {
+          console.error("No authorization code received from GitHub");
+          setError("No authorization code received from GitHub");
+          return;
+        }
+        
+        console.log("Calling handleGithubCallback function with code");
         const result = await handleGithubCallback(code, state || "");
+        console.log("GitHub callback result:", result);
+        
         if (result) {
+          toast({
+            title: "GitHub Connected",
+            description: "Your GitHub account has been successfully connected",
+          });
+          
           // Successfully connected GitHub account
+          console.log("GitHub connection successful, redirecting to home");
           navigate("/");
         } else {
+          console.error("Failed to connect GitHub account, no result returned");
           setError("Failed to connect GitHub account");
         }
       } catch (error: any) {
+        console.error("Error in GitHub callback:", error);
         setError(error.message || "An unexpected error occurred");
       }
     };
     
+    console.log("GitHubCallback component mounted with path:", location.pathname);
     handleOAuthCallback();
-  }, [location, navigate]);
+  }, [location, navigate, toast]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4">

@@ -11,16 +11,21 @@ const githubClientSecret = Deno.env.get("GITHUB_CLIENT_SECRET")!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 serve(async (req) => {
+  console.log("github-auth function called");
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log("Handling CORS preflight request");
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     // Parse request body
+    console.log("Parsing request body");
     const { code } = await req.json();
     
     if (!code) {
+      console.error("No code provided");
       return new Response(
         JSON.stringify({ error: "No code provided" }), 
         { 
@@ -31,9 +36,11 @@ serve(async (req) => {
     }
 
     // Extract user ID from request headers
+    console.log("Extracting user ID from headers");
     const userId = req.headers.get("x-supabase-auth-user-id");
     
     if (!userId) {
+      console.error("Not authenticated, no user ID in headers");
       return new Response(
         JSON.stringify({ error: "Not authenticated" }),
         {
@@ -43,6 +50,7 @@ serve(async (req) => {
       );
     }
 
+    console.log("Exchanging code for access token");
     // Exchange code for access token
     const tokenResponse = await fetch(
       "https://github.com/login/oauth/access_token",
@@ -61,12 +69,15 @@ serve(async (req) => {
     );
 
     const tokenData = await tokenResponse.json();
+    console.log("Token response received:", Object.keys(tokenData));
     const accessToken = tokenData.access_token;
 
     if (!accessToken) {
+      console.error("Failed to get access token:", tokenData);
       throw new Error("Failed to get access token");
     }
 
+    console.log("Getting user data from GitHub");
     // Get user data from GitHub
     const userResponse = await fetch("https://api.github.com/user", {
       headers: {
@@ -75,7 +86,9 @@ serve(async (req) => {
     });
 
     const userData = await userResponse.json();
+    console.log("GitHub user data retrieved:", Object.keys(userData));
 
+    console.log("Storing GitHub data in Supabase");
     // Store GitHub data in Supabase
     const { data, error } = await supabase.from("github_connections").upsert({
       user_id: userId,
@@ -87,8 +100,12 @@ serve(async (req) => {
       connected_at: new Date().toISOString(),
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase error:", error);
+      throw error;
+    }
 
+    console.log("GitHub auth successful");
     return new Response(
       JSON.stringify({ success: true, user: userData }),
       {
@@ -96,6 +113,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
+    console.error("Error in github-auth function:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {
