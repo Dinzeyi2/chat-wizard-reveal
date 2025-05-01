@@ -74,5 +74,9 @@ enabled = true
 [functions.github-auth]
 verify_jwt = true
 
+[functions.github-repos]
+verify_jwt = true
+
 [functions.get-env]
 verify_jwt = true
+

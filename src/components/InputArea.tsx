@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { ArrowUp, Paperclip, X, Palette, Code } from "lucide-react";
+import { ArrowUp, Paperclip, X, Palette, Code, Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   PromptInput,
@@ -20,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { isGithubConnected, initiateGithubAuth } from "@/utils/githubAuth";
 
 interface InputAreaProps {
   onSendMessage: (message: string) => void;
@@ -32,6 +33,10 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
   const [perplexityApiKey, setPerplexityApiKey] = useState("");
   const [showPerplexityDialog, setShowPerplexityDialog] = useState(false);
+  const [showGithubReposDialog, setShowGithubReposDialog] = useState(false);
+  const [githubRepos, setGithubRepos] = useState<any[]>([]);
+  const [isLoadingRepos, setIsLoadingRepos] = useState(false);
+  const [isConnectedToGithub, setIsConnectedToGithub] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
@@ -57,6 +62,16 @@ Based on this design, please ${message}
       }
     }
   });
+
+  // Check GitHub connection status on component mount
+  useState(() => {
+    checkGithubConnection();
+  });
+
+  const checkGithubConnection = async () => {
+    const connected = await isGithubConnected();
+    setIsConnectedToGithub(connected);
+  };
 
   const handleSubmit = async () => {
     if (message.trim() || files.length > 0) {
@@ -165,6 +180,35 @@ Based on this design, please ${message}
     }
   };
 
+  const handleGithubClick = async () => {
+    if (!isConnectedToGithub) {
+      // If not connected to GitHub, initiate auth flow
+      await initiateGithubAuth();
+    } else {
+      // If connected, load repositories and show dialog
+      setIsLoadingRepos(true);
+      setShowGithubReposDialog(true);
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('github-repos', {
+          body: {}
+        });
+        
+        if (error) throw error;
+        
+        setGithubRepos(data.repos || []);
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Failed to load repositories",
+          description: "Could not fetch your GitHub repositories. Please try again."
+        });
+      } finally {
+        setIsLoadingRepos(false);
+      }
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto w-full p-4">
       <PromptInput
@@ -229,7 +273,15 @@ Based on this design, please ${message}
               </PromptInputAction>
             </TooltipProvider>
             
-            <Button variant="outline" size="sm" className="rounded-full">Search</Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="rounded-full"
+              onClick={handleGithubClick}
+            >
+              <Github className="mr-1 size-4" />
+              GitHub
+            </Button>
             <Button variant="outline" size="sm" className="rounded-full">Reason</Button>
             <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Deep research</Button>
             <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Create image</Button>
@@ -326,6 +378,59 @@ Based on this design, please ${message}
                 variant="outline" 
                 onClick={() => setShowPerplexityDialog(false)}
                 className="w-full"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* GitHub Repositories Dialog */}
+      <Dialog open={showGithubReposDialog} onOpenChange={setShowGithubReposDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Your GitHub Repositories</DialogTitle>
+            <DialogDescription>
+              Select a repository to use with this project.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {isLoadingRepos ? (
+              <div className="flex items-center justify-center py-8">
+                <Code className="size-6 animate-spin mr-2" />
+                <span>Loading repositories...</span>
+              </div>
+            ) : (
+              <div className="max-h-72 overflow-y-auto space-y-2">
+                {githubRepos.length > 0 ? (
+                  githubRepos.map((repo) => (
+                    <Button 
+                      key={repo.id}
+                      variant="outline" 
+                      className="w-full justify-start text-left"
+                      onClick={() => {
+                        toast({
+                          title: "Repository selected",
+                          description: `Selected ${repo.name}`
+                        });
+                        setShowGithubReposDialog(false);
+                      }}
+                    >
+                      {repo.name}
+                    </Button>
+                  ))
+                ) : (
+                  <div className="text-center py-4 text-gray-500">
+                    No repositories found
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="mt-4 flex justify-end">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowGithubReposDialog(false)}
               >
                 Cancel
               </Button>
