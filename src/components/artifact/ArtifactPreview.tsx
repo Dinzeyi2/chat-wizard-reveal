@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   SandpackProvider, 
@@ -287,6 +288,203 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
       setAppType("vanilla"); // Fallback to vanilla
     }
   }, [files]);
+
+  // Generate utility files for the Sandpack environment
+  const generateUtilityFiles = (): SandpackFiles => {
+    const utilFiles: SandpackFiles = {};
+    
+    // Create a utils.js file with common utility functions
+    utilFiles['/src/lib/utils.js'] = {
+      code: `
+// Common utility functions
+export function cn(...classes) {
+  return classes.filter(Boolean).join(' ');
+}
+      `
+    };
+    
+    // Create shadcn component stubs for common components
+    const uiComponentsDir = '/src/components/ui';
+    
+    // Basic button component
+    utilFiles[`${uiComponentsDir}/button.jsx`] = {
+      code: `
+import React from 'react';
+
+export const Button = ({ 
+  children, 
+  className = '', 
+  variant = 'default',
+  size = 'default',
+  ...props 
+}) => {
+  const getVariantClasses = () => {
+    switch(variant) {
+      case 'destructive': return 'bg-red-500 text-white hover:bg-red-600';
+      case 'outline': return 'border border-gray-300 bg-transparent hover:bg-gray-100';
+      case 'secondary': return 'bg-gray-200 text-gray-800 hover:bg-gray-300';
+      case 'ghost': return 'bg-transparent hover:bg-gray-100';
+      case 'link': return 'bg-transparent underline-offset-4 hover:underline text-blue-500';
+      default: return 'bg-blue-500 text-white hover:bg-blue-600';
+    }
+  };
+
+  const getSizeClasses = () => {
+    switch(size) {
+      case 'sm': return 'h-8 px-3 text-sm';
+      case 'lg': return 'h-11 px-8';
+      case 'icon': return 'h-9 w-9';
+      default: return 'h-10 px-4 py-2';
+    }
+  };
+
+  return (
+    <button
+      className={\`inline-flex items-center justify-center whitespace-nowrap rounded font-medium transition-colors 
+        \${getVariantClasses()} 
+        \${getSizeClasses()}
+        \${className}\`}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+};
+
+export default Button;
+      `
+    };
+    
+    // Basic alert component
+    utilFiles[`${uiComponentsDir}/alert.jsx`] = {
+      code: `
+import React from 'react';
+
+export const Alert = ({ 
+  children, 
+  className = '', 
+  variant = 'default',
+  ...props 
+}) => {
+  const variantClasses = variant === 'destructive' 
+    ? 'border-red-500 text-red-500' 
+    : 'border-gray-200 text-gray-800';
+
+  return (
+    <div
+      role="alert"
+      className={\`relative w-full rounded-lg border p-4 \${variantClasses} \${className}\`}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+};
+
+export const AlertTitle = ({ className = '', ...props }) => (
+  <h5
+    className={\`mb-1 font-medium leading-none tracking-tight \${className}\`}
+    {...props}
+  />
+);
+
+export const AlertDescription = ({ className = '', ...props }) => (
+  <div
+    className={\`text-sm \${className}\`}
+    {...props}
+  />
+);
+
+export default Alert;
+      `
+    };
+    
+    // Basic tabs component
+    utilFiles[`${uiComponentsDir}/tabs.jsx`] = {
+      code: `
+import React, { createContext, useContext, useState } from 'react';
+
+const TabsContext = createContext({
+  value: '',
+  onValueChange: (value) => {}
+});
+
+export const Tabs = ({ value, onValueChange, children, className = '', ...props }) => {
+  const [tabValue, setTabValue] = useState(value);
+  
+  const handleValueChange = (newValue) => {
+    setTabValue(newValue);
+    if (onValueChange) onValueChange(newValue);
+  };
+  
+  return (
+    <TabsContext.Provider value={{ value: tabValue, onValueChange: handleValueChange }}>
+      <div className={\`w-full \${className}\`} {...props}>
+        {children}
+      </div>
+    </TabsContext.Provider>
+  );
+};
+
+export const TabsList = ({ className = '', ...props }) => (
+  <div
+    role="tablist"
+    className={\`inline-flex items-center justify-center rounded-lg bg-gray-100 p-1 \${className}\`}
+    {...props}
+  />
+);
+
+export const TabsTrigger = ({ value, children, className = '', ...props }) => {
+  const { value: selectedValue, onValueChange } = useContext(TabsContext);
+  const isActive = selectedValue === value;
+  
+  return (
+    <button
+      role="tab"
+      data-state={isActive ? 'active' : 'inactive'}
+      className={\`inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all
+        \${isActive ? 'bg-white shadow text-black' : 'text-gray-600 hover:text-gray-900'}
+        \${className}\`}
+      onClick={() => onValueChange(value)}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+};
+
+export const TabsContent = ({ value, children, className = '', ...props }) => {
+  const { value: selectedValue } = useContext(TabsContext);
+  const isActive = selectedValue === value;
+  
+  if (!isActive) return null;
+  
+  return (
+    <div
+      role="tabpanel"
+      data-state={isActive ? 'active' : 'inactive'}
+      className={\`mt-2 \${className}\`}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+};
+      `
+    };
+    
+    // Add index file that re-exports all UI components
+    utilFiles[`${uiComponentsDir}/index.js`] = {
+      code: `
+// This file re-exports all UI components to make them easier to import
+export * from './button';
+export * from './alert';
+export * from './tabs';
+      `
+    };
+
+    return utilFiles;
+  };
   
   // Transform files to Sandpack format
   const sandpackFiles: SandpackFiles = React.useMemo(() => {
@@ -298,6 +496,11 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
       const result: SandpackFiles = {};
       let hasHtml = false;
       let hasMainScript = false;
+      
+      // Add utility files first
+      const utilityFiles = generateUtilityFiles();
+      Object.assign(result, utilityFiles);
+      console.log("Added utility files for the sandbox environment");
       
       // Add all user's files
       files.forEach(file => {
@@ -319,9 +522,22 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
           // Determine if this file should be active
           const shouldBeActive = path === entryPoint;
           
-          // Store the file content
+          // Process file content to replace problematic imports
+          let processedContent = file.content;
+          
+          // Replace all shadcn/ui imports with local component imports
+          processedContent = processedContent
+            .replace(/@shadcn\/ui/g, './src/components/ui')
+            .replace(/["']@\/shadcn\/ui["']/g, '"@/components/ui"')
+            .replace(/from ["']@ui\/([^"']+)["']/g, 'from "./src/components/ui/$1"')
+            .replace(/from ["']shadcn\/ui["']/g, 'from "./src/components/ui"')
+            .replace(/from ["']@\/components\/ui["']/g, 'from "./src/components/ui"')
+            .replace(/from ["']@\/lib\/utils["']/g, 'from "./src/lib/utils"')
+            .replace(/from ["']@\/hooks\/use-toast["']/g, 'from "./src/hooks/use-toast"');
+          
+          // Store the processed file content
           result[path] = {
-            code: file.content,
+            code: processedContent,
             active: shouldBeActive
           };
           
@@ -330,6 +546,44 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
           console.error(`Error processing file ${file.path}:`, error);
         }
       });
+      
+      // Add hooks directory and use-toast hook
+      result['/src/hooks/use-toast.js'] = {
+        code: `
+// Simple toast hook for the sandbox environment
+import React, { createContext, useContext, useState } from 'react';
+
+const ToastContext = createContext({
+  toast: () => {},
+});
+
+export function ToastProvider({ children }) {
+  const [toasts, setToasts] = useState([]);
+
+  const toast = ({ title, description, variant }) => {
+    console.log('Toast:', { title, description, variant });
+    // In a real implementation, this would show a toast UI
+  };
+
+  return (
+    <ToastContext.Provider value={{ toast }}>
+      {children}
+    </ToastContext.Provider>
+  );
+}
+
+export const toast = (props) => {
+  // This is a fallback for when outside the context
+  console.log('Toast (global):', props);
+};
+
+export const useToast = () => {
+  const context = useContext(ToastContext);
+  if (!context) return { toast };
+  return context;
+};
+        `
+      };
       
       // If no index.html is provided and it's a React app, create one
       if (!hasHtml && (appType === 'react' || appType === 'react-ts' || appType === 'vite')) {
@@ -340,6 +594,41 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>React App Preview</title>
+    <style>
+      /* Basic reset */
+      * { box-sizing: border-box; }
+      body { 
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        margin: 0;
+        padding: 0;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* Add base shadcn-like styles */
+      :root {
+        --background: #ffffff;
+        --foreground: #020817;
+        --card: #ffffff;
+        --card-foreground: #020817;
+        --popover: #ffffff;
+        --popover-foreground: #020817;
+        --primary: #0f172a;
+        --primary-foreground: #f8fafc;
+        --secondary: #f1f5f9;
+        --secondary-foreground: #0f172a;
+        --muted: #f1f5f9;
+        --muted-foreground: #64748b;
+        --accent: #f1f5f9;
+        --accent-foreground: #0f172a;
+        --destructive: #ef4444;
+        --destructive-foreground: #f8fafc;
+        --border: #e2e8f0;
+        --input: #e2e8f0;
+        --ring: #0f172a;
+        --radius: 0.5rem;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
@@ -355,61 +644,45 @@ export const ArtifactPreview: React.FC<ArtifactPreviewProps> = ({ files }) => {
         hasHtml = true;
       }
       
-      // Comprehensive fix for the @shadcn/ui import error
-      // Process ALL files with any shadcn import patterns
-      console.log("Checking for shadcn/ui imports to fix...");
-      for (const path in result) {
-        const fileContent = result[path];
-        // Type check - ensure fileContent is an object with code property
-        if (typeof fileContent === 'object' && fileContent !== null) {
-          const sandpackFile = fileContent as { code: string; active?: boolean };
-          if (typeof sandpackFile.code === 'string') {
-            // Check for any shadcn imports
-            const originalCode = sandpackFile.code;
-            
-            // Replace all shadcn import patterns
-            let updatedCode = originalCode
-              .replace(/@shadcn\/ui/g, '@/components/ui')
-              .replace(/["']@\/shadcn\/ui["']/g, '"@/components/ui"')
-              .replace(/from ["']@ui\/([^"']+)["']/g, 'from "@/components/ui/$1"')
-              .replace(/from ["']shadcn\/ui["']/g, 'from "@/components/ui"');
-            
-            // Only update if changes were actually made
-            if (updatedCode !== originalCode) {
-              console.log(`Fixed shadcn import in ${path}`);
-              result[path] = {
-                ...fileContent,
-                code: updatedCode
-              };
-            }
-          }
-        }
-      }
-      
-      // Additional fallback - add a helper file to mock shadcn/ui imports if detected
-      let needsShadcnHelper = false;
-      
-      for (const path in result) {
-        const fileContent = result[path];
-        if (typeof fileContent === 'object' && fileContent !== null) {
-          const sandpackFile = fileContent as { code: string; active?: boolean };
-          if (typeof sandpackFile.code === 'string' && 
-              (sandpackFile.code.includes('@shadcn/ui') || sandpackFile.code.includes('shadcn/ui'))) {
-            needsShadcnHelper = true;
-            break;
-          }
-        }
-      }
-      
-      if (needsShadcnHelper) {
-        console.log("Adding shadcn helper module for compatibility");
-        // Add a shadcn helper module
-        result['/node_modules/@shadcn/ui/index.js'] = {
-          code: `
-// Shadcn helper module
-export * from "@/components/ui";
-          `
+      // If it's a React app but no main entry point exists, create one
+      if ((appType === 'react' || appType === 'react-ts' || appType === 'vite') && !hasMainScript) {
+        // Create a basic React entry file that renders whatever App component is available
+        const mainContent = `
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { ToastProvider } from './hooks/use-toast';
+
+// Try to import App component if it exists
+let App;
+try {
+  App = require('./App').default || (() => <div>No App component found</div>);
+} catch (error) {
+  console.error("Couldn't import App component:", error);
+  App = () => (
+    <div style={{ padding: '20px' }}>
+      <h1>Preview Error</h1>
+      <p>Could not load the App component. See console for details.</p>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+  <React.StrictMode>
+    <ToastProvider>
+      <App />
+    </ToastProvider>
+  </React.StrictMode>
+);
+`;
+        
+        const mainFilePath = appType === 'vite' ? '/src/main.jsx' : '/src/index.jsx';
+        result[mainFilePath] = {
+          code: mainContent,
         };
+        
+        console.log(`Created fallback main entry file: ${mainFilePath}`);
+        hasMainScript = true;
       }
       
       // If it's a vanilla app with no HTML, create a basic setup
@@ -548,7 +821,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const dependencies: Record<string, string> = {};
     
     // Add dependencies based on app type
-    if (appType === "react" || appType === "react-ts") {
+    if (appType === "react" || appType === "react-ts" || appType === "vite") {
       dependencies["react"] = "^18.2.0";
       dependencies["react-dom"] = "^18.2.0";
     }
@@ -572,14 +845,19 @@ document.addEventListener("DOMContentLoaded", function() {
     if (allContent.includes('lucide-react')) {
       dependencies["lucide-react"] = "^0.288.0";
     }
-    
-    if (allContent.includes('tailwind') || allContent.includes('className=')) {
-      // Already included via external resources but good to note
+
+    // Add class-variance-authority for shadcn components
+    if (allContent.includes('class-variance-authority') || allContent.includes('cva')) {
+      dependencies["class-variance-authority"] = "^0.7.0";
     }
+
+    // Add clsx and tailwind-merge for cn utility
+    dependencies["clsx"] = "^2.0.0";
+    dependencies["tailwind-merge"] = "^1.14.0";
     
     console.log("Set up dependencies for preview:", dependencies);
     
-    const entryPath = appType === "vite" ? "/src/main.tsx" : "/index.js";
+    const entryPath = appType === "vite" ? "/src/main.jsx" : "/src/index.jsx";
     const customEntry = detectEntryPoint(files) || entryPath;
     
     return {
@@ -685,7 +963,7 @@ document.addEventListener("DOMContentLoaded", function() {
           autorun: true,
           bundlerURL: "https://sandpack-bundler.pages.dev",
           externalResources: [
-            "https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css"
+            "https://cdn.tailwindcss.com"
           ],
           classes: {
             "sp-wrapper": "h-full !bg-zinc-900 !important",
@@ -758,3 +1036,4 @@ document.addEventListener("DOMContentLoaded", function() {
     </div>
   );
 };
+
