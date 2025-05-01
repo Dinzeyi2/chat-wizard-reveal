@@ -46,29 +46,22 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
   // Define the checkGithubConnection function before using it
   const checkGithubConnection = async () => {
     const connected = await isGithubConnected();
-    console.log("GitHub connection status:", connected);
     setIsConnectedToGithub(connected);
-    return connected;
   };
 
   const checkAuthStatus = async () => {
     const { data } = await supabase.auth.getSession();
     setIsAuthenticated(!!data.session);
-    return !!data.session;
   };
 
   // Use effects to check auth and GitHub connection status
   useEffect(() => {
-    const checkStatuses = async () => {
-      await checkAuthStatus();
-      await checkGithubConnection();
-    };
+    checkAuthStatus();
+    checkGithubConnection();
     
-    checkStatuses();
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async () => {
-      await checkAuthStatus();
-      await checkGithubConnection();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      checkAuthStatus();
+      checkGithubConnection();
     });
     
     return () => {
@@ -206,50 +199,38 @@ Based on this design, please ${message}
     }
   };
 
-  const loadGithubRepositories = async () => {
-    setIsLoadingRepos(true);
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('github-repos', {
-        body: {}
-      });
-      
-      if (error) {
-        console.error("Error fetching GitHub repositories:", error);
-        throw error;
-      }
-      
-      console.log("GitHub repos loaded:", data.repos);
-      setGithubRepos(data.repos || []);
-      setShowGithubReposDialog(true);
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Failed to load repositories",
-        description: "Could not fetch your GitHub repositories. Please try again."
-      });
-    } finally {
-      setIsLoadingRepos(false);
-    }
-  };
-
   const handleGithubClick = async () => {
-    const isUserAuthenticated = await checkAuthStatus();
-    
-    if (!isUserAuthenticated) {
+    if (!isAuthenticated) {
       // If not authenticated, redirect to auth page
       navigate('/auth');
       return;
     }
 
-    const isConnected = await checkGithubConnection();
-    
-    if (!isConnected) {
+    if (!isConnectedToGithub) {
       // If not connected to GitHub, initiate auth flow
       await initiateGithubAuth();
     } else {
       // If connected, load repositories and show dialog
-      await loadGithubRepositories();
+      setIsLoadingRepos(true);
+      setShowGithubReposDialog(true);
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('github-repos', {
+          body: {}
+        });
+        
+        if (error) throw error;
+        
+        setGithubRepos(data.repos || []);
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Failed to load repositories",
+          description: "Could not fetch your GitHub repositories. Please try again."
+        });
+      } finally {
+        setIsLoadingRepos(false);
+      }
     }
   };
 
@@ -317,17 +298,27 @@ Based on this design, please ${message}
               </PromptInputAction>
             </TooltipProvider>
             
-            {/* Fix: Always show the GitHub button */}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="rounded-full"
-              onClick={handleGithubClick}
-              disabled={isLoadingRepos}
-            >
-              <Github className="mr-1 size-4" />
-              {isConnectedToGithub ? "GitHub Repos" : "Connect GitHub"}
-            </Button>
+            {!isAuthenticated ? (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="rounded-full"
+                onClick={() => navigate('/auth')}
+              >
+                <LogIn className="mr-1 size-4" />
+                Sign In
+              </Button>
+            ) : (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="rounded-full"
+                onClick={handleGithubClick}
+              >
+                <Github className="mr-1 size-4" />
+                GitHub
+              </Button>
+            )}
             <Button variant="outline" size="sm" className="rounded-full">Reason</Button>
             <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Deep research</Button>
             <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Create image</Button>
