@@ -19,7 +19,9 @@ const GitHubCallback = () => {
       
       if (!data.session) {
         setError("You must be signed in to connect your GitHub account");
-        toast("You must be signed in to connect your GitHub account");
+        toast({
+          description: "You must be signed in to connect your GitHub account"
+        });
         return false;
       }
       
@@ -45,7 +47,9 @@ const GitHubCallback = () => {
       if (!code) {
         console.error("No authorization code received from GitHub");
         setError("No authorization code received from GitHub");
-        toast("No authorization code received from GitHub");
+        toast({
+          description: "No authorization code received from GitHub"
+        });
         return;
       }
       
@@ -62,12 +66,16 @@ const GitHubCallback = () => {
         } else {
           console.error("Failed to connect GitHub account - null result returned");
           setError("Failed to connect GitHub account");
-          toast("Failed to connect GitHub account");
+          toast({
+            description: "Failed to connect GitHub account"
+          });
         }
       } catch (error: any) {
         console.error("Error during GitHub callback:", error);
         setError(error.message || "An unexpected error occurred");
-        toast("Error during GitHub callback: " + (error.message || "An unexpected error occurred"));
+        toast({
+          description: error.message || "An unexpected error occurred during GitHub callback"
+        });
       }
     };
     
