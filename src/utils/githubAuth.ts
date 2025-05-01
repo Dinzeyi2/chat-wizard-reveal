@@ -7,9 +7,10 @@ const getRedirectUri = () => {
   const hostname = window.location.hostname;
   const protocol = window.location.protocol;
   
-  // For production domains, use the production URL
+  // For production domains, use the production URL without subdomain specification
   if (hostname === 'i-blue.dev' || hostname === 'www.i-blue.dev') {
-    return `https://${hostname}/callback/github`;
+    // Use exact match including subdomain if present
+    return `${protocol}//${hostname}/callback/github`;
   }
   
   // For local development or other environments
@@ -23,6 +24,9 @@ export const initiateGithubAuth = async () => {
     
     if (!sessionData.session) {
       // User is not authenticated, redirect to login
+      toast({
+        description: "You must be logged in to connect GitHub"
+      });
       window.location.href = '/auth';
       return;
     }
@@ -47,23 +51,23 @@ export const initiateGithubAuth = async () => {
     sessionStorage.setItem("githubOAuthState", state);
     
     // Get the appropriate redirect URI
-    const REDIRECT_URI = getRedirectUri();
+    const redirectUri = getRedirectUri();
     
     // Construct the GitHub authorization URL
     const authUrl = new URL("https://github.com/login/oauth/authorize");
     authUrl.searchParams.append("client_id", clientId);
-    authUrl.searchParams.append("redirect_uri", REDIRECT_URI);
+    authUrl.searchParams.append("redirect_uri", redirectUri);
     authUrl.searchParams.append("state", state);
     authUrl.searchParams.append("scope", "repo user");
     
-    // Log the redirect URI for debugging
-    console.log("Redirecting to GitHub with redirect URI:", REDIRECT_URI);
+    console.log("Redirecting to GitHub with redirect URI:", redirectUri);
     
     // Redirect the user to GitHub's authorization page
     window.location.href = authUrl.toString();
   } catch (error) {
     console.error("Failed to initiate GitHub auth:", error);
     toast({
+      variant: "destructive",
       description: "Failed to start GitHub authentication process. Please try again."
     });
   }
@@ -125,5 +129,21 @@ export const disconnectGithub = async () => {
       description: "Failed to disconnect GitHub account"
     });
     return false;
+  }
+};
+
+export const getGithubRepos = async () => {
+  try {
+    const { data, error } = await supabase.functions.invoke('github-repos');
+    
+    if (error) throw error;
+    
+    return data.repos || [];
+  } catch (error) {
+    console.error("Failed to fetch GitHub repos:", error);
+    toast({
+      description: "Failed to fetch your GitHub repositories"
+    });
+    return [];
   }
 };

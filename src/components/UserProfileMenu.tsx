@@ -21,10 +21,9 @@ import {
   Share2,
   User,
   UserPlus,
-  Users,
   Github,
 } from "lucide-react";
-import { initiateGithubAuth, isGithubConnected, disconnectGithub } from "@/utils/githubAuth";
+import { initiateGithubAuth, isGithubConnected, disconnectGithub, getGithubRepos } from "@/utils/githubAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -81,6 +80,36 @@ export function UserProfileMenu({ username = "O" }: UserProfileMenuProps) {
       await disconnectGithub();
     } else {
       await initiateGithubAuth();
+    }
+  };
+
+  const viewGithubRepos = async () => {
+    if (!githubConnected) {
+      toast({
+        description: "You need to connect your GitHub account first"
+      });
+      return;
+    }
+    
+    try {
+      const repos = await getGithubRepos();
+      
+      if (repos && repos.length > 0) {
+        // Show repos in a toast notification
+        toast({
+          title: "Your GitHub Repositories",
+          description: `You have ${repos.length} repositories. Most recent: ${repos[0].name}`
+        });
+      } else {
+        toast({
+          description: "No repositories found in your GitHub account"
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching GitHub repos:", error);
+      toast({
+        description: "Failed to fetch your GitHub repositories"
+      });
     }
   };
 
@@ -164,6 +193,15 @@ export function UserProfileMenu({ username = "O" }: UserProfileMenuProps) {
           <Github className="mr-2 size-4" />
           {githubConnected ? "Disconnect GitHub" : "Connect GitHub"}
         </DropdownMenuItem>
+        {githubConnected && (
+          <DropdownMenuItem 
+            onClick={viewGithubRepos}
+            className="hover:bg-[#2A2A2A] cursor-pointer"
+          >
+            <Github className="mr-2 size-4" />
+            View GitHub Repos
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator className="bg-[#2A2A2A]" />
         <DropdownMenuItem className="hover:bg-[#2A2A2A] cursor-pointer">
           <Settings className="mr-2 size-4" />

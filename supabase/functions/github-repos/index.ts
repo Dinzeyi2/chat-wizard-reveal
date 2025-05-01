@@ -28,6 +28,8 @@ serve(async (req) => {
       );
     }
 
+    console.log("Fetching GitHub connection for user:", userId);
+
     // Get GitHub connection for this user
     const { data: connection, error: connectionError } = await supabase
       .from("github_connections")
@@ -35,7 +37,18 @@ serve(async (req) => {
       .eq("user_id", userId)
       .single();
 
-    if (connectionError || !connection) {
+    if (connectionError) {
+      console.error("Error fetching GitHub connection:", connectionError);
+      return new Response(
+        JSON.stringify({ error: "Error fetching GitHub connection" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    if (!connection) {
       return new Response(
         JSON.stringify({ error: "GitHub not connected" }),
         {
@@ -44,6 +57,8 @@ serve(async (req) => {
         }
       );
     }
+
+    console.log("Found GitHub connection for user, fetching repos");
 
     // Use access token to call GitHub API
     const reposResponse = await fetch("https://api.github.com/user/repos?sort=updated&per_page=100", {
@@ -54,10 +69,13 @@ serve(async (req) => {
     });
 
     if (!reposResponse.ok) {
+      console.error("GitHub API error:", reposResponse.status);
       throw new Error(`GitHub API error: ${reposResponse.status}`);
     }
 
     const reposData = await reposResponse.json();
+    
+    console.log(`Retrieved ${reposData.length} repos from GitHub`);
     
     // Format the repos data for the frontend
     const repos = reposData.map((repo: any) => ({
@@ -76,6 +94,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
+    console.error("Error processing GitHub repos request:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {

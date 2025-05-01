@@ -48,7 +48,9 @@ additional_redirect_urls = [
   "http://localhost:3000/callback/github",
   "http://localhost:5173/callback/github",
   "https://localhost:3000/callback/github",
-  "https://localhost:5173/callback/github"
+  "https://localhost:5173/callback/github",
+  "http://i-blue.dev/callback/github",
+  "http://www.i-blue.dev/callback/github"
 ]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
