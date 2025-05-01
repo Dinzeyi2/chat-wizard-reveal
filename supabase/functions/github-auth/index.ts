@@ -18,13 +18,7 @@ serve(async (req) => {
 
   try {
     // Parse request body
-    const requestData = await req.json();
-    const code = requestData.code;
-    const redirect_uri = requestData.redirect_uri;
-    
-    console.log("GitHub auth function called with:");
-    console.log("- Code:", code ? `${code.substring(0, 5)}...` : "undefined");
-    console.log("- Redirect URI:", redirect_uri || "undefined");
+    const { code, redirect_uri } = await req.json();
     
     if (!code) {
       return new Response(
@@ -77,7 +71,6 @@ serve(async (req) => {
     );
 
     const tokenData = await tokenResponse.json();
-    console.log("GitHub token response:", JSON.stringify(tokenData));
     
     if (tokenData.error) {
       console.error("GitHub token error:", tokenData);
@@ -98,7 +91,6 @@ serve(async (req) => {
     });
 
     const userData = await userResponse.json();
-    console.log("GitHub user data retrieved:", userData.login);
 
     // Store GitHub data in Supabase
     const { data, error } = await supabase.from("github_connections").upsert({

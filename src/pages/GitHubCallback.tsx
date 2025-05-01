@@ -1,9 +1,9 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { handleGithubCallback } from "@/utils/githubAuth";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
 
 const GitHubCallback = () => {
   const [error, setError] = useState<string | null>(null);
@@ -12,73 +12,54 @@ const GitHubCallback = () => {
   const location = useLocation();
 
   useEffect(() => {
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getSession();
+      setIsAuthenticated(!!data.session);
+      
+      if (!data.session) {
+        setError("You must be signed in to connect your GitHub account");
+        return false;
+      }
+      
+      return true;
+    };
+    
     const handleOAuthCallback = async () => {
+      // Detailed logging for debugging
+      console.log("GitHub callback initiated");
+      console.log("Full URL:", window.location.href);
+      console.log("Current pathname:", location.pathname);
+      console.log("Current search params:", location.search);
+      console.log("Host:", window.location.host);
+      console.log("Origin:", window.location.origin);
+      
+      const authStatus = await checkAuth();
+      if (!authStatus) return;
+      
+      const searchParams = new URLSearchParams(location.search);
+      const code = searchParams.get("code");
+      const state = searchParams.get("state");
+      
+      if (!code) {
+        console.error("No authorization code received from GitHub");
+        setError("No authorization code received from GitHub");
+        return;
+      }
+      
       try {
-        // Check authentication status first
-        const { data } = await supabase.auth.getSession();
-        const isAuthed = !!data.session;
-        setIsAuthenticated(isAuthed);
-        
-        if (!isAuthed) {
-          setError("You must be signed in to connect your GitHub account");
-          toast({
-            description: "You must be signed in to connect your GitHub account"
-          });
-          return;
-        }
-        
-        // Get code from URL
-        const params = new URLSearchParams(location.search);
-        const code = params.get('code');
-        
-        if (!code) {
-          console.error("No authorization code received from GitHub");
-          setError("No authorization code received from GitHub");
-          toast({
-            description: "No authorization code received from GitHub"
-          });
-          return;
-        }
-        
-        // Get redirect URI - must match what was sent to GitHub
-        const hostname = window.location.hostname;
-        const protocol = window.location.protocol;
-        const redirectUri = `${protocol}//${hostname}${window.location.port ? `:${window.location.port}` : ''}/callback/github`;
-        
-        // Call our Supabase edge function to exchange the code for a token
-        const { data: authData, error: authError } = await supabase.functions.invoke('github-auth', {
-          body: { 
-            code,
-            redirect_uri: redirectUri
-          }
-        });
-        
-        if (authError) throw authError;
-        
-        if (authData) {
+        console.log("Processing GitHub callback with code:", code.substring(0, 5) + "...");
+        const result = await handleGithubCallback(code, state || "");
+        if (result) {
           // Successfully connected GitHub account
-          toast({
-            title: "GitHub Connected",
-            description: `Successfully connected to GitHub as ${authData.user?.login || 'user'}`
-          });
-          
-          // Add a small delay to ensure toast is shown
-          setTimeout(() => {
-            navigate("/");
-          }, 1500);
+          console.log("GitHub connection successful, redirecting to home page");
+          navigate("/");
         } else {
+          console.error("Failed to connect GitHub account - null result returned");
           setError("Failed to connect GitHub account");
-          toast({
-            description: "Failed to connect GitHub account"
-          });
         }
       } catch (error: any) {
         console.error("Error during GitHub callback:", error);
         setError(error.message || "An unexpected error occurred");
-        toast({
-          variant: "destructive",
-          description: error.message || "An unexpected error occurred during GitHub callback"
-        });
       }
     };
     
