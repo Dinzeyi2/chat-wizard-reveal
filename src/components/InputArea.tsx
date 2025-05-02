@@ -98,49 +98,25 @@ Based on this design, please ${message}
     onSuccess: (data) => {
       // Format the challenge as a message to be displayed in the chat
       const challengeMessage = `
-# Coding Challenge: ${data.projectName}
+I've created a coding challenge based on your request for: "${data.prompt}"
 
-${data.description}
+Project: ${data.projectName}
+Description: ${data.description}
 
-This project has ${data.challenges.length} coding challenges for you to complete:
+This project has ${data.challenges.length} coding challenges for you to solve:
 ${data.challenges.map((challenge, index) => 
-  `${index + 1}. **${challenge.title}** (${challenge.difficulty}): ${challenge.description.substring(0, 100)}...`
-).join('\n\n')}
+  `${index + 1}. ${challenge.title} (${challenge.difficulty})`
+).join('\n')}
 
 ${data.explanation}
 
-The code has been loaded in the editor. Examine the files, identify the missing features, and complete the challenges!
-
-Let me know if you need any hints or have questions about the implementation.
+Let's get started with the first challenge! Would you like me to explain it in more detail?
       `;
       
       onSendMessage(challengeMessage);
       
       // Store the challenge data in local storage for later use
       localStorage.setItem("currentChallenge", JSON.stringify(data));
-      
-      // Also load the files into the artifact viewer
-      if (data.files && data.files.length > 0) {
-        const artifactFiles = data.files.map(file => ({
-          id: file.path,
-          name: file.path.split('/').pop() || file.path,
-          path: file.path,
-          language: file.path.split('.').pop() || 'txt',
-          content: file.content
-        }));
-        
-        const artifact = {
-          id: data.projectId || `project-${Date.now()}`,
-          title: data.projectName,
-          files: artifactFiles,
-          description: data.description
-        };
-        
-        // Open the artifact viewer if available
-        if (typeof window !== 'undefined' && (window as any).openArtifact) {
-          (window as any).openArtifact(artifact);
-        }
-      }
     }
   });
 
@@ -330,7 +306,7 @@ Let me know if you need any hints or have questions about the implementation.
           </div>
         )}
 
-        <PromptInputTextarea placeholder="Ask for a coding challenge or get help with your current project..." />
+        <PromptInputTextarea placeholder="Ask anything..." />
 
         <PromptInputActions className="flex items-center justify-between gap-2 pt-2">
           <div className="flex gap-2">
@@ -407,7 +383,7 @@ Let me know if you need any hints or have questions about the implementation.
       </PromptInput>
       
       <div className="text-xs text-center mt-2 text-gray-500">
-        Ask for a project to build, and I'll generate an intentionally incomplete version for you to complete.
+        ChatGPT can make mistakes. Check important info.
       </div>
       
       {/* API Key Dialog */}

@@ -12,6 +12,3 @@ port = 54322
 [functions]
 [functions.generate-challenge]
 verify_jwt = false
-
-[functions.analyze-code]
-verify_jwt = false
