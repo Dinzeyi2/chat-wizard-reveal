@@ -1,4 +1,3 @@
-
 export interface Challenge {
   id: string;
   title: string;
@@ -11,6 +10,14 @@ export interface Challenge {
   hints: string[];
 }
 
+export interface ProjectData {
+  name: string;
+  description: string;
+  stack: string;
+  challenges: Challenge[];
+  projectName?: string;
+}
+
 export interface ConversationMessage {
   type: 'user' | 'guide' | 'hint' | 'codeSnippet';
   content: string;
@@ -18,11 +25,11 @@ export interface ConversationMessage {
 }
 
 export class AIGuide {
-  private project: { challenges: Challenge[] };
+  private project: ProjectData;
   private currentChallengeIndex: number;
   private conversationHistory: ConversationMessage[];
   
-  constructor(projectData: { challenges: Challenge[] }) {
+  constructor(projectData: ProjectData) {
     this.project = projectData;
     this.currentChallengeIndex = 0;
     this.conversationHistory = [];
@@ -220,10 +227,14 @@ export class AIGuide {
     const completedChallenges = this.project.challenges.filter(c => c.completed).length;
     const totalChallenges = this.project.challenges.length;
     
+    const projectName = this.project.name || this.project.projectName || "Code Challenge";
+    const description = this.project.description || "A coding challenge project";
+    const stack = this.project.stack || "Full Stack";
+    
     const overview = `
-Project: ${this.project.name || "Code Challenge"}
-Description: ${this.project.description || "A coding challenge project"}
-Stack: ${this.project.stack || "Full Stack"}
+Project: ${projectName}
+Description: ${description}
+Stack: ${stack}
 Progress: ${completedChallenges}/${totalChallenges} challenges completed
 
 Current Challenges:

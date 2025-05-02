@@ -25,8 +25,8 @@ const ChallengeWorkspace = () => {
       if (!projectId) return null;
       
       const { data, error } = await supabase
-        .from('code_challenges')
-        .select('*')
+        .from('app_projects')
+        .select('app_data')
         .eq('id', projectId)
         .single();
         
@@ -34,7 +34,7 @@ const ChallengeWorkspace = () => {
         throw error;
       }
       
-      return data.challenge_data;
+      return data.app_data;
     }
   });
 

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -47,13 +46,12 @@ const ChallengeGenerator = () => {
 
   const { isLoading: isGenerating, refetch: generateProject } = useQuery({
     queryKey: ['generateChallenge'],
-    queryFn: async ({ queryKey }) => {
-      const [_, projectType, userSkillLevel] = queryKey;
+    queryFn: async () => {
       
       const { data, error } = await supabase.functions.invoke('generate-challenge', {
         body: { 
-          prompt: `Generate a ${projectType} application with ${userSkillLevel} level challenges`, 
-          completionLevel: userSkillLevel,
+          prompt: `Generate a project application with ${skillLevel} level challenges`, 
+          completionLevel: skillLevel,
           challengeType: 'frontend'
         }
       });
@@ -79,9 +77,7 @@ const ChallengeGenerator = () => {
         description: "Please wait while we create your coding challenge."
       });
 
-      await generateProject({
-        queryKey: ['generateChallenge', projectType, skillLevel]
-      });
+      await generateProject();
     } catch (err) {
       console.error('Error generating project:', err);
       toast({
