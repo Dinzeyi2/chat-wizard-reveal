@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ArrowRight, Code, Github, Sparkles } from 'lucide-react';
+import { ArrowRight, Code, Github, Sparkles, Lightbulb, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface WelcomeScreenProps {
@@ -68,6 +68,31 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSendMessage }) => {
               </div>
             </div>
           ))}
+        </div>
+        
+        <div className="mt-6">
+          <h2 className="text-lg font-semibold mb-3">Why use learning challenges?</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="border rounded-xl p-4 bg-white">
+              <div className="flex items-center gap-3 mb-2">
+                <Lightbulb className="h-5 w-5 text-yellow-500" />
+                <h3 className="font-medium">Learn by solving</h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                Educational challenges help you build problem-solving skills by presenting real-world coding scenarios
+              </p>
+            </div>
+            
+            <div className="border rounded-xl p-4 bg-white">
+              <div className="flex items-center gap-3 mb-2">
+                <BookOpen className="h-5 w-5 text-green-500" />
+                <h3 className="font-medium">Get guided help</h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                Each challenge includes hints and guidance to help you implement the missing functionality
+              </p>
+            </div>
+          </div>
         </div>
         
         <div className="mt-6">

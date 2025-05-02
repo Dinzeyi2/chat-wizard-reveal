@@ -6,6 +6,8 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { Challenge, GeneratedProject } from "./projectTemplates";
+import { ChallengeGenerator } from "./ChallengeGenerator";
 
 interface GeminiCodeRequest {
   prompt: string;
@@ -44,9 +46,11 @@ export interface ChallengeResult {
 export class GeminiCodeGenerator {
   private apiKey?: string;
   private debug: boolean;
+  private challengeGenerator: ChallengeGenerator;
   
   constructor(config: { debug?: boolean } = {}) {
     this.debug = config.debug || false;
+    this.challengeGenerator = new ChallengeGenerator();
   }
 
   /**
@@ -101,6 +105,149 @@ export class GeminiCodeGenerator {
         error: error.message,
       };
     }
+  }
+  
+  /**
+   * Generate a project directly using the local ChallengeGenerator
+   * This is a fallback if the Gemini API is not available
+   */
+  generateLocalChallenge(prompt: string, completionLevel: 'beginner' | 'intermediate' | 'advanced'): ChallengeResult {
+    try {
+      this.log('Generating local challenge for:', prompt);
+      
+      // Determine the project type from the prompt
+      const projectType = this._determineProjectType(prompt);
+      
+      // Generate project using local challenge generator
+      const generatedProject = this.challengeGenerator.generateProject(projectType, completionLevel);
+      
+      // Convert challenges to required format
+      const challenges = generatedProject.challenges.map(challenge => ({
+        id: challenge.id,
+        title: challenge.featureName,
+        description: challenge.description,
+        difficulty: challenge.difficulty,
+        type: 'implementation' as const,
+        filesPaths: challenge.filesPaths
+      }));
+      
+      // Create a simple file structure based on the project
+      const files = this._generateBasicFiles(generatedProject);
+      
+      return {
+        success: true,
+        projectId: `local-${Date.now()}`,
+        projectName: generatedProject.projectName,
+        description: generatedProject.description,
+        prompt: prompt,
+        files: files,
+        challenges: challenges,
+        explanation: `This is a ${generatedProject.projectName} project with intentional gaps for learning. Complete the challenges to build your skills in React, TypeScript, and web development. Each challenge has hints to guide you.`
+      };
+    } catch (error: any) {
+      this.log('Error generating local challenge:', error.message);
+      
+      return {
+        success: false,
+        projectId: "",
+        projectName: "",
+        description: "",
+        prompt,
+        files: [],
+        challenges: [],
+        explanation: "",
+        error: error.message
+      };
+    }
+  }
+  
+  /**
+   * Determine project type based on prompt
+   */
+  private _determineProjectType(prompt: string): string {
+    const lowerPrompt = prompt.toLowerCase();
+    
+    if (lowerPrompt.includes('twitter') || 
+        lowerPrompt.includes('social media') || 
+        lowerPrompt.includes('tweet') ||
+        lowerPrompt.includes('post')) {
+      return 'twitterClone';
+    }
+    
+    if (lowerPrompt.includes('ecommerce') || 
+        lowerPrompt.includes('shop') || 
+        lowerPrompt.includes('store') ||
+        lowerPrompt.includes('product')) {
+      return 'ecommerceStore';
+    }
+    
+    if (lowerPrompt.includes('task') || 
+        lowerPrompt.includes('todo') || 
+        lowerPrompt.includes('project management') ||
+        lowerPrompt.includes('productivity')) {
+      return 'taskManager';
+    }
+    
+    // Default to task manager if can't determine
+    return 'taskManager';
+  }
+  
+  /**
+   * Generate basic file structure for a local project
+   */
+  private _generateBasicFiles(project: GeneratedProject) {
+    // Generate minimal files for the project
+    const files = [
+      {
+        path: "src/App.tsx",
+        content: `import React from 'react';\nimport { BrowserRouter, Routes, Route } from 'react-router-dom';\nimport HomePage from './pages/Home';\n\nfunction App() {\n  return (\n    <BrowserRouter>\n      <Routes>\n        <Route path="/" element={<HomePage />} />\n        {/* Add more routes here */}\n      </Routes>\n    </BrowserRouter>\n  );\n}\n\nexport default App;`,
+        isComplete: true
+      },
+      {
+        path: "src/pages/Home.tsx",
+        content: `import React from 'react';\n\nconst HomePage = () => {\n  return (\n    <div className="container mx-auto p-4">\n      <h1 className="text-2xl font-bold mb-4">${project.projectName}</h1>\n      <p>${project.description}</p>\n      \n      {/* TODO: Implement the main interface */}\n      \n    </div>\n  );\n};\n\nexport default HomePage;`,
+        isComplete: false,
+        challenges: [
+          {
+            description: "Implement the main interface",
+            difficulty: "easy",
+            hints: ["Consider what components you'll need", "Look at the project structure for guidance"]
+          }
+        ]
+      }
+    ];
+    
+    // Add challenge-specific files
+    project.challenges.forEach(challenge => {
+      if (challenge.filesPaths && challenge.filesPaths.length > 0) {
+        const path = challenge.filesPaths[0].replace('frontend/', 'src/').replace('.js', '.tsx');
+        
+        files.push({
+          path,
+          content: `import React from 'react';\n\n// TODO: Implement ${challenge.description}\n// This file needs implementation for the ${challenge.featureName} feature\n\nconst ${this._getComponentName(path)} = () => {\n  return (\n    <div>\n      {/* TODO: Implement ${challenge.description} */}\n      <p>This component needs implementation</p>\n    </div>\n  );\n};\n\nexport default ${this._getComponentName(path)};`,
+          isComplete: false,
+          challenges: [
+            {
+              description: challenge.description,
+              difficulty: challenge.difficulty === 'beginner' ? 'easy' : 
+                           challenge.difficulty === 'intermediate' ? 'medium' : 'hard',
+              hints: challenge.hints
+            }
+          ]
+        });
+      }
+    });
+    
+    return files;
+  }
+  
+  /**
+   * Extract component name from path
+   */
+  private _getComponentName(path: string): string {
+    const fileName = path.split('/').pop() || '';
+    const componentName = fileName.replace(/\.(tsx|jsx|js|ts)$/, '');
+    return componentName;
   }
   
   /**
