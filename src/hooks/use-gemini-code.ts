@@ -31,18 +31,24 @@ export const useGeminiCode = (options: UseGeminiCodeOptions = {}) => {
         throw new Error(response.error || "Failed to generate code challenge");
       }
       
-      setResult(response);
+      // Ensure the prompt is included in the result
+      const resultWithPrompt: ChallengeResult = {
+        ...response,
+        prompt: prompt // Store the original prompt in the result
+      };
+      
+      setResult(resultWithPrompt);
       
       if (options.onSuccess) {
-        options.onSuccess(response);
+        options.onSuccess(resultWithPrompt);
       }
       
       toast({
         title: "Challenge Generated",
-        description: `Created "${response.projectName}" with ${response.challenges.length} coding challenges!`,
+        description: `Created "${resultWithPrompt.projectName}" with ${resultWithPrompt.challenges.length} coding challenges!`,
       });
       
-      return response;
+      return resultWithPrompt;
     } catch (err: any) {
       setError(err);
       

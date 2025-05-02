@@ -17,6 +17,7 @@ export interface ChallengeResult {
   success: boolean;
   projectName: string;
   description: string;
+  prompt: string; // Add prompt property to match usage in InputArea.tsx
   files: {
     path: string;
     content: string;
@@ -76,7 +77,14 @@ export class GeminiCodeGenerator {
       }
       
       this.log('Challenge generation successful');
-      return data as ChallengeResult;
+      
+      // Make sure to include the original prompt in the result
+      const resultWithPrompt = {
+        ...data as ChallengeResult,
+        prompt: request.prompt
+      };
+      
+      return resultWithPrompt;
     } catch (error: any) {
       this.log('Error generating code challenge:', error.message);
       
@@ -84,6 +92,7 @@ export class GeminiCodeGenerator {
         success: false,
         projectName: "",
         description: "",
+        prompt: "", // Include empty prompt for failed requests
         files: [],
         challenges: [],
         explanation: "",

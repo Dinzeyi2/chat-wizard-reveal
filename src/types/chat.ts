@@ -1,4 +1,3 @@
-
 export interface Message {
   id: string;
   role: "user" | "assistant";
@@ -39,4 +38,12 @@ export interface ChatHistoryItem {
   last_message?: string;
   timestamp: string;
   messages?: Message[]; 
+}
+
+// Add Challenge related interfaces for better type checking
+export interface ChallengeInfo {
+  title: string;
+  description: string;
+  missingFeatures: string[];
+  difficultyLevel: "beginner" | "intermediate" | "advanced";
 }
