@@ -1,9 +1,8 @@
-
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
 import WelcomeScreen from "@/components/WelcomeScreen";
-import { Message } from "@/types/chat";
+import { Message, ChallengeInfo } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -365,6 +364,15 @@ const Index = () => {
           description: challengeResult.description
         };
 
+        // Cast the difficultyLevel to the expected type
+        const difficultyLevel = challengeResult.challengeInfo.difficultyLevel.toLowerCase();
+        const validatedDifficultyLevel = 
+          difficultyLevel === "beginner" || 
+          difficultyLevel === "intermediate" || 
+          difficultyLevel === "advanced" 
+            ? difficultyLevel 
+            : "intermediate";
+
         const formattedResponse = `# 🚀 ${challengeResult.challengeInfo.title} - Coding Challenge
 
 ${challengeResult.challengeInfo.description}
@@ -373,7 +381,7 @@ ${challengeResult.challengeInfo.description}
 ${challengeResult.challengeInfo.missingFeatures.map(feature => `- ${feature}`).join('\n')}
 
 ## 🎯 Difficulty Level:
-${challengeResult.challengeInfo.difficultyLevel.charAt(0).toUpperCase() + challengeResult.challengeInfo.difficultyLevel.slice(1)}
+${validatedDifficultyLevel.charAt(0).toUpperCase() + validatedDifficultyLevel.slice(1)}
 
 ## 🔍 Instructions:
 1. Explore the code in the file explorer panel
@@ -389,7 +397,12 @@ This challenge will help you gain practical experience solving real-world proble
           content: formattedResponse,
           metadata: {
             projectId: challengeResult.projectId,
-            challengeInfo: challengeResult.challengeInfo
+            challengeInfo: {
+              title: challengeResult.challengeInfo.title,
+              description: challengeResult.challengeInfo.description,
+              missingFeatures: challengeResult.challengeInfo.missingFeatures,
+              difficultyLevel: validatedDifficultyLevel as "beginner" | "intermediate" | "advanced"
+            }
           },
           timestamp: new Date()
         };
