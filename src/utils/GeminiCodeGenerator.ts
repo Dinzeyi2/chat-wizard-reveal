@@ -1,6 +1,6 @@
 
 /**
- * GeminiCodeGenerator - Handles the generation of incomplete code challenges
+ * GeminiCodeGenerator - Handles the generation of intentionally incomplete code challenges
  * This module integrates with the Gemini API to create incomplete applications
  * that users can then complete as a learning exercise.
  */
@@ -15,9 +15,10 @@ interface GeminiCodeRequest {
 
 export interface ChallengeResult {
   success: boolean;
+  projectId: string;
   projectName: string;
   description: string;
-  prompt: string; // Add prompt property to match usage in InputArea.tsx
+  prompt: string;
   files: {
     path: string;
     content: string;
@@ -32,7 +33,7 @@ export interface ChallengeResult {
     id: string;
     title: string;
     description: string;
-    difficulty: 'easy' | 'medium' | 'hard';
+    difficulty: string;
     type: 'implementation' | 'bugfix' | 'feature';
     filesPaths: string[];
   }[];
@@ -49,7 +50,7 @@ export class GeminiCodeGenerator {
   }
 
   /**
-   * Generate an incomplete application with specific challenges for the user
+   * Generate an intentionally incomplete application with specific challenges for the user
    * @param request The code generation request
    */
   async generateChallenge(request: GeminiCodeRequest): Promise<ChallengeResult> {
@@ -90,9 +91,10 @@ export class GeminiCodeGenerator {
       
       return {
         success: false,
+        projectId: "",
         projectName: "",
         description: "",
-        prompt: "", // Include empty prompt for failed requests
+        prompt: request.prompt,
         files: [],
         challenges: [],
         explanation: "",

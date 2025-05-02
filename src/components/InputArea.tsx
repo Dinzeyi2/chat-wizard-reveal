@@ -1,5 +1,6 @@
+
 import { useState, useRef, useEffect } from "react";
-import { ArrowUp, Paperclip, X, Palette, Code, Github, LogIn } from "lucide-react";
+import { ArrowUp, Paperclip, X, Code, Github, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   PromptInput,
@@ -8,7 +9,6 @@ import {
   PromptInputTextarea,
 } from "@/components/ui/prompt-input";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useUiScraper } from "@/hooks/use-ui-scraper";
 import { useToast } from "@/hooks/use-toast";
 import { useGeminiCode } from "@/hooks/use-gemini-code";
 import {
@@ -33,8 +33,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
-  const [perplexityApiKey, setPerplexityApiKey] = useState("");
-  const [showPerplexityDialog, setShowPerplexityDialog] = useState(false);
+  const [geminiApiKey, setGeminiApiKey] = useState("");
   const [showGithubReposDialog, setShowGithubReposDialog] = useState(false);
   const [githubRepos, setGithubRepos] = useState<any[]>([]);
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
@@ -70,29 +69,6 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
     };
   }, []);
 
-  const { findDesignCode, isLoading: isScraperLoading } = useUiScraper({
-    onSuccess: (data) => {
-      if (data.code) {
-        const enhancedPrompt = `
-I have a design code from Perplexity AI for a ${data.requirements?.componentType || 'component'}.
-Please use this code as a reference for creating my application:
-
-\`\`\`
-${data.code}
-\`\`\`
-
-Based on this design, please ${message}
-`;
-        onSendMessage(enhancedPrompt);
-        setShowPerplexityDialog(false);
-        toast({
-          title: "Design Search Complete",
-          description: "Using the found design as a reference for your request",
-        });
-      }
-    }
-  });
-
   // Add Gemini code generation hook
   const { generateChallenge, isLoading: isGeneratingChallenge } = useGeminiCode({
     onSuccess: (data) => {
@@ -103,7 +79,11 @@ I've created a coding challenge based on your request for: "${data.prompt}"
 Project: ${data.projectName}
 Description: ${data.description}
 
-This project has ${data.challenges.length} coding challenges for you to solve:
+IMPORTANT: This is an intentionally incomplete application with ${data.challenges.length} learning challenges!
+
+I've created a starting point with some working code, but there are specific areas left incomplete as coding challenges for you to implement and learn from.
+
+Challenges to complete:
 ${data.challenges.map((challenge, index) => 
   `${index + 1}. ${challenge.title} (${challenge.difficulty})`
 ).join('\n')}
@@ -122,21 +102,8 @@ Let's get started with the first challenge! Would you like me to explain it in m
 
   const handleSubmit = async () => {
     if (message.trim() || files.length > 0) {
-      // Check if the message appears to be requesting app creation
-      const isCreationRequest = /create|generate|build|make|develop/i.test(message.toLowerCase());
-      
-      if (isCreationRequest) {
-        // Use Gemini to generate a coding challenge
-        try {
-          await generateChallenge(message);
-        } catch (error) {
-          // If Gemini fails, fall back to regular message handling
-          onSendMessage(message);
-        }
-      } else {
-        // For regular chat messages, use the default handler
-        onSendMessage(message);
-      }
+      // Always call the standard onSendMessage - the backend will handle everything now
+      onSendMessage(message);
       
       setMessage("");
       setFiles([]);
@@ -157,16 +124,19 @@ Let's get started with the first challenge! Would you like me to explain it in m
     }
   };
   
-  const handleSearchDesigns = async () => {
+  const handleCheckGeminiKey = async () => {
     // First check if we have a stored API key in Supabase
     try {
       const { data, error } = await supabase.functions.invoke('get-env', {
-        body: { key: 'PERPLEXITY_API_KEY' }
+        body: { key: 'GEMINI_API_KEY' }
       });
       
       if (!error && data?.value) {
-        // We have an API key stored, use it
-        setShowPerplexityDialog(true);
+        // We have an API key stored, we're good
+        toast({
+          title: "Gemini API Key Available",
+          description: "Your Gemini API key is already configured"
+        });
       } else {
         // No API key, prompt user
         setApiKeyDialogOpen(true);
@@ -178,10 +148,10 @@ Let's get started with the first challenge! Would you like me to explain it in m
   };
   
   const handleSaveApiKey = async () => {
-    if (!perplexityApiKey) {
+    if (!geminiApiKey) {
       toast({
         title: "API Key Required",
-        description: "Please enter a valid Perplexity API key",
+        description: "Please enter a valid Gemini API key",
         variant: "destructive"
       });
       return;
@@ -190,53 +160,21 @@ Let's get started with the first challenge! Would you like me to explain it in m
     try {
       // Store the API key in Supabase secrets
       const { error } = await supabase.functions.invoke('set-env', {
-        body: { key: 'PERPLEXITY_API_KEY', value: perplexityApiKey }
+        body: { key: 'GEMINI_API_KEY', value: geminiApiKey }
       });
       
       if (error) throw error;
       
       toast({
         title: "API Key Saved",
-        description: "Your Perplexity API key has been securely saved"
+        description: "Your Gemini API key has been securely saved"
       });
       
       setApiKeyDialogOpen(false);
-      setShowPerplexityDialog(true);
     } catch (error) {
       toast({
         title: "Error Saving API Key",
         description: "Could not save your API key. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-  
-  const handlePerplexitySearch = async () => {
-    if (!message.trim()) {
-      toast({
-        title: "Input Required",
-        description: "Please enter a design request first",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    try {
-      // Get the stored API key
-      const { data, error } = await supabase.functions.invoke('get-env', {
-        body: { key: 'PERPLEXITY_API_KEY' }
-      });
-      
-      if (error || !data?.value) {
-        setApiKeyDialogOpen(true);
-        return;
-      }
-      
-      await findDesignCode(message, data.value);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Could not perform design search. Please try again.",
         variant: "destructive"
       });
     }
@@ -282,7 +220,7 @@ Let's get started with the first challenge! Would you like me to explain it in m
       <PromptInput
         value={message}
         onValueChange={setMessage}
-        isLoading={loading || isScraperLoading || isGeneratingChallenge}
+        isLoading={loading || isGeneratingChallenge}
         onSubmit={handleSubmit}
         className="w-full"
       >
@@ -306,7 +244,7 @@ Let's get started with the first challenge! Would you like me to explain it in m
           </div>
         )}
 
-        <PromptInputTextarea placeholder="Ask anything..." />
+        <PromptInputTextarea placeholder="Ask anything or describe the app you want to build..." />
 
         <PromptInputActions className="flex items-center justify-between gap-2 pt-2">
           <div className="flex gap-2">
@@ -330,13 +268,13 @@ Let's get started with the first challenge! Would you like me to explain it in m
             </TooltipProvider>
             
             <TooltipProvider>
-              <PromptInputAction tooltip="Search UI Designs with Perplexity AI">
+              <PromptInputAction tooltip="Check Gemini API Key">
                 <button 
-                  onClick={handleSearchDesigns}
+                  onClick={handleCheckGeminiKey}
                   className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl"
-                  disabled={loading || isScraperLoading}
+                  disabled={loading || isGeneratingChallenge}
                 >
-                  <Palette className="text-primary size-5" />
+                  <Code className="text-primary size-5" />
                 </button>
               </PromptInputAction>
             </TooltipProvider>
@@ -362,9 +300,6 @@ Let's get started with the first challenge! Would you like me to explain it in m
                 GitHub
               </Button>
             )}
-            <Button variant="outline" size="sm" className="rounded-full">Reason</Button>
-            <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Deep research</Button>
-            <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Create image</Button>
           </div>
 
           <TooltipProvider>
@@ -383,27 +318,27 @@ Let's get started with the first challenge! Would you like me to explain it in m
       </PromptInput>
       
       <div className="text-xs text-center mt-2 text-gray-500">
-        ChatGPT can make mistakes. Check important info.
+        Ask for help or request to create an app with intentional learning challenges!
       </div>
       
       {/* API Key Dialog */}
       <Dialog open={apiKeyDialogOpen} onOpenChange={setApiKeyDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Perplexity AI API Key</DialogTitle>
+            <DialogTitle>Gemini API Key</DialogTitle>
             <DialogDescription>
-              Enter your Perplexity AI API key to enable UI design scraping.
+              Enter your Gemini API key to enable educational code challenge creation.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="perplexity-api-key">API Key</Label>
+              <Label htmlFor="gemini-api-key">API Key</Label>
               <Input
-                id="perplexity-api-key"
+                id="gemini-api-key"
                 type="password"
-                placeholder="pplx-xxxxxxxxxxxxxxxxxxxxxxxx"
-                value={perplexityApiKey}
-                onChange={(e) => setPerplexityApiKey(e.target.value)}
+                placeholder="AIza..."
+                value={geminiApiKey}
+                onChange={(e) => setGeminiApiKey(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
                 Your API key will be stored securely in Supabase environment variables.
@@ -412,55 +347,6 @@ Let's get started with the first challenge! Would you like me to explain it in m
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setApiKeyDialogOpen(false)}>Cancel</Button>
               <Button onClick={handleSaveApiKey}>Save API Key</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Perplexity Search Dialog */}
-      <Dialog open={showPerplexityDialog} onOpenChange={setShowPerplexityDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Search UI Designs</DialogTitle>
-            <DialogDescription>
-              Use Perplexity AI to search for UI designs matching your prompt.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="mb-4 text-sm">
-              Current prompt: <span className="font-medium">{message}</span>
-            </p>
-            <p className="mb-6 text-sm">
-              Perplexity AI will search for UI components that match your prompt
-              from design systems like shadcn/ui, Tailwind UI, and others.
-            </p>
-            <div className="flex flex-col gap-4">
-              <Button 
-                onClick={handlePerplexitySearch}
-                disabled={isScraperLoading || loading}
-                className="w-full"
-              >
-                {isScraperLoading ? (
-                  <>
-                    <span className="animate-spin mr-2">
-                      <Code className="size-4" />
-                    </span>
-                    Searching designs...
-                  </>
-                ) : (
-                  <>
-                    <Palette className="mr-2 size-4" />
-                    Find UI Designs
-                  </>
-                )}
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => setShowPerplexityDialog(false)}
-                className="w-full"
-              >
-                Cancel
-              </Button>
             </div>
           </div>
         </DialogContent>

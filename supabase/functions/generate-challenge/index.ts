@@ -60,6 +60,7 @@ serve(async (req) => {
             - It should be a React-based application using Tailwind CSS and shadcn/ui
             - Include 3-5 specific coding challenges for the user to complete
             - Each challenge should have clear instructions, hints, and education value
+            - IMPORTANT: Make sure to create intentional gaps in the code that users need to fill in as part of the challenges
             
             Format your response as a JSON object with the following structure:
             {
