@@ -2,13 +2,15 @@
 import React from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 
 interface ChatWindowProps {
   messages: Message[];
-  loading: boolean;
+  isLoading: boolean; // Changed from 'loading' to 'isLoading' for consistency
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ messages, loading }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
   return (
     <div className="px-4 py-5 md:px-8 lg:px-12">
       {messages.map((message) => (
@@ -29,7 +31,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, loading }) => {
         </div>
       ))}
       
-      {loading && (
+      {isLoading && (
         <div className="mb-8">
           <div className="ml-0 bg-white border border-gray-200 rounded-3xl px-6 py-4">
             <div className="flex space-x-2">

@@ -617,7 +617,7 @@ If you were trying to generate an app, this might be due to limits with our AI m
               ) : (
                 <ChatWindow 
                   messages={messages} 
-                  loading={loading} 
+                  isLoading={loading} 
                 />
               )}
               <div ref={messagesEndRef} />

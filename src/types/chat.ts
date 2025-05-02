@@ -1,3 +1,4 @@
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
@@ -46,4 +47,18 @@ export interface ChallengeInfo {
   description: string;
   missingFeatures: string[];
   difficultyLevel: "beginner" | "intermediate" | "advanced";
+}
+
+// Add ChallengeResult interface to include the prompt property
+export interface ChallengeResult {
+  prompt: string;
+  projectId: string;
+  projectName: string;
+  description: string;
+  challenges: Array<{
+    title: string;
+    description: string;
+    difficulty: string;
+  }>;
+  explanation: string;
 }
