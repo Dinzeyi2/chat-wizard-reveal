@@ -1,12 +1,11 @@
 
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, MessageSquare, Code, Wrench } from "lucide-react";
+import { ArrowRight, MessageSquare, Code, Wrench, BookOpen, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { UserProfileMenu } from "@/components/UserProfileMenu";
 
 const Landing = () => {
@@ -74,7 +73,7 @@ const Landing = () => {
         <div className="container mx-auto px-4 flex justify-between items-center">
           <div className="font-bold text-xl flex items-center">
             <Code className="mr-2 h-5 w-5" />
-            CodeTrainer
+            CodeLab
           </div>
           <div className="flex items-center gap-4">
             {isAuthenticated ? (
@@ -100,7 +99,7 @@ const Landing = () => {
             <Wrench className="h-6 w-6 ml-2 text-primary" />
           </div>
           <p className="text-xl text-muted-foreground mb-8">
-            Request a full-stack app and get an intentionally incomplete version with real-world coding challenges for you to solve.
+            Request a project and get an intentionally incomplete version with real-world coding challenges to solve and learn from.
           </p>
           
           {/* Input bar */}
@@ -123,18 +122,27 @@ const Landing = () => {
             </div>
           </form>
           
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
             <div className="bg-secondary/30 p-6 rounded-lg">
-              <h3 className="text-lg font-medium mb-2">Build Real Projects</h3>
-              <p className="text-muted-foreground">Create functional applications with purposeful challenges that mimic real-world development scenarios.</p>
+              <div className="flex items-center mb-2">
+                <BookOpen className="h-5 w-5 text-primary mr-2" />
+                <h3 className="text-lg font-medium">Learn By Doing</h3>
+              </div>
+              <p className="text-muted-foreground">Practice with real-world coding challenges designed to build practical skills.</p>
             </div>
             <div className="bg-secondary/30 p-6 rounded-lg">
-              <h3 className="text-lg font-medium mb-2">Solve Challenges</h3>
-              <p className="text-muted-foreground">Complete the missing pieces of code to learn how different parts of an application work together.</p>
+              <div className="flex items-center mb-2">
+                <Wrench className="h-5 w-5 text-primary mr-2" />
+                <h3 className="text-lg font-medium">Fix Real Problems</h3>
+              </div>
+              <p className="text-muted-foreground">Solve intentionally incomplete code that mimics scenarios from actual development jobs.</p>
             </div>
             <div className="bg-secondary/30 p-6 rounded-lg">
-              <h3 className="text-lg font-medium mb-2">Gain Experience</h3>
-              <p className="text-muted-foreground">Build a portfolio of projects and practice solving the same challenges faced by professional developers.</p>
+              <div className="flex items-center mb-2">
+                <Sparkles className="h-5 w-5 text-primary mr-2" />
+                <h3 className="text-lg font-medium">AI Feedback</h3>
+              </div>
+              <p className="text-muted-foreground">Get instant feedback on your solutions to accelerate your learning progress.</p>
             </div>
           </div>
         </div>
@@ -143,7 +151,7 @@ const Landing = () => {
       {/* Footer */}
       <footer className="border-t py-8">
         <div className="container mx-auto px-4 text-center text-muted-foreground">
-          <p>© 2025 CodeTrainer. All rights reserved.</p>
+          <p>© 2025 CodeLab. All rights reserved.</p>
         </div>
       </footer>
     </div>
