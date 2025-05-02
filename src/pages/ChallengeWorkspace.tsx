@@ -25,7 +25,7 @@ interface Challenge {
   title: string;
   description: string;
   difficulty: string;
-  type: string;
+  type: "implementation" | "bugfix" | "feature"; // Updated to use the specific literal types
   filesPaths: string[];
   hints?: string[];
   completed?: boolean;
@@ -58,7 +58,25 @@ const ChallengeWorkspace = () => {
         throw error;
       }
       
-      return data.app_data as AppData;
+      // Use a safer approach with type guard to handle the JSON data
+      const appData = data.app_data as Json;
+      if (
+        typeof appData === 'object' && 
+        appData !== null && 
+        'projectName' in appData &&
+        'files' in appData &&
+        'challenges' in appData
+      ) {
+        // Now we can safely cast it as AppData
+        return appData as unknown as AppData;
+      }
+      
+      // Return a default structure if the data doesn't match our expected format
+      return {
+        projectName: "Unknown Project",
+        files: [],
+        challenges: []
+      } as AppData;
     }
   });
 
