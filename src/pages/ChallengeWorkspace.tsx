@@ -8,9 +8,33 @@ import { supabase } from '@/integrations/supabase/client';
 import ChallengeList from '@/components/challenge/ChallengeList';
 import ChallengeDetail from '@/components/challenge/ChallengeDetail';
 import { toast } from '@/hooks/use-toast';
+import { Json } from '@/types/chat';
 
 interface FileStructure {
   [key: string]: string | FileStructure;
+}
+
+// Define interfaces for the app data structure
+interface AppFile {
+  path: string;
+  content: string;
+}
+
+interface Challenge {
+  id: string;
+  title: string;
+  description: string;
+  difficulty: string;
+  type: string;
+  filesPaths: string[];
+  hints?: string[];
+  completed?: boolean;
+}
+
+interface AppData {
+  projectName: string;
+  files: AppFile[];
+  challenges: Challenge[];
 }
 
 const ChallengeWorkspace = () => {
@@ -34,7 +58,7 @@ const ChallengeWorkspace = () => {
         throw error;
       }
       
-      return data.app_data;
+      return data.app_data as AppData;
     }
   });
 
@@ -58,7 +82,7 @@ const ChallengeWorkspace = () => {
     }
   }, [selectedFile, projectData]);
 
-  const findFileInProject = (files, path) => {
+  const findFileInProject = (files: AppFile[], path: string) => {
     if (!files) return null;
     return files.find(file => file.path === path);
   };
@@ -121,10 +145,10 @@ const ChallengeWorkspace = () => {
     );
   };
 
-  const buildFileStructure = (files) => {
+  const buildFileStructure = (files: AppFile[]) => {
     if (!files) return {};
     
-    const structure = {};
+    const structure: FileStructure = {};
     
     files.forEach(file => {
       const parts = file.path.split('/');
@@ -137,7 +161,7 @@ const ChallengeWorkspace = () => {
           if (!current[part]) {
             current[part] = {};
           }
-          current = current[part];
+          current = current[part] as FileStructure;
         }
       });
     });
