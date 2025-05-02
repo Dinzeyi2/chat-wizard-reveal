@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import ChallengeList from '@/components/challenge/ChallengeList';
 import ChallengeDetail from '@/components/challenge/ChallengeDetail';
+import CodeEditor from '@/components/challenge/CodeEditor';
 import { toast } from '@/hooks/use-toast';
 import { Json } from '@/types/chat';
 
@@ -233,23 +234,12 @@ const ChallengeWorkspace = () => {
           <div className={`flex h-full ${view === 'split' ? 'flex-col md:flex-row' : 'flex-col'}`}>
             {(view === 'split' || view === 'code') && (
               <div className={`${view === 'split' ? 'flex-1' : 'h-full'} border-r`}>
-                <div className="p-4 border-b flex justify-between items-center">
-                  <span className="font-mono text-sm">{selectedFile || 'Select a file'}</span>
-                  <Button size="sm" onClick={handleSaveFile} disabled={!selectedFile}>Save</Button>
-                </div>
-                <div className="p-4 h-[calc(100%-64px)] overflow-auto">
-                  {selectedFile ? (
-                    <textarea
-                      className="w-full h-full font-mono text-sm p-4 border rounded"
-                      value={fileContent}
-                      onChange={(e) => handleCodeChange(e.target.value)}
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-gray-500">
-                      Select a file to edit
-                    </div>
-                  )}
-                </div>
+                <CodeEditor 
+                  content={fileContent}
+                  onChange={handleCodeChange}
+                  filename={selectedFile}
+                  onSave={handleSaveFile}
+                />
               </div>
             )}
 
