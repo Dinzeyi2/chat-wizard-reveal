@@ -197,7 +197,16 @@ export class GeminiCodeGenerator {
    */
   private _generateBasicFiles(project: GeneratedProject) {
     // Generate minimal files for the project
-    const files = [
+    const files: {
+      path: string;
+      content: string;
+      isComplete: boolean;
+      challenges?: {
+        description: string;
+        difficulty: 'easy' | 'medium' | 'hard';
+        hints: string[];
+      }[];
+    }[] = [
       {
         path: "src/App.tsx",
         content: `import React from 'react';\nimport { BrowserRouter, Routes, Route } from 'react-router-dom';\nimport HomePage from './pages/Home';\n\nfunction App() {\n  return (\n    <BrowserRouter>\n      <Routes>\n        <Route path="/" element={<HomePage />} />\n        {/* Add more routes here */}\n      </Routes>\n    </BrowserRouter>\n  );\n}\n\nexport default App;`,
@@ -222,6 +231,22 @@ export class GeminiCodeGenerator {
       if (challenge.filesPaths && challenge.filesPaths.length > 0) {
         const path = challenge.filesPaths[0].replace('frontend/', 'src/').replace('.js', '.tsx');
         
+        // Map the beginner/intermediate/advanced difficulty to easy/medium/hard
+        let mappedDifficulty: 'easy' | 'medium' | 'hard';
+        switch (challenge.difficulty) {
+          case 'beginner':
+            mappedDifficulty = 'easy';
+            break;
+          case 'intermediate':
+            mappedDifficulty = 'medium';
+            break;
+          case 'advanced':
+            mappedDifficulty = 'hard';
+            break;
+          default:
+            mappedDifficulty = 'medium';
+        }
+        
         files.push({
           path,
           content: `import React from 'react';\n\n// TODO: Implement ${challenge.description}\n// This file needs implementation for the ${challenge.featureName} feature\n\nconst ${this._getComponentName(path)} = () => {\n  return (\n    <div>\n      {/* TODO: Implement ${challenge.description} */}\n      <p>This component needs implementation</p>\n    </div>\n  );\n};\n\nexport default ${this._getComponentName(path)};`,
@@ -229,8 +254,7 @@ export class GeminiCodeGenerator {
           challenges: [
             {
               description: challenge.description,
-              difficulty: challenge.difficulty === 'beginner' ? 'easy' : 
-                           challenge.difficulty === 'intermediate' ? 'medium' : 'hard',
+              difficulty: mappedDifficulty,
               hints: challenge.hints
             }
           ]

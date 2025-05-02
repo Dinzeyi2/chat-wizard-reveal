@@ -88,7 +88,8 @@ export function ChallengeDetail({
     toast({
       title: "Challenge Completed",
       description: "Congratulations! You've completed this challenge.",
-      variant: "success"
+      // Fix: Remove the invalid "success" variant since it's not a valid option
+      // The default variant will be used instead
     });
     
     if (onComplete) {
