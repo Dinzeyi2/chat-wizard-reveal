@@ -10,6 +10,7 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useUiScraper } from "@/hooks/use-ui-scraper";
 import { useToast } from "@/hooks/use-toast";
+import { useGeminiCode } from "@/hooks/use-gemini-code";
 import {
   Dialog,
   DialogContent,
@@ -92,9 +93,51 @@ Based on this design, please ${message}
     }
   });
 
+  // Add Gemini code generation hook
+  const { generateChallenge, isLoading: isGeneratingChallenge } = useGeminiCode({
+    onSuccess: (data) => {
+      // Format the challenge as a message to be displayed in the chat
+      const challengeMessage = `
+I've created a coding challenge based on your request for: "${data.prompt}"
+
+Project: ${data.projectName}
+Description: ${data.description}
+
+This project has ${data.challenges.length} coding challenges for you to solve:
+${data.challenges.map((challenge, index) => 
+  `${index + 1}. ${challenge.title} (${challenge.difficulty})`
+).join('\n')}
+
+${data.explanation}
+
+Let's get started with the first challenge! Would you like me to explain it in more detail?
+      `;
+      
+      onSendMessage(challengeMessage);
+      
+      // Store the challenge data in local storage for later use
+      localStorage.setItem("currentChallenge", JSON.stringify(data));
+    }
+  });
+
   const handleSubmit = async () => {
     if (message.trim() || files.length > 0) {
-      onSendMessage(message);
+      // Check if the message appears to be requesting app creation
+      const isCreationRequest = /create|generate|build|make|develop/i.test(message.toLowerCase());
+      
+      if (isCreationRequest) {
+        // Use Gemini to generate a coding challenge
+        try {
+          await generateChallenge(message);
+        } catch (error) {
+          // If Gemini fails, fall back to regular message handling
+          onSendMessage(message);
+        }
+      } else {
+        // For regular chat messages, use the default handler
+        onSendMessage(message);
+      }
+      
       setMessage("");
       setFiles([]);
     }
@@ -239,7 +282,7 @@ Based on this design, please ${message}
       <PromptInput
         value={message}
         onValueChange={setMessage}
-        isLoading={loading || isScraperLoading}
+        isLoading={loading || isScraperLoading || isGeneratingChallenge}
         onSubmit={handleSubmit}
         className="w-full"
       >

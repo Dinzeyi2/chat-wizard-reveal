@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, MessageSquare } from "lucide-react";
+import { ArrowRight, MessageSquare, Code, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -41,7 +41,7 @@ const Landing = () => {
     if (!prompt.trim()) {
       toast({
         title: "Empty prompt",
-        description: "Please enter a description for your application",
+        description: "Please enter a description for your learning project",
         variant: "destructive",
       });
       return;
@@ -72,7 +72,10 @@ const Landing = () => {
       {/* Header */}
       <header className="border-b py-4">
         <div className="container mx-auto px-4 flex justify-between items-center">
-          <div className="font-bold text-xl">AppCreator</div>
+          <div className="font-bold text-xl flex items-center">
+            <Code className="mr-2 h-5 w-5" />
+            CodeTrainer
+          </div>
           <div className="flex items-center gap-4">
             {isAuthenticated ? (
               <UserProfileMenu />
@@ -89,11 +92,15 @@ const Landing = () => {
       {/* Main content */}
       <main className="flex-1 flex flex-col items-center justify-center p-4">
         <div className="max-w-3xl w-full text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold mb-6">
-            Create web applications with AI
-          </h1>
+          <div className="flex items-center justify-center mb-4">
+            <Code className="h-6 w-6 mr-2 text-primary" />
+            <h1 className="text-4xl md:text-5xl font-bold">
+              Learn coding by solving real challenges
+            </h1>
+            <Wrench className="h-6 w-6 ml-2 text-primary" />
+          </div>
           <p className="text-xl text-muted-foreground mb-8">
-            Simply describe what you want to build, and our AI will generate a complete application for you.
+            Request a full-stack app and get an intentionally incomplete version with real-world coding challenges for you to solve.
           </p>
           
           {/* Input bar */}
@@ -102,7 +109,7 @@ const Landing = () => {
               <Input 
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Describe the application you want to build..."
+                placeholder="What would you like to build and learn from? e.g., 'Twitter clone'"
                 className="pr-12 py-6 text-lg"
               />
               <Button 
@@ -115,13 +122,28 @@ const Landing = () => {
               </Button>
             </div>
           </form>
+          
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+            <div className="bg-secondary/30 p-6 rounded-lg">
+              <h3 className="text-lg font-medium mb-2">Build Real Projects</h3>
+              <p className="text-muted-foreground">Create functional applications with purposeful challenges that mimic real-world development scenarios.</p>
+            </div>
+            <div className="bg-secondary/30 p-6 rounded-lg">
+              <h3 className="text-lg font-medium mb-2">Solve Challenges</h3>
+              <p className="text-muted-foreground">Complete the missing pieces of code to learn how different parts of an application work together.</p>
+            </div>
+            <div className="bg-secondary/30 p-6 rounded-lg">
+              <h3 className="text-lg font-medium mb-2">Gain Experience</h3>
+              <p className="text-muted-foreground">Build a portfolio of projects and practice solving the same challenges faced by professional developers.</p>
+            </div>
+          </div>
         </div>
       </main>
 
       {/* Footer */}
       <footer className="border-t py-8">
         <div className="container mx-auto px-4 text-center text-muted-foreground">
-          <p>© 2025 AppCreator. All rights reserved.</p>
+          <p>© 2025 CodeTrainer. All rights reserved.</p>
         </div>
       </footer>
     </div>
