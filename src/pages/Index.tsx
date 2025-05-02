@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -7,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
-import { ArtifactProvider, ArtifactLayout } from "@/components/artifact/ArtifactSystem";
+import { ArtifactProvider, ArtifactLayout, useArtifact } from "@/components/artifact/ArtifactSystem";
 import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
 import { useLocation } from "react-router-dom";
 
@@ -17,6 +18,24 @@ interface ChatHistoryItem {
   title: string;
   lastMessage: string;
   timestamp: string;
+}
+
+interface ChallengeResult {
+  projectId: string;
+  projectName: string;
+  description: string;
+  challengeInfo: {
+    title: string;
+    description: string;
+    missingFeatures: string[];
+    difficultyLevel: string;
+  };
+  files: {
+    path: string;
+    content: string;
+    language: string;
+  }[];
+  explanation: string;
 }
 
 const Index = () => {
@@ -192,6 +211,73 @@ const Index = () => {
     }
   }, [messages]);
 
+  const handleAnalyzeCode = async (code: string) => {
+    if (!code.trim() || !currentProjectId) return;
+    
+    setLoading(true);
+    
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: `Can you analyze this code and provide feedback?\n\n\`\`\`\n${code}\n\`\`\``,
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    
+    const processingMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      role: "assistant",
+      content: "Analyzing your code...",
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, processingMessage]);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-code', {
+        body: { 
+          code: code,
+          projectId: currentProjectId,
+          language: 'typescript' // Default to typescript, could be more dynamic
+        }
+      });
+
+      if (error) throw error;
+
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: data.analysis,
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
+      setMessages(prev => [...prev, aiMessage]);
+      
+    } catch (error) {
+      console.error('Error analyzing code:', error);
+      
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to analyze code. Please try again.",
+      });
+      
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: `I'm sorry, but I encountered an error while analyzing your code. Please try again later.`,
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
     
@@ -206,14 +292,15 @@ const Index = () => {
     
     setMessages(prev => [...prev, userMessage]);
     
-    // Check if this is a standard app generation request
-    const isAppGeneration = 
+    // Check if this is a challenge app generation request
+    const isChallengeRequest = 
       (content.toLowerCase().includes("create") || 
        content.toLowerCase().includes("build") || 
        content.toLowerCase().includes("generate") ||
        content.toLowerCase().includes("make") || 
        content.toLowerCase().includes("develop") ||
-       content.toLowerCase().includes("code")) && 
+       content.toLowerCase().includes("code") ||
+       content.toLowerCase().includes("challenge")) && 
       (content.toLowerCase().includes("app") || 
        content.toLowerCase().includes("website") || 
        content.toLowerCase().includes("dashboard") || 
@@ -223,18 +310,9 @@ const Index = () => {
        content.toLowerCase().includes("system") ||
        content.toLowerCase().includes("project") ||
        content.toLowerCase().includes("site"));
-
-    // Check if this is a modification request for an existing app
-    const isModificationRequest = 
-      currentProjectId && // We have a current project ID
-      (content.toLowerCase().includes("change") ||
-       content.toLowerCase().includes("modify") ||
-       content.toLowerCase().includes("update") ||
-       content.toLowerCase().includes("add") ||
-       content.toLowerCase().includes("fix"));
     
-    if (isAppGeneration) {
-      console.log("Calling generate-app function with prompt:", content);
+    if (isChallengeRequest) {
+      console.log("Calling generate-challenge-app function with prompt:", content);
       
       setGenerationDialog(true);
       setIsGeneratingApp(true);
@@ -243,14 +321,14 @@ const Index = () => {
       const processingMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "I'm working on generating your application. This may take a minute or two...",
+        content: "I'm working on generating your coding challenge. This may take a minute or two...",
         timestamp: new Date()
       };
       
       setMessages(prev => [...prev, processingMessage]);
       
       try {
-        const { data, error } = await supabase.functions.invoke('generate-app', {
+        const { data, error } = await supabase.functions.invoke('generate-challenge-app', {
           body: { prompt: content }
         });
 
@@ -259,46 +337,78 @@ const Index = () => {
           
           setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
           
-          throw new Error(`Error generating application: ${error.message || "Unknown error"}`);
+          throw new Error(`Error generating challenge: ${error.message || "Unknown error"}`);
         }
 
-        const appData = data;
-        console.log("App generation successful:", appData);
-        setCurrentProjectId(appData.projectId);
+        const challengeResult = data as ChallengeResult;
+        console.log("Challenge generation successful:", challengeResult.projectName);
+        setCurrentProjectId(challengeResult.projectId);
         
         setGenerationDialog(false);
         
         setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
 
-        const formattedResponse = `I've generated a full-stack application based on your request. Here's what I created:
+        // Convert the files to the format expected by the artifact system
+        const artifactFiles = challengeResult.files.map(file => ({
+          id: crypto.randomUUID(),
+          name: file.path.split('/').pop() || file.path,
+          path: file.path,
+          language: file.language || 'typescript',
+          content: file.content
+        }));
 
-\`\`\`json
-${JSON.stringify(appData, null, 2)}
-\`\`\`
+        // Create artifact to display files
+        const artifact = {
+          id: challengeResult.projectId,
+          title: challengeResult.projectName,
+          files: artifactFiles,
+          description: challengeResult.description
+        };
 
-You can explore the file structure and content in the panel above. This is a starting point that you can further customize and expand.`;
+        const formattedResponse = `# 🚀 ${challengeResult.challengeInfo.title} - Coding Challenge
+
+${challengeResult.challengeInfo.description}
+
+## 📋 Missing Features to Implement:
+${challengeResult.challengeInfo.missingFeatures.map(feature => `- ${feature}`).join('\n')}
+
+## 🎯 Difficulty Level:
+${challengeResult.challengeInfo.difficultyLevel.charAt(0).toUpperCase() + challengeResult.challengeInfo.difficultyLevel.slice(1)}
+
+## 🔍 Instructions:
+1. Explore the code in the file explorer panel
+2. Find the TODOs and missing features
+3. Implement the missing functionality
+4. Submit your code for analysis using the "Analyze My Code" button
+
+This challenge will help you gain practical experience solving real-world problems. Good luck!`;
 
         const aiMessage: Message = {
           id: (Date.now() + 2).toString(),
           role: "assistant",
           content: formattedResponse,
           metadata: {
-            projectId: appData.projectId
+            projectId: challengeResult.projectId,
+            challengeInfo: challengeResult.challengeInfo
           },
           timestamp: new Date()
         };
         
         setMessages(prev => [...prev, aiMessage]);
         
+        // Open the artifact to show the code
+        const { openArtifact } = require("@/components/artifact/ArtifactSystem").useArtifact();
+        if (openArtifact) {
+          openArtifact(artifact);
+        }
+        
         toast({
-          title: "App Generated Successfully",
-          description: `${appData.projectName} has been generated with ${appData.files.length} files.`,
+          title: "Challenge Generated",
+          description: `${challengeResult.projectName} has been generated with ${challengeResult.files.length} files.`,
         });
         
         // Save this conversation to chat history
-        if (data && data.response) {
-          saveToHistory(content, data.response);
-        }
+        saveToHistory(content, formattedResponse);
       } catch (error) {
         console.error('Error calling function:', error);
         setGenerationDialog(false);
@@ -315,8 +425,8 @@ You can explore the file structure and content in the panel above. This is a sta
           role: "assistant",
           content: `I'm sorry, but I encountered an error while processing your request: ${error.message || 'Please try again later.'}
           
-If you were trying to generate an app, this might be due to limits with our AI model or connectivity issues. You can try:
-1. Using a shorter, more focused prompt (e.g., "Create a simple Twitter clone with basic tweet functionality")
+If you were trying to generate a challenge, this might be due to limits with our AI model or connectivity issues. You can try:
+1. Using a shorter, more focused prompt (e.g., "Create a simple Twitter clone challenge")
 2. Breaking down your request into smaller parts
 3. Trying again in a few minutes`,
           timestamp: new Date()
@@ -327,79 +437,6 @@ If you were trying to generate an app, this might be due to limits with our AI m
       } finally {
         setLoading(false);
         setIsGeneratingApp(false);
-      }
-    } else if (isModificationRequest) {
-      console.log("Calling chat function with modification request for project:", currentProjectId);
-      
-      setLoading(true);
-      
-      const processingMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: "I'm working on modifying your application. This may take a moment...",
-        timestamp: new Date()
-      };
-      
-      setMessages(prev => [...prev, processingMessage]);
-      
-      try {
-        const { data, error } = await supabase.functions.invoke('chat', {
-          body: { 
-            message: content,
-            projectId: currentProjectId 
-          }
-        });
-
-        if (error) throw error;
-
-        const aiMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: data.response,
-          metadata: {
-            projectId: data.projectId || currentProjectId
-          },
-          timestamp: new Date()
-        };
-        
-        setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
-        setMessages(prev => [...prev, aiMessage]);
-        
-        // Update current project ID if we got a new one from the modification
-        if (data.projectId && data.projectId !== currentProjectId) {
-          setCurrentProjectId(data.projectId);
-        }
-        
-        toast({
-          title: "App Modified Successfully",
-          description: "Your application has been updated with your requested changes.",
-        });
-        
-        // Save this conversation to chat history
-        if (data && data.response) {
-          saveToHistory(content, data.response);
-        }
-      } catch (error) {
-        console.error('Error calling function:', error);
-        setGenerationError(error.message || "An unexpected error occurred");
-        
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: error.message || "An unexpected error occurred",
-        });
-        
-        const errorMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: `I'm sorry, but I encountered an error while modifying your application: ${error.message || 'Please try again later.'}`,
-          timestamp: new Date()
-        };
-        
-        setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
-        setMessages(prev => [...prev, errorMessage]);
-      } finally {
-        setLoading(false);
       }
     } else {
       setLoading(true);
@@ -414,8 +451,12 @@ If you were trying to generate an app, this might be due to limits with our AI m
       setMessages(prev => [...prev, processingMessage]);
       
       try {
+        // Use the chat function with added context about the current project/challenge
         const { data, error } = await supabase.functions.invoke('chat', {
-          body: { message: content }
+          body: { 
+            message: content,
+            projectId: currentProjectId // Include project context if available
+          }
         });
 
         if (error) throw error;
@@ -465,17 +506,18 @@ If you were trying to generate an app, this might be due to limits with our AI m
             <div className="h-14 border-b flex items-center px-4 justify-between">
               <div className="flex items-center">
                 <HamburgerMenuButton />
+                <h1 className="ml-4 font-semibold text-lg">CodeLab</h1>
               </div>
               <div className="flex items-center text-sm text-gray-600">
-                <span className="mr-2">Saved memory full</span>
+                <span className="mr-2">Learning mode active</span>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
                 <div className="ml-5 px-3 py-1 rounded-full bg-gray-100 flex items-center">
-                  <span>Temporary</span>
+                  <span>Coding Challenge</span>
                 </div>
                 <div className="ml-2 w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white">
-                  O
+                  C
                 </div>
               </div>
             </div>
@@ -494,7 +536,7 @@ If you were trying to generate an app, this might be due to limits with our AI m
               {generationError && (
                 <div className="px-4 py-3 mx-auto my-4 max-w-3xl bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-sm text-red-700">
-                    <strong>Error generating app:</strong> {generationError}
+                    <strong>Error generating challenge:</strong> {generationError}
                   </p>
                   <p className="text-xs text-red-600 mt-1">
                     Try refreshing the page and using a simpler prompt.
@@ -504,7 +546,12 @@ If you were trying to generate an app, this might be due to limits with our AI m
             </div>
             
             <div className="p-4 pb-8">
-              <InputArea onSendMessage={handleSendMessage} loading={loading} />
+              <InputArea 
+                onSendMessage={handleSendMessage} 
+                onAnalyzeCode={handleAnalyzeCode}
+                loading={loading} 
+                currentProjectId={currentProjectId}
+              />
             </div>
           </div>
         </ArtifactLayout>
@@ -516,16 +563,16 @@ If you were trying to generate an app, this might be due to limits with our AI m
             }
           }}>
             <DialogHeader>
-              <DialogTitle>Generating Your Application</DialogTitle>
+              <DialogTitle>Generating Your Coding Challenge</DialogTitle>
               <DialogDescription>
-                Please wait while we generate your application. This may take a minute or two.
+                Please wait while we generate your coding challenge project. This may take a minute or two.
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col items-center justify-center py-6">
               <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
               <div className="text-center">
-                <p className="font-medium">Building app architecture...</p>
-                <p className="text-sm text-muted-foreground mt-1">This may take up to 2 minutes.</p>
+                <p className="font-medium">Creating challenge project...</p>
+                <p className="text-sm text-muted-foreground mt-1">We're intentionally including educational gaps for you to solve!</p>
               </div>
             </div>
           </DialogContent>

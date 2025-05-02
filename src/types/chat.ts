@@ -6,8 +6,16 @@ export interface Message {
   timestamp: Date;
   metadata?: {
     projectId?: string;
+    challengeInfo?: ChallengeInfo;
     [key: string]: any;
   };
+}
+
+export interface ChallengeInfo {
+  title: string;
+  description: string;
+  missingFeatures: string[];
+  difficultyLevel: "beginner" | "intermediate" | "advanced";
 }
 
 export interface SidebarItem {

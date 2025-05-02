@@ -1,6 +1,6 @@
 
 import { useState, useRef } from "react";
-import { ArrowUp, Paperclip, X } from "lucide-react";
+import { ArrowUp, Paperclip, X, Code, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   PromptInput,
@@ -11,10 +11,17 @@ import {
 
 interface InputAreaProps {
   onSendMessage: (message: string) => void;
+  onAnalyzeCode?: (code: string) => void;
   loading: boolean;
+  currentProjectId?: string | null;
 }
 
-const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
+const InputArea: React.FC<InputAreaProps> = ({ 
+  onSendMessage, 
+  onAnalyzeCode,
+  loading, 
+  currentProjectId 
+}) => {
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -70,7 +77,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
           </div>
         )}
 
-        <PromptInputTextarea placeholder="Ask anything..." />
+        <PromptInputTextarea placeholder="Ask for a coding challenge or get help with your code..." />
 
         <PromptInputActions className="flex items-center justify-between gap-2 pt-2">
           <div className="flex gap-2">
@@ -90,10 +97,26 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
                 <Paperclip className="text-primary size-5" />
               </label>
             </PromptInputAction>
-            <Button variant="outline" size="sm" className="rounded-full">Search</Button>
-            <Button variant="outline" size="sm" className="rounded-full">Reason</Button>
-            <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Deep research</Button>
-            <Button variant="outline" size="sm" className="hidden md:flex rounded-full">Create image</Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="rounded-full flex items-center gap-2"
+              onClick={() => onSendMessage("Create a coding challenge for me")}
+            >
+              <Brain size={16} />
+              <span>Generate Challenge</span>
+            </Button>
+            {currentProjectId && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="rounded-full flex items-center gap-2"
+                onClick={() => onAnalyzeCode && onAnalyzeCode(message)}
+              >
+                <Code size={16} />
+                <span>Analyze My Code</span>
+              </Button>
+            )}
           </div>
 
           <PromptInputAction tooltip={loading ? "Stop generation" : "Send message"}>
@@ -110,7 +133,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
       </PromptInput>
       
       <div className="text-xs text-center mt-2 text-gray-500">
-        ChatGPT can make mistakes. Check important info.
+        CodeLab: Learn coding by solving real-world challenges
       </div>
     </div>
   );

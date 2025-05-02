@@ -23,6 +23,7 @@ const App = () => {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/history" element={<ChatHistory />} />
+            <Route path="/app" element={<Index />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

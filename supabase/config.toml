@@ -33,3 +33,9 @@ verify_jwt = false
 
 [functions.modify-app]
 verify_jwt = false
+
+[functions.generate-challenge-app]
+verify_jwt = false
+
+[functions.analyze-code]
+verify_jwt = false
