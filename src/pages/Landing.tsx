@@ -1,16 +1,73 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const Landing = () => {
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [chatHistory, setChatHistory] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Load chat history when component mounts
+  useEffect(() => {
+    const fetchChatHistory = async () => {
+      setIsLoadingHistory(true);
+      try {
+        const { data: session } = await supabase.auth.getSession();
+        
+        if (session.session) {
+          // User is logged in, fetch from Supabase
+          const { data, error } = await supabase
+            .from('chat_history')
+            .select('*')
+            .order('updated_at', { ascending: false })
+            .limit(6);
+          
+          if (error) throw error;
+          if (data) {
+            setChatHistory(data);
+          }
+        } else {
+          // Not authenticated, check localStorage
+          const storedHistory = localStorage.getItem('chatHistory');
+          if (storedHistory) {
+            const parsedHistory = JSON.parse(storedHistory);
+            setChatHistory(parsedHistory.slice(0, 6)); // Take only first 6 items
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching chat history:", error);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+    
+    fetchChatHistory();
+  }, []);
+
+  const formatTimestamp = (timestamp: string) => {
+    try {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+      
+      if (diffInHours < 1) return 'Just now';
+      if (diffInHours === 1) return '1 hour ago';
+      if (diffInHours < 24) return `${diffInHours} hours ago`;
+      if (diffInHours < 48) return '1 day ago';
+      return `${Math.floor(diffInHours / 24)} days ago`;
+    } catch (e) {
+      return 'Unknown time';
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,6 +99,10 @@ const Landing = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleChatSelect = (chatId: string) => {
+    navigate(`/app?chat=${chatId}`);
   };
 
   return (
@@ -88,26 +149,50 @@ const Landing = () => {
           </form>
         </div>
 
-        {/* Features section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl w-full">
-          <div className="border rounded-lg p-6">
-            <h3 className="font-semibold text-xl mb-2">Fast Development</h3>
-            <p className="text-muted-foreground">
-              Build complete applications in minutes, not days or weeks.
-            </p>
+        {/* Chat History section - replacing Features section */}
+        <div className="w-full max-w-4xl mb-12">
+          <h2 className="text-2xl font-semibold mb-4 text-center">Recent Conversations</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl w-full">
+            {isLoadingHistory ? (
+              // Loading skeleton
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="border rounded-lg p-6 animate-pulse">
+                  <div className="h-6 bg-gray-200 rounded mb-3 w-3/4"></div>
+                  <div className="h-4 bg-gray-200 rounded mb-2 w-full"></div>
+                  <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                </div>
+              ))
+            ) : chatHistory.length > 0 ? (
+              // Show chat history
+              chatHistory.map((chat, index) => (
+                <div 
+                  key={index} 
+                  className="border rounded-lg p-6 cursor-pointer hover:bg-gray-50 transition"
+                  onClick={() => handleChatSelect(chat.id)}
+                >
+                  <div className="flex items-center mb-2">
+                    <MessageSquare className="h-4 w-4 mr-2 text-blue-500" />
+                    <h3 className="font-semibold text-xl truncate">{chat.title}</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground truncate">{chat.last_message || "No messages"}</p>
+                  <p className="text-xs text-gray-400 mt-2">{formatTimestamp(chat.updated_at || chat.timestamp)}</p>
+                </div>
+              ))
+            ) : (
+              // No history
+              <div className="col-span-3 text-center py-10 border rounded-lg">
+                <p className="text-muted-foreground">No recent conversations</p>
+                <p className="text-sm mt-2">Start a new chat to build your application</p>
+              </div>
+            )}
           </div>
-          <div className="border rounded-lg p-6">
-            <h3 className="font-semibold text-xl mb-2">AI-Powered</h3>
-            <p className="text-muted-foreground">
-              Leverages advanced AI to generate code and design.
-            </p>
-          </div>
-          <div className="border rounded-lg p-6">
-            <h3 className="font-semibold text-xl mb-2">Customizable</h3>
-            <p className="text-muted-foreground">
-              Tweak and refine your application through conversation.
-            </p>
-          </div>
+          {chatHistory.length > 0 && (
+            <div className="flex justify-center mt-6">
+              <Button variant="outline" onClick={() => navigate('/history')}>
+                View All Conversations
+              </Button>
+            </div>
+          )}
         </div>
       </main>
 
