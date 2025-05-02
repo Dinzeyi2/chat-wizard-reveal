@@ -235,7 +235,6 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
       });
     }
     
-    console.log("Extracted code blocks:", codeFiles.length);
     return codeFiles;
   };
   
@@ -341,90 +340,66 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
     );
   };
 
-  // Modified function to handle viewing the full project
+  // Completely rewritten handleViewFullProject to be more robust
   const handleViewFullProject = () => {
-    try {
-      console.log("Opening artifact viewer with message content:", message.content.substring(0, 100) + "...");
-      
-      // Create a guaranteed artifact ID
-      const artifactId = `artifact-${Date.now()}`;
-      // Default title that will always work
-      const projectTitle = appData?.projectName || "Generated Application";
-      
-      // Try extracting code blocks first as the primary method
-      const extractedFiles = extractCodeBlocks();
-      console.log("Extracted files count:", extractedFiles.length);
-      
-      // Create final files array with proper structure
-      let files = [];
-      
-      if (extractedFiles && extractedFiles.length > 0) {
-        console.log("Using extracted code blocks, count:", extractedFiles.length);
-        files = extractedFiles;
-      } 
-      // If no extracted files, but we have appData, use those files
-      else if (appData?.files && appData.files.length > 0) {
-        console.log("Using appData files, count:", appData.files.length);
-        files = appData.files.map((file, index) => ({
-          id: `file-${index}`,
-          name: file.path.split('/').pop() || `file-${index}`,
-          path: file.path,
-          language: getLanguageFromPath(file.path),
-          content: file.content
-        }));
-      }
-      // Ultimate fallback - create at least one file with the message content
-      else {
-        console.log("Using ultimate fallback - creating content file");
-        files = [{
-          id: "content-file",
-          name: "generated-content.md",
-          path: "generated-content.md",
-          language: "markdown",
-          content: message.content
-        }];
-      }
-      
-      // Ensure we have at least one file
-      if (files.length === 0) {
-        files = [{
-          id: "fallback-file",
-          name: "content.md",
-          path: "content.md",
-          language: "markdown",
-          content: "No code content could be extracted. Please check the message content."
-        }];
-      }
-      
-      // Log what we're actually opening
-      console.log(`Opening artifact with ${files.length} files:`, 
-        files.map(f => f.path).join(', '));
-      
-      // Ensure we have a valid artifact to open
-      const artifact = {
-        id: artifactId,
-        title: projectTitle,
-        description: appData?.description || "Generated application",
-        files: files
-      };
-      
-      // Call the openArtifact function
-      console.log("Calling openArtifact with artifact:", artifact.id);
-      openArtifact(artifact);
-      
-      // If we get here, we should show a message to the user
-      toast({
-        title: "Code viewer opened",
-        description: `Displaying ${files.length} code files`
-      });
-    } catch (error) {
-      console.error("Error opening artifact:", error);
-      toast({
-        variant: "destructive",
-        title: "Error opening code viewer",
-        description: "There was a problem displaying the code. Please try again."
-      });
+    console.log("Opening artifact viewer with message content:", message.content.substring(0, 100) + "...");
+    console.log("Project ID:", appData?.projectId || propProjectId || "none");
+    
+    // Create a guaranteed artifact ID
+    const artifactId = `artifact-${Date.now()}`;
+    // Default title that will always work
+    const projectTitle = appData?.projectName || "Generated Application";
+    
+    // Try three different approaches to get files, with guaranteed fallbacks
+    let files = [];
+    
+    // Method 1: Try to get files from parsed app data
+    if (appData?.files && appData.files.length > 0) {
+      console.log("Using parsed app data files");
+      files = appData.files.map((file, index) => ({
+        id: `file-${index}`,
+        name: file.path.split('/').pop() || `file-${index}`,
+        path: file.path,
+        language: getLanguageFromPath(file.path),
+        content: file.content
+      }));
     }
+    
+    // Method 2: If no files from app data, try to extract code blocks
+    if (files.length === 0) {
+      console.log("Falling back to code block extraction");
+      const extractedFiles = extractCodeBlocks();
+      if (extractedFiles.length > 0) {
+        files = extractedFiles;
+      }
+    }
+    
+    // Method 3: Ultimate fallback - create at least one file with the message content
+    if (files.length === 0) {
+      console.log("Using ultimate fallback - creating content file");
+      files = [{
+        id: "content-file",
+        name: "generated-content.md",
+        path: "generated-content.md",
+        language: "markdown",
+        content: message.content
+      }];
+    }
+    
+    // Ensure we have a valid artifact to open
+    const artifact = {
+      id: artifactId,
+      title: projectTitle,
+      description: appData?.description || "Generated application",
+      files: files,
+      metadata: {
+        projectId: appData?.projectId || propProjectId || null
+      }
+    };
+    
+    // Open the artifact with our guaranteed valid artifact object
+    console.log("Opening artifact with", files.length, "files");
+    openArtifact(artifact);
   };
 
   const handleDownload = () => {
@@ -618,15 +593,12 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
           <span className="font-medium text-lg">{isModification ? "View updated code" : "View code"}</span>
         </div>
         <Button 
-          variant="default" 
+          variant="ghost" 
           size="sm" 
-          className="bg-blue-600 hover:bg-blue-700" 
-          onClick={() => {
-            console.log("View Code button clicked");
-            handleViewFullProject();
-          }}
+          className="hover:bg-transparent" 
+          onClick={handleViewFullProject}
         >
-          View Code <ChevronRight className="h-4 w-4 ml-1" />
+          <ChevronRight className="h-5 w-5 text-gray-400" />
         </Button>
       </div>
       

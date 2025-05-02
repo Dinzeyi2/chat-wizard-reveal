@@ -1,12 +1,8 @@
-
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import { FileCode, X, ExternalLink, ChevronRight, Download, File, Code } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { toast } from '@/hooks/use-toast';
-import './ArtifactSystem.css';
-import { ArtifactPreview } from './ArtifactPreview';
 
 // Types
 interface ArtifactFile {
@@ -47,56 +43,13 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
   const [currentArtifact, setCurrentArtifact] = useState<Artifact | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
-  useEffect(() => {
-    // Update chat area class when artifact opens/closes
-    const chatArea = document.querySelector('.chat-area');
-    if (chatArea) {
-      if (isOpen) {
-        chatArea.classList.add('artifact-open');
-      } else {
-        chatArea.classList.remove('artifact-open');
-      }
-    }
-    
-    // Force reflow to ensure CSS changes take effect
-    if (chatArea) {
-      // Cast to HTMLElement to fix TypeScript error
-      void (chatArea as HTMLElement).offsetHeight;
-    }
-  }, [isOpen]);
-
   const openArtifact = (artifact: Artifact) => {
-    console.log("ArtifactProvider.openArtifact called with:", artifact.id);
-    if (!artifact || !artifact.files || artifact.files.length === 0) {
-      console.error("Cannot open artifact: Invalid artifact or empty files array");
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Cannot display code: No valid files found"
-      });
-      return;
-    }
-    
-    // Ensure we're working with a valid artifact
-    console.log(`Opening artifact with ${artifact.files.length} files`);
-    
-    // Set the artifact and open the viewer
     setCurrentArtifact(artifact);
     setIsOpen(true);
-    
-    // Force reflow to ensure the viewer is rendered
-    setTimeout(() => {
-      console.log("Forcing reflow to ensure artifact viewer is visible");
-      window.dispatchEvent(new Event('resize'));
-    }, 100);
-    
-    console.log("Artifact viewer opened successfully");
   };
 
   const closeArtifact = () => {
-    console.log("Closing artifact viewer");
     setIsOpen(false);
-    setTimeout(() => setCurrentArtifact(null), 300); // Clear after animation
   };
 
   return (
@@ -107,7 +60,6 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
       isOpen
     }}>
       {children}
-      {isOpen && currentArtifact && <ArtifactViewer />}
     </ArtifactContext.Provider>
   );
 };
@@ -120,9 +72,6 @@ export const ArtifactViewer: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'code' | 'preview'>('code');
 
   useEffect(() => {
-    console.log("ArtifactViewer mounted, isOpen:", isOpen);
-    console.log("Current artifact:", currentArtifact?.id);
-    
     if (currentArtifact && currentArtifact.files.length > 0) {
       setActiveFile(currentArtifact.files[0].id);
       
@@ -142,41 +91,9 @@ export const ArtifactViewer: React.FC = () => {
     } else {
       setActiveFile(null);
     }
-    
-    // Force reflow on mount
-    window.dispatchEvent(new Event('resize'));
-    
-    // Prevent scroll on body when viewer is open
-    document.body.style.overflow = 'hidden';
-    
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [currentArtifact, isOpen]);
+  }, [currentArtifact]);
 
-  // Debug log when tab changes
-  useEffect(() => {
-    console.log("Active tab changed to:", activeTab);
-  }, [activeTab]);
-
-  const handleTabChange = (tab: 'code' | 'preview') => {
-    console.log("Changing tab to:", tab);
-    setActiveTab(tab);
-    // Force reflow when switching to preview tab to ensure Sandpack renders properly
-    if (tab === 'preview') {
-      setTimeout(() => {
-        window.dispatchEvent(new Event('resize'));
-      }, 50);
-    }
-  };
-
-  if (!isOpen || !currentArtifact) {
-    console.log("ArtifactViewer not rendering because isOpen:", isOpen, "currentArtifact:", !!currentArtifact);
-    return null;
-  }
-
-  console.log("Rendering ArtifactViewer with artifact:", currentArtifact.id);
-  console.log("Number of files:", currentArtifact.files.length);
+  if (!isOpen || !currentArtifact) return null;
 
   const currentFile = currentArtifact.files.find(f => f.id === activeFile);
 
@@ -317,7 +234,7 @@ export const ArtifactViewer: React.FC = () => {
               variant="ghost"
               size="sm"
               className={`file-viewer-tab ${activeTab === 'preview' ? 'active' : ''}`}
-              onClick={() => handleTabChange('preview')}
+              onClick={() => setActiveTab('preview')}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
@@ -330,7 +247,7 @@ export const ArtifactViewer: React.FC = () => {
               variant="ghost"
               size="sm"
               className={`file-viewer-tab ${activeTab === 'code' ? 'active' : ''}`}
-              onClick={() => handleTabChange('code')}
+              onClick={() => setActiveTab('code')}
             >
               <Code size={18} />
               Code
@@ -363,43 +280,35 @@ export const ArtifactViewer: React.FC = () => {
           </div>
         </div>
         
-        <div className={`artifact-viewer-content flex flex-1 overflow-hidden ${activeTab === 'preview' ? 'preview-mode' : ''}`}>
-          {activeTab === 'code' && (
-            <div className="file-explorer w-1/4 min-w-[220px] border-r border-zinc-800 bg-black overflow-y-auto">
-              <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 px-3 py-2">
-                <h4 className="text-sm font-medium text-gray-400">Files</h4>
-              </div>
-              {renderFileTree()}
+        <div className="artifact-viewer-content flex flex-1 overflow-hidden">
+          <div className="file-explorer w-1/4 min-w-[220px] border-r border-zinc-800 bg-black overflow-y-auto">
+            <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 px-3 py-2">
+              <h4 className="text-sm font-medium text-gray-400">Files</h4>
             </div>
-          )}
+            {renderFileTree()}
+          </div>
           
           <div className="file-content flex-1 overflow-auto flex flex-col">
-            {activeTab === 'code' ? (
-              currentFile ? (
-                <>
-                  <div className="file-path px-4 py-2 text-xs text-gray-400 bg-zinc-900 border-b border-zinc-800 flex justify-between items-center">
-                    <span>{currentFile.path}</span>
-                    <span className="text-gray-500">{getLanguageFromPath(currentFile.path).toUpperCase()}</span>
-                  </div>
-                  <div className="code-container flex-1 overflow-auto bg-zinc-900">
-                    <SyntaxHighlighter 
-                      language={getLanguageFromPath(currentFile.path)}
-                      style={vs2015}
-                      customStyle={{ margin: 0, padding: '16px', height: '100%', fontSize: '14px', lineHeight: '1.5', backgroundColor: '#18181b' }}
-                      showLineNumbers={true}
-                    >
-                      {currentFile.content}
-                    </SyntaxHighlighter>
-                  </div>
-                </>
-              ) : (
-                <div className="no-file-selected p-4 text-center text-gray-500 mt-8 bg-zinc-900">
-                  Select a file to view its content
+            {currentFile ? (
+              <>
+                <div className="file-path px-4 py-2 text-xs text-gray-400 bg-zinc-900 border-b border-zinc-800 flex justify-between items-center">
+                  <span>{currentFile.path}</span>
+                  <span className="text-gray-500">{getLanguageFromPath(currentFile.path).toUpperCase()}</span>
                 </div>
-              )
+                <div className="code-container flex-1 overflow-auto bg-zinc-900">
+                  <SyntaxHighlighter 
+                    language={getLanguageFromPath(currentFile.path)}
+                    style={vs2015}
+                    customStyle={{ margin: 0, padding: '16px', height: '100%', fontSize: '14px', lineHeight: '1.5', backgroundColor: '#18181b' }}
+                    showLineNumbers={true}
+                  >
+                    {currentFile.content}
+                  </SyntaxHighlighter>
+                </div>
+              </>
             ) : (
-              <div className="preview-container h-full w-full flex-1">
-                <ArtifactPreview files={currentArtifact.files} />
+              <div className="no-file-selected p-4 text-center text-gray-500 mt-8 bg-zinc-900">
+                Select a file to view its content
               </div>
             )}
           </div>
@@ -409,13 +318,17 @@ export const ArtifactViewer: React.FC = () => {
   );
 };
 
-// Simplified layout for the artifact system
+// The Layout component that manages the artifact system
 export const ArtifactLayout: React.FC<{children: React.ReactNode}> = ({ children }) => {
+  const { isOpen } = useArtifact();
+
   return (
-    <div className="artifact-system">
-      <div className="chat-area">
+    <div className="artifact-system flex h-full">
+      <div className={`chat-area transition-all duration-300 ease-in-out ${isOpen ? 'w-[40%] border-r' : 'w-full'}`}>
         {children}
       </div>
+      
+      {isOpen && <ArtifactViewer />}
     </div>
   );
 };

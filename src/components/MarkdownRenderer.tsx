@@ -3,7 +3,7 @@ import React from "react";
 import { Message } from "@/types/chat";
 import AppGeneratorDisplay from "./AppGeneratorDisplay";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useArtifact, ArtifactProvider } from "./artifact/ArtifactSystem";
+import { ArtifactProvider } from "./artifact/ArtifactSystem";
 
 interface MarkdownRendererProps {
   content: string;
@@ -94,32 +94,15 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
                             content.toLowerCase().includes('updated')
                           ));
     
-    // Debug
-    console.log("App generation detection:", {
-      hasJsonContent,
-      hasProjectName,
-      hasFiles,
-      hasGenerationPhrase,
-      hasAppKeyword,
-      hasGenerationKeyword,
-      hasFileStructure,
-      hasMultipleCodeBlocks,
-      projectId,
-      isModification,
-      codeBlockCount
-    });
-    
     // Be VERY lenient - if multiple conditions are met, treat it as app generation
     return isModification || 
            (hasJsonContent && (hasProjectName || hasFiles)) || 
            (hasGenerationPhrase && (hasAppKeyword || hasFileStructure)) ||
            (hasGenerationKeyword && hasAppKeyword && (hasFileStructure || hasMultipleCodeBlocks)) ||
-           (projectId !== null) || 
-           (hasMultipleCodeBlocks && hasFileStructure);
+           (projectId !== null); // If we detected a projectId, it's definitely app generation
   }, [content, message, projectId]);
   
   if (message && isAppGeneration) {
-    console.log("Rendering AppGeneratorDisplay for message:", message.id);
     return (
       <ArtifactProvider>
         <AppGeneratorDisplay message={message} projectId={projectId} />

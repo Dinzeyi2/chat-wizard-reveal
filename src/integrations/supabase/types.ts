@@ -162,39 +162,6 @@ export type Database = {
         }
         Relationships: []
       }
-      chat_history: {
-        Row: {
-          created_at: string | null
-          id: string
-          last_message: string | null
-          messages: Json | null
-          timestamp: string | null
-          title: string
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          last_message?: string | null
-          messages?: Json | null
-          timestamp?: string | null
-          title: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          last_message?: string | null
-          messages?: Json | null
-          timestamp?: string | null
-          title?: string
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       code_samples: {
         Row: {
           content: string
@@ -625,42 +592,6 @@ export type Database = {
           id?: string
           platform?: string
           project_description?: string
-        }
-        Relationships: []
-      }
-      github_connections: {
-        Row: {
-          access_token: string
-          connected_at: string
-          github_avatar: string | null
-          github_id: string
-          github_name: string | null
-          github_username: string
-          id: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          access_token: string
-          connected_at?: string
-          github_avatar?: string | null
-          github_id: string
-          github_name?: string | null
-          github_username: string
-          id?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          access_token?: string
-          connected_at?: string
-          github_avatar?: string | null
-          github_id?: string
-          github_name?: string | null
-          github_username?: string
-          id?: string
-          updated_at?: string
-          user_id?: string
         }
         Relationships: []
       }
