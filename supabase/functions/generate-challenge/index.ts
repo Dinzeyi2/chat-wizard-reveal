@@ -1,40 +1,15 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { Configuration, OpenAI } from "https://esm.sh/openai@4.0.0";
 import { corsHeaders } from "../_shared/cors.ts";
 
-interface ChallengeRequest {
+interface GenerateChallengeRequest {
   prompt: string;
   completionLevel?: 'beginner' | 'intermediate' | 'advanced';
   challengeType?: 'frontend' | 'backend' | 'fullstack';
 }
 
-interface Challenge {
-  id: string;
-  title: string;
-  description: string;
-  difficulty: string;
-  type: 'implementation' | 'bugfix' | 'feature';
-  filesPaths: string[];
-}
-
-interface ProjectFile {
-  path: string;
-  content: string;
-  isComplete: boolean;
-}
-
-interface GeneratedProject {
-  projectId: string;
-  projectName: string;
-  description: string;
-  files: ProjectFile[];
-  challenges: Challenge[];
-  explanation: string;
-}
-
 serve(async (req) => {
-  console.log("Generate code challenge function called");
+  console.log("Generate challenge function called");
   
   // Handle CORS
   if (req.method === "OPTIONS") {
@@ -45,7 +20,7 @@ serve(async (req) => {
     const requestData = await req.json();
     console.log("Request data:", JSON.stringify(requestData));
     
-    const { prompt, completionLevel = 'intermediate', challengeType = 'fullstack' } = requestData as ChallengeRequest;
+    const { prompt, completionLevel, challengeType } = requestData as GenerateChallengeRequest;
 
     if (!prompt) {
       console.error("Missing prompt in request");
@@ -55,117 +30,200 @@ serve(async (req) => {
       });
     }
 
-    // Configure OpenAI client
-    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+    // Get the Gemini API key from environment variables
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
-    
-    if (!openaiApiKey) {
-      throw new Error("OpenAI API key is required");
-    }
-    
-    const configuration = new Configuration({
-      apiKey: openaiApiKey,
-    });
-    const openai = new OpenAI({ apiKey: openaiApiKey });
-    
-    // Generate project structure with challenges
-    const systemPrompt = `You are an expert software developer and educator specializing in creating educational coding projects.
-    
-Your task is to create an intentionally incomplete application with strategic gaps for learning purposes based on the user's prompt: "${prompt}".
-
-The application should be mostly working but have specific challenges that the user needs to complete as part of their learning process.
-
-For the skill level "${completionLevel}", create an appropriate number of challenges (3-6 challenges).
-
-Each generated file should be syntactically correct and runnable, even if functionally incomplete.
-
-Return a JSON object with the following structure:
-{
-  "projectId": "string", // A unique ID for the project
-  "projectName": "string", // A descriptive name for the project
-  "description": "string", // Brief description of what the project does
-  "files": [ // Array of code files
-    {
-      "path": "string", // File path (e.g., "src/components/App.js")
-      "content": "string", // Complete code content for the file
-      "isComplete": boolean // Whether the file has missing implementations (false if it contains challenges)
-    }
-  ],
-  "challenges": [ // Array of learning challenges
-    {
-      "id": "string", // Unique ID for the challenge
-      "title": "string", // Short descriptive title
-      "description": "string", // Detailed description of what needs to be implemented
-      "difficulty": "easy|medium|hard", // Challenge difficulty
-      "type": "implementation|bugfix|feature", // Type of challenge
-      "filesPaths": ["string"] // Array of file paths related to this challenge
-    }
-  ],
-  "explanation": "string" // Brief explanation of the project structure and learning goals
-}
-
-For the "challenges" field, create specialized learning tasks that require the user to implement missing functionalities.
-Mark relevant code sections with TODO comments pointing to what needs to be implemented.
-Ensure each challenge is clearly defined and has educational value.
-`;
-
-    console.log("Making API request to generate code challenge");
-    
-    // Call OpenAI to generate the project structure
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.7,
-      max_tokens: 4000,
-    });
-
-    const generatedContent = completion.choices[0]?.message?.content || "";
-    console.log("Generated code challenge response received");
-    
-    // Parse the generated content to extract the JSON
-    try {
-      // Find JSON in the response
-      const jsonMatch = generatedContent.match(/```json\n([\s\S]*?)\n```/) || 
-                         generatedContent.match(/```([\s\S]*?)```/) ||
-                         generatedContent.match(/{[\s\S]*"projectId"[\s\S]*}/);
-                         
-      let jsonString = "";
-      
-      if (jsonMatch) {
-        jsonString = jsonMatch[1] || jsonMatch[0];
-      } else {
-        jsonString = generatedContent;
-      }
-      
-      // Clean up and parse the JSON
-      jsonString = jsonString.replace(/```json/g, "").replace(/```/g, "").trim();
-      const project = JSON.parse(jsonString) as GeneratedProject;
-      
-      console.log(`Successfully generated project "${project.projectName}" with ${project.challenges.length} challenges`);
-      
-      return new Response(JSON.stringify({
-        ...project,
-        success: true
-      }), {
-        status: 200,
+    if (!geminiApiKey) {
+      console.error("Gemini API key not configured");
+      return new Response(JSON.stringify({ error: "Gemini API key not configured" }), {
+        status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
-    } catch (parseError) {
-      console.error("Error parsing generated content:", parseError);
-      console.log("Generated content:", generatedContent);
-      throw new Error("Failed to parse generated project structure");
+    }
+    
+    // Call Gemini API to generate the code challenge
+    console.log("Calling Gemini API to generate code challenge");
+    const geminiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": geminiApiKey
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: `You are an expert software engineer creating coding challenges for a learning platform. 
+            Please create an intentionally incomplete full-stack application based on the following prompt: "${prompt}".
+            
+            The application should have the following characteristics:
+            - Completion Level: ${completionLevel || 'intermediate'}
+            - Focus Area: ${challengeType || 'fullstack'}
+            - It should be a React-based application using Tailwind CSS and shadcn/ui
+            - Include 3-5 specific coding challenges for the user to complete
+            - Each challenge should have clear instructions, hints, and education value
+            - IMPORTANT: Make sure to create intentional gaps in the code that users need to fill in as part of the challenges
+            
+            Format your response as a JSON object with the following structure:
+            {
+              "projectName": "name-of-project",
+              "description": "Brief description of the application",
+              "files": [
+                {
+                  "path": "src/components/Example.tsx",
+                  "content": "// Actual code content",
+                  "isComplete": false,
+                  "challenges": [
+                    {
+                      "description": "Challenge description",
+                      "difficulty": "medium",
+                      "hints": ["Hint 1", "Hint 2"]
+                    }
+                  ]
+                }
+              ],
+              "challenges": [
+                {
+                  "id": "challenge-1",
+                  "title": "Implement User Authentication",
+                  "description": "Detailed description of the challenge",
+                  "difficulty": "medium",
+                  "type": "implementation",
+                  "filesPaths": ["src/components/Auth.tsx"]
+                }
+              ],
+              "explanation": "Overall explanation of the architecture and challenges"
+            }
+            
+            Ensure the code is valid TypeScript/React, uses modern practices, and the incomplete parts are educational to implement.`
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 8192
+        }
+      })
+    });
+
+    if (!geminiResponse.ok) {
+      const errorText = await geminiResponse.text();
+      console.error(`Gemini API error (${geminiResponse.status}): ${errorText}`);
+      return new Response(JSON.stringify({ error: `Gemini API error: ${geminiResponse.status}` }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
 
-  } catch (error: any) {
-    console.error("Error in generate-challenge function:", error);
+    const geminiData = await geminiResponse.json();
+    console.log("Gemini response received");
     
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: error.message || "Unknown error occurred"
+    // Extract the generated content
+    if (!geminiData.candidates || geminiData.candidates.length === 0 || !geminiData.candidates[0].content) {
+      console.error("Empty or invalid response from Gemini API");
+      return new Response(JSON.stringify({ error: "Empty or invalid response from Gemini API" }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+    
+    // Extract and parse JSON from Gemini response
+    let challengeResult;
+    try {
+      const textContent = geminiData.candidates[0].content.parts[0].text;
+      
+      // Try to extract JSON from the response
+      const jsonMatch = textContent.match(/```json\n([\s\S]*?)\n```/) || 
+                        textContent.match(/{[\s\S]*"projectName"[\s\S]*}/);
+      
+      let jsonContent = textContent;
+      if (jsonMatch) {
+        jsonContent = jsonMatch[1] || jsonMatch[0];
+      }
+      
+      challengeResult = JSON.parse(jsonContent.trim());
+      console.log("Successfully parsed challenge data");
+    } catch (jsonError) {
+      console.error("Failed to parse JSON response:", jsonError);
+      return new Response(JSON.stringify({ 
+        error: "Failed to parse challenge data",
+        technicalDetails: `JSON parse error: ${jsonError.message}`
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+    
+    // Store the challenge data in the database
+    const projectId = crypto.randomUUID();
+    try {
+      // Get user_id from the JWT if available
+      let userId = null;
+      const authHeader = req.headers.get("authorization");
+      
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.substring(7);
+        try {
+          // Simple JWT parsing to extract user_id
+          const base64Url = token.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          }).join(''));
+          
+          const payload = JSON.parse(jsonPayload);
+          userId = payload.sub;
+        } catch (e) {
+          console.error("Error parsing JWT:", e);
+        }
+      }
+      
+      // If we couldn't get a user_id, use a placeholder
+      if (!userId) {
+        userId = "00000000-0000-0000-0000-000000000000"; // Anonymous user
+      }
+      
+      // Store project in database using service role
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      
+      if (supabaseUrl && supabaseServiceKey) {
+        await fetch(`${supabaseUrl}/rest/v1/code_challenges`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": supabaseServiceKey,
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+            "Prefer": "return=minimal"
+          },
+          body: JSON.stringify({
+            id: projectId,
+            user_id: userId,
+            prompt: prompt,
+            challenge_data: challengeResult,
+            completion_level: completionLevel || 'intermediate',
+            challenge_type: challengeType || 'fullstack',
+            created_at: new Date().toISOString()
+          })
+        });
+      }
+    } catch (dbError) {
+      console.error("Database error when storing challenge:", dbError);
+      // Continue even if storage fails - we'll return the data to the client
+    }
+
+    console.log(`Successfully generated code challenge`);
+    return new Response(JSON.stringify({
+      success: true,
+      projectId: projectId,
+      ...challengeResult
     }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
+
+  } catch (error) {
+    console.error("Error in generate-challenge function:", error);
+    return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });

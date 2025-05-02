@@ -33,13 +33,12 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
-  const [apiKey, setApiKey] = useState("");
+  const [geminiApiKey, setGeminiApiKey] = useState("");
   const [showGithubReposDialog, setShowGithubReposDialog] = useState(false);
   const [githubRepos, setGithubRepos] = useState<any[]>([]);
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
   const [isConnectedToGithub, setIsConnectedToGithub] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isGeneratingChallenge, setIsGeneratingChallenge] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -71,7 +70,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onSendMessage, loading }) => {
   }, []);
 
   // Add Gemini code generation hook
-  const { generateChallenge, isLoading: isGeneratingCodeChallenge } = useGeminiCode({
+  const { generateChallenge, isLoading: isGeneratingChallenge } = useGeminiCode({
     onSuccess: (data) => {
       // Format the challenge as a message to be displayed in the chat
       const challengeMessage = `
@@ -91,10 +90,6 @@ ${data.challenges.map((challenge, index) =>
 
 ${data.explanation}
 
-\`\`\`json
-${JSON.stringify(data, null, 2)}
-\`\`\`
-
 Let's get started with the first challenge! Would you like me to explain it in more detail?
       `;
       
@@ -102,46 +97,13 @@ Let's get started with the first challenge! Would you like me to explain it in m
       
       // Store the challenge data in local storage for later use
       localStorage.setItem("currentChallenge", JSON.stringify(data));
-      setIsGeneratingChallenge(false);
-    },
-    onError: (error) => {
-      toast({
-        title: "Error Generating Challenge",
-        description: error.message,
-        variant: "destructive"
-      });
-      setIsGeneratingChallenge(false);
     }
   });
 
   const handleSubmit = async () => {
     if (message.trim() || files.length > 0) {
-      // Check if this is an app generation request
-      const isAppGenerationRequest = 
-        (message.toLowerCase().includes("create") || 
-         message.toLowerCase().includes("build") || 
-         message.toLowerCase().includes("make") || 
-         message.toLowerCase().includes("generate")) &&
-        (message.toLowerCase().includes("app") || 
-         message.toLowerCase().includes("site") ||
-         message.toLowerCase().includes("clone") ||
-         message.toLowerCase().includes("application"));
-      
-      if (isAppGenerationRequest) {
-        // Use Gemini to create a learning challenge
-        setIsGeneratingChallenge(true);
-        try {
-          await generateChallenge(message);
-        } catch (error) {
-          console.error("Failed to generate challenge:", error);
-          setIsGeneratingChallenge(false);
-          // If Gemini fails, fall back to standard message processing
-          onSendMessage(message);
-        }
-      } else {
-        // Standard message processing
-        onSendMessage(message);
-      }
+      // Always call the standard onSendMessage - the backend will handle everything now
+      onSendMessage(message);
       
       setMessage("");
       setFiles([]);
@@ -162,18 +124,18 @@ Let's get started with the first challenge! Would you like me to explain it in m
     }
   };
   
-  const handleCheckApiKey = async () => {
+  const handleCheckGeminiKey = async () => {
     // First check if we have a stored API key in Supabase
     try {
       const { data, error } = await supabase.functions.invoke('get-env', {
-        body: { key: 'OPENAI_API_KEY' }
+        body: { key: 'GEMINI_API_KEY' }
       });
       
       if (!error && data?.value) {
         // We have an API key stored, we're good
         toast({
-          title: "API Key Available",
-          description: "Your OpenAI API key is already configured"
+          title: "Gemini API Key Available",
+          description: "Your Gemini API key is already configured"
         });
       } else {
         // No API key, prompt user
@@ -186,10 +148,10 @@ Let's get started with the first challenge! Would you like me to explain it in m
   };
   
   const handleSaveApiKey = async () => {
-    if (!apiKey) {
+    if (!geminiApiKey) {
       toast({
         title: "API Key Required",
-        description: "Please enter a valid OpenAI API key",
+        description: "Please enter a valid Gemini API key",
         variant: "destructive"
       });
       return;
@@ -198,14 +160,14 @@ Let's get started with the first challenge! Would you like me to explain it in m
     try {
       // Store the API key in Supabase secrets
       const { error } = await supabase.functions.invoke('set-env', {
-        body: { key: 'OPENAI_API_KEY', value: apiKey }
+        body: { key: 'GEMINI_API_KEY', value: geminiApiKey }
       });
       
       if (error) throw error;
       
       toast({
         title: "API Key Saved",
-        description: "Your API key has been securely saved"
+        description: "Your Gemini API key has been securely saved"
       });
       
       setApiKeyDialogOpen(false);
@@ -258,7 +220,7 @@ Let's get started with the first challenge! Would you like me to explain it in m
       <PromptInput
         value={message}
         onValueChange={setMessage}
-        isLoading={loading || isGeneratingChallenge || isGeneratingCodeChallenge}
+        isLoading={loading || isGeneratingChallenge}
         onSubmit={handleSubmit}
         className="w-full"
       >
@@ -282,7 +244,7 @@ Let's get started with the first challenge! Would you like me to explain it in m
           </div>
         )}
 
-        <PromptInputTextarea placeholder="Ask anything or describe an app to build as a learning challenge..." />
+        <PromptInputTextarea placeholder="Ask anything or describe the app you want to build..." />
 
         <PromptInputActions className="flex items-center justify-between gap-2 pt-2">
           <div className="flex gap-2">
@@ -306,11 +268,11 @@ Let's get started with the first challenge! Would you like me to explain it in m
             </TooltipProvider>
             
             <TooltipProvider>
-              <PromptInputAction tooltip="Check OpenAI API Key">
+              <PromptInputAction tooltip="Check Gemini API Key">
                 <button 
-                  onClick={handleCheckApiKey}
+                  onClick={handleCheckGeminiKey}
                   className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl"
-                  disabled={loading || isGeneratingChallenge || isGeneratingCodeChallenge}
+                  disabled={loading || isGeneratingChallenge}
                 >
                   <Code className="text-primary size-5" />
                 </button>
@@ -356,27 +318,27 @@ Let's get started with the first challenge! Would you like me to explain it in m
       </PromptInput>
       
       <div className="text-xs text-center mt-2 text-gray-500">
-        Request an educational app with coding challenges or ask for coding help!
+        Ask for help or request to create an app with intentional learning challenges!
       </div>
       
       {/* API Key Dialog */}
       <Dialog open={apiKeyDialogOpen} onOpenChange={setApiKeyDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>OpenAI API Key</DialogTitle>
+            <DialogTitle>Gemini API Key</DialogTitle>
             <DialogDescription>
-              Enter your OpenAI API key to enable educational code challenge creation.
+              Enter your Gemini API key to enable educational code challenge creation.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="api-key">API Key</Label>
+              <Label htmlFor="gemini-api-key">API Key</Label>
               <Input
-                id="api-key"
+                id="gemini-api-key"
                 type="password"
-                placeholder="sk-..."
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="AIza..."
+                value={geminiApiKey}
+                onChange={(e) => setGeminiApiKey(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
                 Your API key will be stored securely in Supabase environment variables.
