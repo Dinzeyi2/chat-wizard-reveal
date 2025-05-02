@@ -4,6 +4,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 
 interface AppGenerationRequest {
   prompt: string;
+  completionLevel?: 'beginner' | 'intermediate' | 'advanced';
 }
 
 // Function to estimate tokens in a string (rough approximation)
@@ -77,7 +78,7 @@ serve(async (req) => {
     const requestData = await req.json();
     console.log("Request data:", JSON.stringify(requestData));
     
-    const { prompt } = requestData as AppGenerationRequest;
+    const { prompt, completionLevel = 'intermediate' } = requestData as AppGenerationRequest;
 
     if (!prompt) {
       console.error("Missing prompt in request");
@@ -100,536 +101,279 @@ serve(async (req) => {
       });
     }
     
-    const projectName = `project-${Date.now()}`;
+    const projectId = crypto.randomUUID();
 
-    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!anthropicKey) {
-      console.error("Anthropic API key not configured");
-      return new Response(JSON.stringify({ error: "Anthropic API key not configured" }), {
+    // Get the Gemini API key from environment variables
+    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+    if (!geminiApiKey) {
+      console.error("Gemini API key not configured");
+      return new Response(JSON.stringify({ error: "Gemini API key not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
     
-    // Generate architecture using Anthropic API with reduced token limit to ensure we stay within model limits
-    console.log("Calling Anthropic API for architecture generation");
-    let architectureResponse;
-    try {
-      architectureResponse = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": anthropicKey,
-          "anthropic-version": "2023-06-01"
-        },
-        body: JSON.stringify({
-          model: "claude-3-5-sonnet-20240620",
-          max_tokens: 3000, // Further reduced to ensure we stay well within limits
-          temperature: 0.7,
-          system: `You are an expert full stack developer specializing in modern web applications.
-          When given a prompt for a web application, you will create a detailed architecture plan with:
-          1. A list of all files needed (frontend, backend, configuration)
-          2. Technologies to use (React, Next.js, Express, etc.)
-          3. Project structure
-          4. Component hierarchy
-          5. Data models
-          
-          IMPORTANT: Keep your response concise and within 3000 tokens.
-          Format your response as a valid, complete JSON object with the following structure only:
-          {
-            "projectName": "name-of-project",
-            "description": "Brief description",
-            "technologies": ["tech1", "tech2"],
-            "fileStructure": {
-              "frontend": ["file1", "file2"],
-              "backend": ["file1", "file2"],
-              "config": ["file1", "file2"]
-            }
-          }
-          
-          Make sure the JSON is complete and valid, with no trailing commas or syntax errors.
-          Do not include any explanatory text outside the JSON object.`,
-          messages: [
+    // Generate architecture using Gemini API instead of Claude
+    console.log("Calling Gemini API to generate application with intentional challenges");
+    
+    const geminiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": geminiApiKey
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: `You are an expert software engineer creating educational coding challenges for a learning platform. 
+            Please create an intentionally incomplete application based on the following prompt: "${processedPrompt}".
+            
+            The application should have the following characteristics:
+            - Completion Level: ${completionLevel}
+            - It should be a React-based application using modern web technologies
+            - Include 3-5 specific coding challenges/bugs for the user to fix
+            - Each challenge should have clear error patterns that are educational to solve
+            - IMPORTANT: Include comments that explain what needs to be fixed as TODOs
+            
+            Format your response as a valid, complete JSON object with the following structure:
             {
-              role: "user",
-              content: processedPrompt
+              "projectName": "name-of-project",
+              "description": "Brief description of the application",
+              "fileStructure": {
+                "src": {
+                  "components": {
+                    "ComponentName.js": "// Component code with intentional issues"
+                  },
+                  "App.js": "// App code with some issues to fix"
+                }
+              },
+              "challenges": [
+                {
+                  "id": "challenge-1",
+                  "title": "Fix Component Rendering Issue",
+                  "description": "There's a problem with how the component renders. Find and fix it.",
+                  "filesPaths": ["src/components/ComponentName.js"]
+                }
+              ],
+              "explanation": "Overall explanation of the challenges and what the user will learn"
             }
-          ]
-        })
-      });
-    } catch (error) {
-      console.error("Error making Anthropic API request:", error);
-      return new Response(JSON.stringify({ error: `Failed to contact Anthropic API: ${error.message}` }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
+            
+            Ensure the code has real, fixable errors that teach important programming concepts.`
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 8192
+        }
+      })
+    });
 
-    if (!architectureResponse.ok) {
-      const errorText = await architectureResponse.text();
-      console.error(`Anthropic API error (${architectureResponse.status}): ${errorText}`);
-      return new Response(JSON.stringify({ error: `Anthropic API error (${architectureResponse.status})` }), {
+    if (!geminiResponse.ok) {
+      const errorText = await geminiResponse.text();
+      console.error(`Gemini API error (${geminiResponse.status}): ${errorText}`);
+      return new Response(JSON.stringify({ error: `Gemini API error: ${geminiResponse.status}` }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
-    console.log("Architecture response received");
-    const architectureData = await architectureResponse.json();
+    const geminiData = await geminiResponse.json();
+    console.log("Gemini response received");
     
-    if (!architectureData || !architectureData.content || architectureData.content.length === 0) {
-      console.error("Empty or invalid response from Anthropic API");
-      return new Response(JSON.stringify({ error: "Empty or invalid response from Anthropic API" }), {
+    // Extract the generated content
+    if (!geminiData.candidates || geminiData.candidates.length === 0 || !geminiData.candidates[0].content) {
+      console.error("Empty or invalid response from Gemini API");
+      return new Response(JSON.stringify({ error: "Empty or invalid response from Gemini API" }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
-    
-    const architectureContent = architectureData.content[0].text;
-    console.log("Architecture content received:", architectureContent.substring(0, 200) + "...");
-    
-    let architecture;
-    
+
+    // Extract and parse content from Gemini response
+    console.log("Processing Gemini response");
+    let appData;
     try {
-      // Improved JSON parsing with better error handling
-      // Try to clean the response before parsing if needed
-      let jsonToParse = architectureContent;
+      const textContent = geminiData.candidates[0].content.parts[0].text;
       
-      // Remove any markdown code block markers if present
-      if (jsonToParse.includes("```json")) {
-        jsonToParse = jsonToParse.replace(/```json\n?|\n?```/g, "");
+      // Try to extract JSON from the response
+      const jsonMatch = textContent.match(/```json\n([\s\S]*?)\n```/) || 
+                    textContent.match(/{[\s\S]*"projectName"[\s\S]*}/);
+      
+      let jsonContent = textContent;
+      if (jsonMatch) {
+        jsonContent = jsonMatch[1] || jsonMatch[0];
       }
+      console.log("Cleaned JSON for parsing:", jsonContent.substring(0, 100) + "...");
       
-      // Clean the JSON string - remove any non-JSON content before or after
-      const jsonStart = jsonToParse.indexOf('{');
-      const jsonEnd = jsonToParse.lastIndexOf('}');
-      
-      if (jsonStart >= 0 && jsonEnd > jsonStart) {
-        jsonToParse = jsonToParse.substring(jsonStart, jsonEnd + 1);
-      }
-      
-      console.log("Cleaned JSON for parsing:", jsonToParse.substring(0, 100) + "...");
-      architecture = JSON.parse(jsonToParse);
+      appData = JSON.parse(jsonContent.trim());
       console.log("Successfully parsed JSON");
     } catch (jsonError) {
       console.error("Failed to parse JSON response:", jsonError);
-      
-      // Return a more user-friendly error with instruction for retry
-      return new Response(JSON.stringify({ 
-        error: "Failed to generate application architecture. Please try again with a simpler prompt.",
-        technicalDetails: `JSON parse error: ${jsonError.message}`,
-        snippet: architectureContent.substring(0, 300) // Include part of the content for debugging
-      }), {
-        status: 400, // Changed from 502 to 400 to indicate a client-side retry might help
+      return new Response(JSON.stringify({ error: "Failed to parse application data" }), {
+        status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
-    // Generate files based on architecture
-    if (!architecture || !architecture.fileStructure) {
-      console.error("Invalid architecture structure received");
-      return new Response(JSON.stringify({ 
-        error: "Invalid architecture structure", 
-        architecture: architecture || "null" 
-      }), {
-        status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-    
+    // Convert file structure to actual files
     const files = [];
     
-    // Flatten file structure
-    const fileList = [];
-    for (const section in architecture.fileStructure) {
-      for (const file of architecture.fileStructure[section]) {
-        fileList.push(file);
+    function extractFilesFromStructure(structure, basePath = '') {
+      for (const [key, value] of Object.entries(structure)) {
+        const currentPath = basePath ? `${basePath}/${key}` : key;
+        
+        if (typeof value === 'object' && value !== null) {
+          // It's a directory
+          extractFilesFromStructure(value, currentPath);
+        } else if (typeof value === 'string') {
+          // It's a file
+          files.push({
+            path: currentPath,
+            content: value
+          });
+        }
       }
     }
-
-    // Get a smaller batch of files (reducing from 10 to 5 to minimize API calls)
-    const batchSize = 5;
-    const filesToGenerate = fileList.slice(0, batchSize);
-    console.log(`Generating ${filesToGenerate.length} files`);
     
-    for (const filePath of filesToGenerate) {
-      try {
-        console.log(`Generating file: ${filePath}`);
-        const fileContent = await generateFileContent(filePath, architecture, processedPrompt);
-        files.push({
-          path: filePath,
-          content: fileContent
-        });
-      } catch (fileError) {
-        console.error(`Error generating file ${filePath}:`, fileError);
-        files.push({
-          path: filePath,
-          content: `// Error generating content: ${fileError.message}`
-        });
+    if (appData.fileStructure) {
+      console.log(`Generating ${Object.keys(appData.fileStructure).length} files`);
+      extractFilesFromStructure(appData.fileStructure);
+      
+      // Generate files
+      for (const file of files) {
+        console.log(`Generating file: ${file.path}`);
       }
     }
-
-    // Create package.json
-    try {
+    
+    // Generate package.json if it doesn't exist
+    if (!files.some(file => file.path === 'package.json')) {
       console.log("Generating package.json");
-      const packageJson = await generatePackageJson(architecture);
       files.push({
-        path: "package.json",
-        content: packageJson
-      });
-    } catch (packageError) {
-      console.error("Error generating package.json:", packageError);
-      // Use a simplified fallback package.json
-      files.push({
-        path: "package.json",
-        content: `{ 
-  "name": "${architecture.projectName || 'generated-app'}",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "next": "^13.4.0"
-  }
-}`
-      });
-    }
-
-    // Generate explanation of the codebase
-    let explanation;
-    try {
-      explanation = await generateExplanation(architecture, files);
-    } catch (error) {
-      console.error("Error generating explanation:", error);
-      explanation = "Failed to generate explanation due to an error.";
-    }
-
-    // Create the application data object
-    const appData = {
-      projectName: architecture.projectName,
-      description: architecture.description,
-      explanation: explanation,
-      files: files,
-      technologies: architecture.technologies || []
-    };
-
-    // Store the generated app in the database
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    
-    let projectId = null;
-    
-    if (supabaseUrl && supabaseServiceKey) {
-      try {
-        // Get user_id from the JWT if available
-        let userId = null;
-        const authHeader = req.headers.get("authorization");
-        
-        if (authHeader && authHeader.startsWith("Bearer ")) {
-          const token = authHeader.substring(7);
-          try {
-            // Simple JWT parsing to extract user_id
-            const base64Url = token.split('.')[1];
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-            const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
-              return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-            }).join(''));
-            
-            const payload = JSON.parse(jsonPayload);
-            userId = payload.sub;
-          } catch (e) {
-            console.error("Error parsing JWT:", e);
-          }
-        }
-        
-        // If we couldn't get a user_id, use a placeholder
-        if (!userId) {
-          userId = "00000000-0000-0000-0000-000000000000"; // Anonymous user
-        }
-        
-        // Create a new project record
-        const projectResponse = await fetch(`${supabaseUrl}/rest/v1/app_projects`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "apikey": supabaseServiceKey,
-            "Authorization": `Bearer ${supabaseServiceKey}`,
-            "Prefer": "return=representation"
+        path: 'package.json',
+        content: JSON.stringify({
+          name: appData.projectName,
+          version: '0.1.0',
+          private: true,
+          dependencies: {
+            "react": "^18.2.0",
+            "react-dom": "^18.2.0",
+            "react-scripts": "5.0.1"
           },
-          body: JSON.stringify({
-            id: crypto.randomUUID(),
-            user_id: userId,
-            version: 1,
-            app_data: appData,
-            original_prompt: prompt,
-            created_at: new Date().toISOString()
-          })
-        });
-        
-        if (projectResponse.ok) {
-          const project = await projectResponse.json();
-          projectId = project[0].id;
-          console.log("Stored app project with ID:", projectId);
-        } else {
-          console.error("Failed to store app project:", await projectResponse.text());
-        }
-      } catch (dbError) {
-        console.error("Database error when storing app:", dbError);
+          scripts: {
+            "start": "react-scripts start",
+            "build": "react-scripts build",
+            "test": "react-scripts test",
+            "eject": "react-scripts eject"
+          },
+          eslintConfig: {
+            "extends": [
+              "react-app"
+            ]
+          },
+          browserslist: {
+            "production": [
+              ">0.2%",
+              "not dead",
+              "not op_mini all"
+            ],
+            "development": [
+              "last 1 chrome version",
+              "last 1 firefox version",
+              "last 1 safari version"
+            ]
+          }
+        }, null, 2)
+      });
+    }
+    
+    // Store the app data in the database
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      
+      if (!supabaseUrl || !supabaseServiceKey) {
+        throw new Error("Supabase credentials not configured");
       }
-    } else {
-      console.log("Supabase credentials not found, skipping database storage");
+      
+      // Get user_id from the JWT if available
+      let userId = null;
+      const authHeader = req.headers.get("authorization");
+      
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.substring(7);
+        try {
+          // Simple JWT parsing to extract user_id
+          const base64Url = token.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          }).join(''));
+          
+          const payload = JSON.parse(jsonPayload);
+          userId = payload.sub;
+        } catch (e) {
+          console.error("Error parsing JWT:", e);
+        }
+      }
+      
+      // If we couldn't get a user_id, use a placeholder
+      if (!userId) {
+        userId = "00000000-0000-0000-0000-000000000000"; // Anonymous user
+      }
+      
+      // Store project in database
+      const response = await fetch(`${supabaseUrl}/rest/v1/app_projects`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": supabaseServiceKey,
+          "Authorization": `Bearer ${supabaseServiceKey}`,
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({
+          id: projectId,
+          user_id: userId,
+          version: 1,
+          app_data: {
+            projectName: appData.projectName,
+            description: appData.description,
+            files: files,
+            challenges: appData.challenges || [],
+            explanation: appData.explanation || "Learn by fixing the issues in this application"
+          },
+          creation_prompt: prompt,
+          created_at: new Date().toISOString()
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to store project: ${response.status}`);
+      }
+      console.log(`Stored app project with ID: ${projectId}`);
+      console.log(`Successfully generated ${files.length} files`);
+    } catch (dbError) {
+      console.error("Database error when storing app data:", dbError);
     }
 
-    console.log(`Successfully generated ${files.length} files`);
+    // Return the generated app data to the client
     return new Response(JSON.stringify({
-      projectId: projectId,
-      projectName: architecture.projectName,
-      description: architecture.description,
-      explanation: explanation,
-      files: files
+      projectId,
+      projectName: appData.projectName,
+      description: appData.description,
+      files: files,
+      challenges: appData.challenges || [],
+      explanation: appData.explanation || "Learn by fixing the issues in this application"
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   } catch (error) {
-    console.error("Fatal error in generate-app function:", error);
-    return new Response(JSON.stringify({ error: `${error.message}`, stack: error.stack }), {
+    console.error("Error in generate-app function:", error);
+    return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
 });
-
-async function generateFileContent(filePath: string, architecture: any, originalPrompt: string): Promise<string> {
-  const fileExtension = filePath.substring(filePath.lastIndexOf(".") || filePath.length);
-  const fileName = filePath.substring(filePath.lastIndexOf("/") + 1 || 0);
-  const relativeDir = filePath.substring(0, filePath.lastIndexOf("/") || 0);
-
-  const fileTypeMap: Record<string, string> = {
-    ".js": "JavaScript",
-    ".jsx": "React JSX",
-    ".ts": "TypeScript",
-    ".tsx": "React TypeScript",
-    ".css": "CSS",
-    ".scss": "SCSS",
-    ".html": "HTML",
-    ".json": "JSON",
-    ".md": "Markdown",
-  };
-
-  const fileType = fileTypeMap[fileExtension] || "Code";
-
-  try {
-    const fileResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") || "",
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: "claude-3-5-sonnet-20240620",
-        max_tokens: 3000, // Further reduced to ensure we stay within the model's limits
-        temperature: 0.7,
-        system: `You are an expert developer specializing in creating high-quality code files.
-        Generate ONLY the complete code for this specific file.
-        Do not include explanations or comments outside the code.
-        Make sure the code is production-ready, follows best practices, and implements modern patterns.
-        IMPORTANT: Keep your response within 3000 tokens.
-        If generating React components with shadcn/ui, use the proper import syntax and components.`,
-        messages: [
-          {
-            role: "user",
-            content: `Generate code for the file "${fileName}" in the directory "${relativeDir}" for this project:
-            
-            Project Name: ${architecture.projectName}
-            Project Description: ${architecture.description}
-            Technologies: ${architecture.technologies.join(", ")}
-            
-            Original request: "${originalPrompt}"
-            
-            Generate the complete ${fileType} code for this file. Consider its role within the application architecture.
-            Keep the implementation focused and within token limits.`
-          }
-        ]
-      }),
-    });
-
-    if (!fileResponse.ok) {
-      const errorText = await fileResponse.text();
-      throw new Error(`Anthropic API error (${fileResponse.status}) when generating file: ${errorText}`);
-    }
-
-    const fileData = await fileResponse.json();
-    
-    if (!fileData || !fileData.content || fileData.content.length === 0) {
-      throw new Error(`Empty or invalid response for file ${fileName}`);
-    }
-    
-    const fileContent = fileData.content[0].text;
-    
-    // Clean up the code (remove markdown code blocks if present)
-    let cleanedContent = fileContent;
-    if (fileContent.includes("```")) {
-      // More robust code block detection and removal
-      const codeBlockRegex = /```(?:\w+)?\n([\s\S]+?)\n```/;
-      const match = fileContent.match(codeBlockRegex);
-      if (match && match[1]) {
-        cleanedContent = match[1];
-      } else {
-        // Fallback if regex doesn't match but we still have code blocks
-        cleanedContent = fileContent
-          .replace(/^```(?:\w+)?/, "")
-          .replace(/```$/, "")
-          .trim();
-      }
-    }
-
-    return cleanedContent;
-  } catch (error) {
-    console.error(`Error generating file ${filePath}:`, error);
-    return `// Error generating content for ${filePath}: ${error.message}`;
-  }
-}
-
-async function generatePackageJson(architecture: any): Promise<string> {
-  try {
-    const packageResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": Deno.env.get("ANTHROPIC_API_KEY") || "",
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: "claude-3-5-sonnet-20240620",
-        max_tokens: 2000,
-        temperature: 0.7,
-        system: `You are an expert in JavaScript/Node.js development.
-        Generate a complete package.json file for a project with the following specifications.
-        The package.json should include all necessary dependencies, scripts, and configuration.
-        Format your response as valid JSON only, without any code blocks or explanatory text.`,
-        messages: [
-          {
-            role: "user",
-            content: `Generate a complete package.json file for this project:
-            
-            Project Name: ${architecture.projectName}
-            Technologies: ${architecture.technologies.join(", ")}
-            
-            Include all necessary dependencies for these technologies, appropriate scripts (dev, build, start, etc.),
-            and any other configuration needed. If using shadcn/ui, include all required dependencies.`
-          }
-        ]
-      })
-    });
-
-    if (!packageResponse.ok) {
-      const errorText = await packageResponse.text();
-      throw new Error(`Anthropic API error (${packageResponse.status}) when generating package.json: ${errorText}`);
-    }
-
-    const packageData = await packageResponse.json();
-    
-    if (!packageData || !packageData.content || packageData.content.length === 0) {
-      throw new Error("Empty or invalid response for package.json");
-    }
-    
-    const packageContent = packageData.content[0].text;
-    
-    // Clean up the JSON (remove markdown code blocks if present)
-    let cleanedContent = packageContent;
-    if (packageContent.includes("```")) {
-      const jsonBlockRegex = /```(?:json)?\n([\s\S]+?)\n```/;
-      const match = packageContent.match(jsonBlockRegex);
-      if (match && match[1]) {
-        cleanedContent = match[1];
-      } else {
-        cleanedContent = packageContent
-          .replace(/^```(?:json)?/, "")
-          .replace(/```$/, "")
-          .trim();
-      }
-    }
-
-    // Validate that we have valid JSON
-    JSON.parse(cleanedContent); // This will throw if the JSON is invalid
-    return cleanedContent;
-  } catch (error) {
-    console.error("Error generating package.json:", error);
-    return `{ 
-  "name": "${architecture.projectName || 'generated-app'}",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "next": "^13.4.0"
-  }
-}`;
-  }
-}
-
-async function generateExplanation(architecture: any, files: any[]): Promise<string> {
-  try {
-    // Create a summary of the files
-    const fileSummary = files.map(f => `${f.path}`).join('\n');
-    
-    const explanationResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert software developer explaining a codebase to a user. Provide a clear, concise explanation of the generated application, its architecture, and key features."
-          },
-          {
-            role: "user",
-            content: `This application "${architecture.projectName}" was generated with the following description: "${architecture.description}"
-            
-            Technologies: ${architecture.technologies.join(", ")}
-            
-            Generated files:
-            ${fileSummary}
-            
-            Please provide a clear, concise explanation of:
-            1. The overall architecture of the application
-            2. The key components and their purposes
-            3. The main features implemented
-            4. How the technologies work together
-            5. What would be needed to extend this application
-            
-            Keep your explanation technical but accessible to developers of all levels.`
-          }
-        ],
-        max_tokens: 1000
-      })
-    });
-
-    if (!explanationResponse.ok) {
-      const errorText = await explanationResponse.text();
-      throw new Error(`OpenAI API error (${explanationResponse.status}): ${errorText}`);
-    }
-
-    const data = await explanationResponse.json();
-    return data.choices[0].message.content;
-  } catch (error) {
-    console.error("Error generating explanation:", error);
-    return "An explanation of this codebase could not be generated at this time.";
-  }
-}
