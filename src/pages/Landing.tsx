@@ -7,12 +7,33 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { UserProfileMenu } from "@/components/UserProfileMenu";
 
 const Landing = () => {
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  // Check authentication status when component mounts
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getSession();
+      setIsAuthenticated(!!data.session);
+    };
+    
+    checkAuth();
+    
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session);
+    });
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,8 +74,14 @@ const Landing = () => {
         <div className="container mx-auto px-4 flex justify-between items-center">
           <div className="font-bold text-xl">AppCreator</div>
           <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => navigate("/auth")}>Sign In</Button>
-            <Button>Get Started</Button>
+            {isAuthenticated ? (
+              <UserProfileMenu />
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => navigate("/auth")}>Sign In</Button>
+                <Button>Get Started</Button>
+              </>
+            )}
           </div>
         </div>
       </header>
