@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { GeminiCodeGenerator, ChallengeResult } from '@/utils/GeminiCodeGenerator';
 import { useToast } from '@/hooks/use-toast';
+import { ChallengeGenerator } from '@/utils/ChallengeGenerator';
 
 interface UseGeminiCodeOptions {
   onSuccess?: (data: ChallengeResult) => void;
@@ -15,14 +16,16 @@ export const useGeminiCode = (options: UseGeminiCodeOptions = {}) => {
   const [result, setResult] = useState<ChallengeResult | null>(null);
   const { toast } = useToast();
   
-  const generator = new GeminiCodeGenerator({ debug: options.debug });
+  // Initialize both generators
+  const geminiGenerator = new GeminiCodeGenerator({ debug: options.debug });
+  const challengeGenerator = new ChallengeGenerator();
   
   const generateChallenge = async (prompt: string, completionLevel?: 'beginner' | 'intermediate' | 'advanced') => {
     setIsLoading(true);
     setError(null);
     
     try {
-      const response = await generator.generateChallenge({
+      const response = await geminiGenerator.generateChallenge({
         prompt,
         completionLevel
       });
@@ -45,7 +48,7 @@ export const useGeminiCode = (options: UseGeminiCodeOptions = {}) => {
       
       toast({
         title: "Challenge Generated",
-        description: `Created "${resultWithPrompt.projectName}" with ${resultWithPrompt.challenges.length} coding challenges!`,
+        description: `Created "${resultWithPrompt.projectName}" with ${resultWithPrompt.challenges.length} learning challenges!`,
       });
       
       return resultWithPrompt;

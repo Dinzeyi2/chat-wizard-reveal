@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ArrowRight, Code, Github, Sparkles } from 'lucide-react';
+import { ArrowRight, Code, Github, Sparkles, BookOpen, Code2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface WelcomeScreenProps {
@@ -34,18 +34,18 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSendMessage }) => {
     <div className="flex flex-col items-center justify-center px-4 py-10">
       <div className="text-center max-w-2xl mb-10">
         <h1 className="text-4xl font-bold tracking-tight mb-3">
-          Welcome to Code Challenge Generator
+          Welcome to CodeCraft Challenge
         </h1>
         <p className="text-lg text-gray-600 mb-6">
-          I create educational coding challenges that help you learn by doing. 
-          Ask me to build any application, and I'll create an intentionally incomplete
-          version with specific challenges for you to solve!
+          Learn by completing coding challenges in intentionally incomplete applications.
+          Ask me to build any application, and I'll create a structured learning experience
+          with strategic code gaps for you to implement!
         </p>
         <div className="bg-blue-50 p-4 rounded-lg mb-6 text-left border border-blue-200">
           <p className="text-sm text-blue-800">
-            <strong>⚠️ Note:</strong> The applications I generate are intentionally incomplete.
-            They contain specific coding challenges designed for learning - you'll need to
-            complete key parts of the code to make everything work!
+            <strong>⚠️ Important:</strong> The applications I generate are intentionally incomplete.
+            Each one contains specific coding challenges designed as a learning experience - you'll
+            need to implement key features with my guidance to make everything work!
           </p>
         </div>
       </div>
@@ -78,9 +78,12 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSendMessage }) => {
               onClick={() => handleExampleClick("Create a simple blog with posts and comments for me to learn from")}
               className="justify-start h-auto py-3 px-4"
             >
-              <div className="flex flex-col items-start text-left">
-                <span className="font-medium">Generate a learning project</span>
-                <span className="text-sm text-gray-500">I'll create an educational coding challenge</span>
+              <div className="flex items-center">
+                <BookOpen className="mr-2 size-4" />
+                <div className="flex flex-col items-start text-left">
+                  <span className="font-medium">Generate a learning project</span>
+                  <span className="text-sm text-gray-500">I'll create educational coding challenges</span>
+                </div>
               </div>
             </Button>
             <Button 
@@ -88,9 +91,12 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSendMessage }) => {
               onClick={() => handleExampleClick("Explain how React hooks work")}
               className="justify-start h-auto py-3 px-4"
             >
-              <div className="flex flex-col items-start text-left">
-                <span className="font-medium">Ask a coding question</span>
-                <span className="text-sm text-gray-500">Get help with programming concepts</span>
+              <div className="flex items-center">
+                <Code2 className="mr-2 size-4" />
+                <div className="flex flex-col items-start text-left">
+                  <span className="font-medium">Ask a coding question</span>
+                  <span className="text-sm text-gray-500">Get help with programming concepts</span>
+                </div>
               </div>
             </Button>
           </div>

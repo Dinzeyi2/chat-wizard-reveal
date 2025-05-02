@@ -110,20 +110,20 @@ export class GeminiCodeGenerator {
     if (!this.apiKey) {
       try {
         const { data, error } = await supabase.functions.invoke('get-env', {
-          body: { key: 'GEMINI_API_KEY' }
+          body: { key: 'OPENAI_API_KEY' }
         });
         
         if (!error && data?.value) {
           this.apiKey = data.value;
         }
       } catch (error) {
-        this.log('Error retrieving Gemini API key:', error);
+        this.log('Error retrieving API key:', error);
       }
     }
   }
   
   /**
-   * Set a new Gemini API key
+   * Set a new API key
    */
   setApiKey(apiKey: string): void {
     this.apiKey = apiKey;

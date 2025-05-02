@@ -1,689 +1,179 @@
-import React, { useState, useEffect } from "react";
-import { Message } from "@/types/chat";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Download, FileCode, ChevronRight, ChevronDown, ShoppingBag, Code, SquareDashed, History } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { 
-  Accordion, 
-  AccordionContent, 
-  AccordionItem, 
-  AccordionTrigger 
-} from "@/components/ui/accordion";
-import { useArtifact } from "./artifact/ArtifactSystem";
-import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
 
-interface GeneratedFile {
-  path: string;
-  content: string;
-}
-
-interface GeneratedApp {
-  projectName: string;
-  description: string;
-  files: GeneratedFile[];
-  explanation?: string;
-  technologies?: string[];
-  projectId?: string;
-  version?: number;
-}
+import React, { useState, useEffect } from 'react';
+import { Message } from '@/types/chat';
+import { useArtifact } from './artifact/ArtifactSystem';
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+import { Button } from './ui/button';
+import { ScrollArea } from './ui/scroll-area';
+import { Code, FileCode, Files, Info } from 'lucide-react';
+import { ChallengeResult } from '@/types/chat';
+import { ChallengeProjectView } from './challenge/ChallengeProjectView';
 
 interface AppGeneratorDisplayProps {
   message: Message;
-  projectId?: string | null;
+  projectId: string | null;
 }
 
-const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, projectId: propProjectId }) => {
-  const [isOpen, setIsOpen] = useState(false);
+const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, projectId }) => {
+  const [parsedData, setParsedData] = useState<any | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const { openArtifact } = useArtifact();
-  const [appData, setAppData] = useState<GeneratedApp | null>(null);
-  const [showVersionHistory, setShowVersionHistory] = useState(false);
-  const [versionHistory, setVersionHistory] = useState<any[]>([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const { toast } = useToast();
+  const [isChallengeProject, setIsChallengeProject] = useState<boolean>(false);
+  const [challengeResult, setChallengeResult] = useState<ChallengeResult | null>(null);
   
   useEffect(() => {
-    const extractAppData = (): GeneratedApp | null => {
+    const parseMessageContent = () => {
       try {
-        // Primary extraction method: Try to find JSON data
-        const jsonRegex = /```json([\s\S]*?)```/;
-        const appDataMatch = message.content.match(jsonRegex);
+        // Check if message contains JSON data
+        const jsonRegex = /```json\n([\s\S]*?)```/;
+        const jsonMatch = message.content.match(jsonRegex);
         
-        if (appDataMatch && appDataMatch[1]) {
-          const jsonText = appDataMatch[1].trim();
-          const jsonData = JSON.parse(jsonText);
+        if (jsonMatch && jsonMatch[1]) {
+          const jsonData = JSON.parse(jsonMatch[1]);
+          setParsedData(jsonData);
           
-          if (jsonData && 
-              typeof jsonData.projectName === 'string' && 
-              typeof jsonData.description === 'string' && 
-              Array.isArray(jsonData.files)) {
-            
-            // Include the project ID if provided from props or found in JSON
-            const extractedData = {
-              ...jsonData,
-              projectId: propProjectId || jsonData.projectId || null
-            };
-            
-            return extractedData;
+          // Detect if this is a challenge project
+          const isChallenge = 
+            jsonData.challenges !== undefined && 
+            Array.isArray(jsonData.challenges) &&
+            jsonData.explanation !== undefined;
+          
+          setIsChallengeProject(isChallenge);
+          
+          if (isChallenge) {
+            setChallengeResult(jsonData);
           }
+        } else {
+          setError("No app data found in the message");
         }
-        
-        // Fallback method: try to find any JSON in the content
-        const anyJsonRegex = /{[\s\S]*?"files"[\s\S]*?}/;
-        const anyJsonMatch = message.content.match(anyJsonRegex);
-        
-        if (anyJsonMatch) {
-          try {
-            const jsonData = JSON.parse(anyJsonMatch[0]);
-            if (jsonData && Array.isArray(jsonData.files)) {
-              return {
-                projectName: jsonData.projectName || "Generated Application",
-                description: jsonData.description || "Generated application files",
-                files: jsonData.files,
-                technologies: jsonData.technologies || [],
-                projectId: propProjectId || jsonData.projectId || null,
-                version: jsonData.version || 1
-              };
-            }
-          } catch (e) {
-            console.log("Failed to parse JSON in fallback method:", e);
-          }
-        }
-        
-        return null;
-      } catch (error) {
-        console.error("Failed to parse app data:", error);
-        return null;
+      } catch (e) {
+        console.error("Error parsing message data:", e);
+        setError(`Error parsing app data: ${e instanceof Error ? e.message : String(e)}`);
       }
     };
     
-    setAppData(extractAppData());
-  }, [message, propProjectId]);
-  
-  useEffect(() => {
-    // Load version history when project ID is available and when showVersionHistory becomes true
-    if (showVersionHistory && (appData?.projectId || propProjectId)) {
-      fetchVersionHistory();
-    }
-  }, [showVersionHistory, appData?.projectId, propProjectId]);
+    parseMessageContent();
+  }, [message]);
 
-  // Function to fetch version history from Supabase
-  const fetchVersionHistory = async () => {
-    try {
-      setIsLoadingHistory(true);
-      const projectId = appData?.projectId || propProjectId;
-      
-      if (!projectId) {
-        console.error("No project ID available to fetch history");
-        return;
-      }
-      
-      console.log("Fetching version history for project:", projectId);
-      
-      // Fetch all versions of this project
-      const { data: versions, error } = await supabase
-        .from('app_projects')
-        .select('*')
-        .eq('id', projectId)
-        .order('version', { ascending: false });
-      
-      if (error) {
-        console.error("Error fetching project versions:", error);
-        throw error;
-      }
-      
-      // Also fetch versions where this project is a parent
-      const { data: childVersions, error: childError } = await supabase
-        .from('app_projects')
-        .select('*')
-        .eq('parent_id', projectId)
-        .order('version', { ascending: false });
-      
-      if (childError) {
-        console.error("Error fetching child versions:", childError);
-        throw childError;
-      }
-      
-      console.log("Fetched versions:", versions?.length || 0, "child versions:", childVersions?.length || 0);
-      
-      // Combine and sort all versions
-      const allVersions = [...(versions || []), ...(childVersions || [])];
-      allVersions.sort((a, b) => b.version - a.version);
-      
-      setVersionHistory(allVersions);
-    } catch (error) {
-      console.error("Error fetching version history:", error);
-      toast({
-        title: "Error fetching version history",
-        description: "Could not load project versions",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingHistory(false);
+  const handleViewFiles = () => {
+    if (!parsedData || !parsedData.files) {
+      return;
     }
-  };
-
-  // Function to handle restoring a specific version
-  const handleRestoreVersion = async (versionData: any) => {
-    try {
-      toast({
-        title: "Restoring version...",
-        description: `Restoring to version ${versionData.version}`,
-      });
-      
-      console.log("Restoring version:", versionData.version, "with ID:", versionData.id);
-      
-      const { data, error } = await supabase.functions.invoke('restore-version', {
-        body: { 
-          projectId: versionData.id,
-        }
-      });
-      
-      if (error) {
-        console.error("Error from restore-version function:", error);
-        throw error;
-      }
-      
-      console.log("Restore version response:", data);
-      
-      toast({
-        title: "Version restored",
-        description: `Successfully restored to version ${versionData.version}`,
-      });
-      
-      // Ask the user to submit a new message to see the restored version
-      toast({
-        title: "Ask the assistant",
-        description: "Send a message to see your restored application",
-      });
-      
-    } catch (error) {
-      console.error("Error restoring version:", error);
-      toast({
-        title: "Error restoring version",
-        description: "Could not restore to selected version",
-        variant: "destructive",
-      });
-    }
+    
+    const artifactFiles = parsedData.files.map((file: any) => ({
+      id: file.path,
+      name: file.path.split('/').pop(),
+      path: file.path,
+      language: file.path.split('.').pop() || 'text',
+      content: file.content
+    }));
+    
+    openArtifact({
+      id: parsedData.projectId || 'generated-app',
+      title: parsedData.projectName || 'Generated App',
+      files: artifactFiles,
+      description: parsedData.description
+    });
   };
   
-  // Improved and simplified function to extract code blocks from message content
-  const extractCodeBlocks = () => {
-    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)\n```/g;
-    const codeFiles = [];
-    let match;
-    let index = 0;
-    
-    while ((match = codeBlockRegex.exec(message.content)) !== null) {
-      const language = match[1] || 'plaintext';
-      const content = match[2].trim();
-      
-      // Skip if it's JSON we already tried to parse
-      if (language.toLowerCase() === 'json' && content.includes('"files"') && content.includes('"projectName"')) {
-        continue;
-      }
-      
-      codeFiles.push({
-        id: `file-${index++}`,
-        name: `file-${index}.${getExtensionFromLanguage(language)}`,
-        path: `file-${index}.${getExtensionFromLanguage(language)}`,
-        language: language,
-        content: content
-      });
-    }
-    
-    console.log("Extracted code blocks:", codeFiles.length);
-    return codeFiles;
-  };
-  
-  const getExtensionFromLanguage = (lang: string) => {
-    const langMap: Record<string, string> = {
-      'javascript': 'js',
-      'typescript': 'ts',
-      'jsx': 'jsx',
-      'tsx': 'tsx',
-      'html': 'html',
-      'css': 'css',
-      'json': 'json',
-      'markdown': 'md',
-      'plaintext': 'txt'
-    };
-    
-    return langMap[lang.toLowerCase()] || 'txt';
-  };
-
-  // Enhanced version of formatExplanationText to completely remove all markdown symbols
-  const formatExplanationText = (text: string) => {
-    if (!text) return null;
-
-    // Split the explanation into paragraphs
-    const paragraphs = text.split('\n\n');
-    
+  if (error) {
     return (
-      <div className="space-y-4">
-        {paragraphs.map((paragraph, idx) => {
-          // Check if paragraph is a heading (starts with # or ##)
-          if (paragraph.trim().startsWith('# ')) {
-            return <h3 key={idx} className="text-lg font-bold mt-4">{paragraph.replace(/^# /, '')}</h3>;
-          } 
-          if (paragraph.trim().startsWith('## ')) {
-            return <h4 key={idx} className="text-md font-semibold mt-3">{paragraph.replace(/^## /, '')}</h4>;
-          }
-          if (paragraph.trim().startsWith('### ')) {
-            return <h5 key={idx} className="text-base font-semibold mt-2">{paragraph.replace(/^### /, '')}</h5>;
-          }
-          
-          // Check if paragraph is a list
-          if (paragraph.includes('\n- ') || paragraph.includes('\n* ')) {
-            const listItems = paragraph.split(/\n[-*] /).filter(Boolean);
-            return (
-              <div key={idx}>
-                {listItems[0].trim() && <p className="mb-2">{listItems[0].trim()}</p>}
-                <ul className="list-disc pl-5 space-y-1">
-                  {listItems.slice(listItems[0].trim() ? 1 : 0).map((item, i) => {
-                    // Process nested formatting within list items (bold, italic)
-                    let formattedItem = item;
-                    
-                    // Handle bold in list items
-                    formattedItem = formattedItem.replace(/\*\*(.*?)\*\*|__(.*?)__/g, (_, p1, p2) => {
-                      return `<strong>${p1 || p2}</strong>`;
-                    });
-                    
-                    // Handle italic in list items
-                    formattedItem = formattedItem.replace(/\*(.*?)\*|_(.*?)_/g, (_, p1, p2) => {
-                      // Skip if this is part of a bold pattern we already replaced
-                      if (!p1 && !p2) return _;
-                      const content = p1 || p2;
-                      return `<em>${content}</em>`;
-                    });
-                    
-                    return <li key={i} dangerouslySetInnerHTML={{ __html: formattedItem }} />;
-                  })}
-                </ul>
-              </div>
-            );
-          }
-          
-          // Format text with common markdown patterns
-          let formattedText = paragraph;
-          
-          // Replace bold markdown (**text** or __text__)
-          formattedText = formattedText.replace(/\*\*(.*?)\*\*|__(.*?)__/g, (_, p1, p2) => {
-            const content = p1 || p2;
-            return `<strong>${content}</strong>`;
-          });
-          
-          // Replace italic markdown (*text* or _text_)
-          formattedText = formattedText.replace(/\*(.*?)\*|_(.*?)_/g, (_, p1, p2) => {
-            // Skip if this is part of a bold pattern we already replaced
-            if (!p1 && !p2) return _;
-            const content = p1 || p2;
-            return `<em>${content}</em>`;
-          });
-          
-          // Replace code/inline code markdown (`text`)
-          formattedText = formattedText.replace(/`(.*?)`/g, (_, p1) => {
-            return `<code class="px-1 py-0.5 bg-gray-100 rounded text-sm font-mono">${p1}</code>`;
-          });
-          
-          // Replace links [text](url)
-          formattedText = formattedText.replace(/\[(.*?)\]\((.*?)\)/g, (_, text, url) => {
-            return `<a href="${url}" class="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">${text}</a>`;
-          });
-          
-          // Use dangerouslySetInnerHTML to render the HTML tags
-          return <p key={idx} dangerouslySetInnerHTML={{ __html: formattedText }} />;
-        })}
-      </div>
-    );
-  };
-
-  // Modified function to handle viewing the full project
-  const handleViewFullProject = () => {
-    try {
-      console.log("Opening artifact viewer with message content:", message.content.substring(0, 100) + "...");
-      
-      // Create a guaranteed artifact ID
-      const artifactId = `artifact-${Date.now()}`;
-      // Default title that will always work
-      const projectTitle = appData?.projectName || "Generated Application";
-      
-      // Try extracting code blocks first as the primary method
-      const extractedFiles = extractCodeBlocks();
-      console.log("Extracted files count:", extractedFiles.length);
-      
-      // Create final files array with proper structure
-      let files = [];
-      
-      if (extractedFiles && extractedFiles.length > 0) {
-        console.log("Using extracted code blocks, count:", extractedFiles.length);
-        files = extractedFiles;
-      } 
-      // If no extracted files, but we have appData, use those files
-      else if (appData?.files && appData.files.length > 0) {
-        console.log("Using appData files, count:", appData.files.length);
-        files = appData.files.map((file, index) => ({
-          id: `file-${index}`,
-          name: file.path.split('/').pop() || `file-${index}`,
-          path: file.path,
-          language: getLanguageFromPath(file.path),
-          content: file.content
-        }));
-      }
-      // Ultimate fallback - create at least one file with the message content
-      else {
-        console.log("Using ultimate fallback - creating content file");
-        files = [{
-          id: "content-file",
-          name: "generated-content.md",
-          path: "generated-content.md",
-          language: "markdown",
-          content: message.content
-        }];
-      }
-      
-      // Ensure we have at least one file
-      if (files.length === 0) {
-        files = [{
-          id: "fallback-file",
-          name: "content.md",
-          path: "content.md",
-          language: "markdown",
-          content: "No code content could be extracted. Please check the message content."
-        }];
-      }
-      
-      // Log what we're actually opening
-      console.log(`Opening artifact with ${files.length} files:`, 
-        files.map(f => f.path).join(', '));
-      
-      // Ensure we have a valid artifact to open
-      const artifact = {
-        id: artifactId,
-        title: projectTitle,
-        description: appData?.description || "Generated application",
-        files: files
-      };
-      
-      // Call the openArtifact function
-      console.log("Calling openArtifact with artifact:", artifact.id);
-      openArtifact(artifact);
-      
-      // If we get here, we should show a message to the user
-      toast({
-        title: "Code viewer opened",
-        description: `Displaying ${files.length} code files`
-      });
-    } catch (error) {
-      console.error("Error opening artifact:", error);
-      toast({
-        variant: "destructive",
-        title: "Error opening code viewer",
-        description: "There was a problem displaying the code. Please try again."
-      });
-    }
-  };
-
-  const handleDownload = () => {
-    alert("Download functionality would be implemented here");
-  };
-
-  const getLanguageFromPath = (path: string): string => {
-    const extension = path.split('.').pop()?.toLowerCase() || '';
-    const languageMap: Record<string, string> = {
-      'js': 'javascript',
-      'jsx': 'javascript',
-      'ts': 'typescript',
-      'tsx': 'typescript',
-      'css': 'css',
-      'scss': 'scss',
-      'html': 'html',
-      'json': 'json',
-      'md': 'markdown',
-    };
-    return languageMap[extension] || 'plaintext';
-  };
-
-  const generateSummary = () => {
-    if (!appData) return null;
-    
-    const fileTypes = appData.files
-      .map(file => file.path.split('.').pop()?.toLowerCase())
-      .filter((value, index, self) => value && self.indexOf(value) === index);
-    
-    const frontendFiles = appData.files.filter(file => 
-      file.path.includes('pages') || 
-      file.path.includes('components') || 
-      file.path.includes('.jsx') || 
-      file.path.includes('.tsx'));
-    
-    const backendFiles = appData.files.filter(file => 
-      file.path.includes('api') || 
-      file.path.includes('server') || 
-      file.path.includes('routes'));
-
-    return (
-      <div className="text-sm space-y-3">
-        <p className="text-base font-medium">{appData.description}</p>
-        
-        <div className="flex flex-wrap gap-2 my-2">
-          {appData.technologies?.map(tech => (
-            <Badge key={tech} variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100">{tech}</Badge>
-          ))}
-          {!appData.technologies && fileTypes.map(type => (
-            <Badge key={type} variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100">{type}</Badge>
-          ))}
-        </div>
-        
-        <div className="grid grid-cols-2 gap-4 mt-3">
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <p className="font-medium text-gray-700">Frontend</p>
-            <p className="text-gray-600">{frontendFiles.length} files</p>
-          </div>
-          
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <p className="font-medium text-gray-700">Backend</p>
-            <p className="text-gray-600">{backendFiles.length > 0 ? `${backendFiles.length} files` : 'Frontend only'}</p>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const getMainFeatures = () => {
-    if (!appData) return [];
-    
-    const isEcommerce = 
-      appData.description.toLowerCase().includes('ecommerce') || 
-      appData.description.toLowerCase().includes('e-commerce') ||
-      appData.projectName.toLowerCase().includes('shop') ||
-      appData.projectName.toLowerCase().includes('store');
-      
-    if (isEcommerce) {
-      return [
-        "Product catalog with search and filtering",
-        "Shopping cart and checkout process",
-        "User authentication and profiles",
-        "Order management and payment processing"
-      ];
-    }
-    
-    return [
-      "User authentication",
-      "Interactive UI components",
-      "Data management",
-      "Responsive design"
-    ];
-  };
-
-  // If no app data could be extracted, show a simple message
-  if (!appData) {
-    return (
-      <div className="my-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
-        <p className="text-gray-600">Unable to extract application data. Click the button below to view any code that might be available.</p>
-        <Button 
-          variant="outline" 
-          className="mt-3" 
-          onClick={handleViewFullProject}
-        >
-          <Code className="mr-2 h-4 w-4" /> View Available Code
-        </Button>
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 my-4">
+        <h3 className="text-red-800 font-medium flex items-center gap-2">
+          <Info className="h-4 w-4" />
+          Error Displaying App
+        </h3>
+        <p className="text-red-600 text-sm mt-1">{error}</p>
       </div>
     );
   }
-
-  // Detect if this is a modified app or an original generation
-  const isModification = message.content.toLowerCase().includes('modified') || 
-                        message.content.toLowerCase().includes('updated') || 
-                        message.content.toLowerCase().includes('changed') ||
-                        message.content.toLowerCase().includes("i've updated your app");
-
-  return (
-    <div className="my-6 space-y-6">
-      <div>
-        <h3 className="text-xl font-semibold mb-2">
-          {isModification 
-            ? `Your app has been updated with the requested changes` 
-            : `I've generated a full-stack application: ${appData.projectName}`}
-        </h3>
-        <p className="text-gray-600">{isModification 
-          ? "The changes you requested have been applied to your existing application."
-          : appData.description}
-        </p>
-        
-        {appData.version && (
-          <div className="flex items-center gap-2 mt-2">
-            <Badge variant="outline" className="text-xs font-normal">
-              Version {appData.version}
-            </Badge>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-7 px-2 text-xs bg-gray-50 hover:bg-gray-100"
-              onClick={() => setShowVersionHistory(!showVersionHistory)}
-            >
-              <History className="h-3 w-3 mr-1" />
-              {showVersionHistory ? "Hide History" : "Version History"}
+  
+  if (!parsedData) {
+    return (
+      <div className="bg-gray-100 rounded-lg p-4 my-4 animate-pulse">
+        <div className="h-6 bg-gray-300 rounded w-1/3 mb-2"></div>
+        <div className="h-4 bg-gray-300 rounded w-2/3 mb-4"></div>
+        <div className="space-y-2">
+          <div className="h-4 bg-gray-300 rounded"></div>
+          <div className="h-4 bg-gray-300 rounded"></div>
+          <div className="h-4 bg-gray-300 rounded"></div>
+        </div>
+      </div>
+    );
+  }
+  
+  // If this is a challenge project, display the challenge UI
+  if (isChallengeProject && challengeResult) {
+    return (
+      <div className="border rounded-lg shadow-sm overflow-hidden my-4">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h3 className="font-bold text-lg text-blue-900">
+                {challengeResult.projectName}
+              </h3>
+              <p className="text-blue-700 text-sm">
+                Learning Project with {challengeResult.challenges?.length || 0} Coding Challenges
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleViewFiles}>
+              <Files className="h-4 w-4 mr-2" />
+              View Files
             </Button>
           </div>
-        )}
+          
+          <div className="bg-blue-100/50 border border-blue-200 rounded p-3 mb-4">
+            <div className="font-medium text-blue-800 mb-1">Important Note:</div>
+            <p className="text-sm text-blue-700">
+              This is an intentionally incomplete application with learning challenges.
+              It's designed for you to practice implementing key features as a learning exercise.
+            </p>
+          </div>
+        </div>
+        
+        <ChallengeProjectView challenge={challengeResult} />
+      </div>
+    );
+  }
+  
+  // Display regular app
+  return (
+    <div className="border rounded-lg shadow-sm overflow-hidden my-4">
+      <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4">
+        <div className="flex justify-between items-start">
+          <div>
+            <h3 className="font-bold text-lg text-purple-900">
+              {parsedData.projectName || 'Generated App'}
+            </h3>
+            <p className="text-purple-700 text-sm">
+              {parsedData.files?.length || 0} files • {parsedData.description || 'No description'}
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleViewFiles}>
+            <FileCode className="h-4 w-4 mr-2" />
+            View Files
+          </Button>
+        </div>
       </div>
       
-      {showVersionHistory && (
-        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-          <h4 className="font-medium mb-3">Version History</h4>
-          {isLoadingHistory ? (
-            <div className="flex items-center justify-center p-4">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-              <span className="ml-2 text-sm text-gray-500">Loading version history...</span>
-            </div>
-          ) : versionHistory.length === 0 ? (
-            <p className="text-sm text-gray-500 p-2">No version history available</p>
-          ) : (
-            <ScrollArea className="h-[250px]">
-              <div className="space-y-3">
-                {versionHistory.map((version, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-white rounded-md border border-gray-100">
-                    <div>
-                      <p className="text-sm font-medium">Version {version.version}</p>
-                      <p className="text-xs text-gray-500">
-                        {new Date(version.created_at).toLocaleDateString()} {new Date(version.created_at).toLocaleTimeString()}
-                      </p>
-                      {version.modification_prompt && (
-                        <p className="text-xs text-gray-600 mt-1 italic max-w-[300px] truncate">"{version.modification_prompt}"</p>
-                      )}
-                    </div>
-                    <Button 
-                      variant="secondary" 
-                      size="sm" 
-                      className="h-8 ml-2"
-                      onClick={() => handleRestoreVersion(version)}
-                    >
-                      Restore
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          )}
-        </div>
-      )}
-      
-      <div className="bg-white border border-gray-200 rounded-full shadow-sm p-4 flex items-center justify-between">
-        <div className="flex items-center">
-          <SquareDashed className="mr-3 h-5 w-5 text-gray-500" />
-          <span className="font-medium text-lg">{isModification ? "View updated code" : "View code"}</span>
-        </div>
-        <Button 
-          variant="default" 
-          size="sm" 
-          className="bg-blue-600 hover:bg-blue-700" 
-          onClick={() => {
-            console.log("View Code button clicked");
-            handleViewFullProject();
-          }}
-        >
-          View Code <ChevronRight className="h-4 w-4 ml-1" />
-        </Button>
+      <div className="border-t p-4">
+        <h4 className="text-sm font-medium mb-2 flex items-center">
+          <Code className="h-4 w-4 mr-1" />
+          Project Structure
+        </h4>
+        
+        <ScrollArea className="h-40">
+          <div className="font-mono text-xs">
+            <SyntaxHighlighter language="bash" style={vs2015} customStyle={{
+              backgroundColor: 'transparent',
+              padding: '0.5rem'
+            }}>
+              {parsedData.files?.map((file: any) => file.path).join('\n')}
+            </SyntaxHighlighter>
+          </div>
+        </ScrollArea>
       </div>
-      
-      {!isModification && (
-        <div className="space-y-4">
-          <h4 className="font-semibold">This application includes:</h4>
-          <ol className="list-decimal pl-6 space-y-2">
-            {appData.files.length > 0 && (
-              <li>
-                <span className="font-medium">{appData.files.length} files</span> organized in a structured project
-              </li>
-            )}
-            {appData.technologies && appData.technologies.length > 0 && (
-              <li>
-                <span className="font-medium">Technologies used:</span> {appData.technologies.join(', ')}
-              </li>
-            )}
-            <li>
-              <span className="font-medium">Main features:</span>
-              <ul className="list-disc pl-6 pt-1">
-                {getMainFeatures().map((feature, index) => (
-                  <li key={index}>{feature}</li>
-                ))}
-              </ul>
-            </li>
-          </ol>
-        </div>
-      )}
-      
-      <Accordion type="single" collapsible className="w-full">
-        <AccordionItem value="explanation">
-          <AccordionTrigger className="px-5 py-3 hover:bg-gray-50">Application Details</AccordionTrigger>
-          <AccordionContent className="px-5 pb-4">
-            <div className="text-sm space-y-2">
-              {appData?.explanation ? (
-                formatExplanationText(appData.explanation)
-              ) : (
-                <div className="space-y-4">
-                  <p><strong>Architecture Overview:</strong> This {appData?.projectName || "generated"} application follows a modern web architecture with a clean separation of concerns.</p>
-                  
-                  <p><strong>Frontend:</strong> The UI is built with React components organized in a logical hierarchy, with pages for different views and reusable components for common elements.</p>
-                  
-                  <p><strong>Data Management:</strong> The application handles data through state management and API calls to backend services.</p>
-                  
-                  <h4 className="text-md font-semibold mt-4">Key Technical Features:</h4>
-                  <ul className="list-disc pl-5 space-y-1">
-                    <li>React components for UI building blocks</li>
-                    <li>State management for application data</li>
-                    <li>API integration for data fetching</li>
-                    <li>Responsive design for all device sizes</li>
-                  </ul>
-                </div>
-              )}
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
     </div>
   );
 };
