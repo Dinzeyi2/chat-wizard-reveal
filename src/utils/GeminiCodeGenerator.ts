@@ -7,7 +7,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { Challenge, GeneratedProject } from "./projectTemplates";
-import { ChallengeGenerator } from "./ChallengeGenerator";
+import { ChallengeGenerator, AIGuide } from "./ChallengeGenerator";
 
 interface GeminiCodeRequest {
   prompt: string;
@@ -41,6 +41,7 @@ export interface ChallengeResult {
   }[];
   explanation: string;
   error?: string;
+  guide?: AIGuide;
 }
 
 export class GeminiCodeGenerator {
@@ -93,17 +94,8 @@ export class GeminiCodeGenerator {
     } catch (error: any) {
       this.log('Error generating code challenge:', error.message);
       
-      return {
-        success: false,
-        projectId: "",
-        projectName: "",
-        description: "",
-        prompt: request.prompt,
-        files: [],
-        challenges: [],
-        explanation: "",
-        error: error.message,
-      };
+      // Use the local generator as a fallback
+      return this.generateLocalChallenge(request.prompt, request.completionLevel || 'intermediate');
     }
   }
   
@@ -120,6 +112,9 @@ export class GeminiCodeGenerator {
       
       // Generate project using local challenge generator
       const generatedProject = this.challengeGenerator.generateProject(projectType, completionLevel);
+      
+      // Create an AI guide for the project
+      const guide = this.challengeGenerator.createGuideForProject(generatedProject);
       
       // Convert challenges to required format
       const challenges = generatedProject.challenges.map(challenge => ({
@@ -142,7 +137,8 @@ export class GeminiCodeGenerator {
         prompt: prompt,
         files: files,
         challenges: challenges,
-        explanation: `This is a ${generatedProject.projectName} project with intentional gaps for learning. Complete the challenges to build your skills in React, TypeScript, and web development. Each challenge has hints to guide you.`
+        explanation: `This is a ${generatedProject.projectName} project with intentional gaps for learning. Complete the challenges to build your skills in React, TypeScript, and web development. Each challenge has hints to guide you.`,
+        guide: guide
       };
     } catch (error: any) {
       this.log('Error generating local challenge:', error.message);
@@ -158,6 +154,40 @@ export class GeminiCodeGenerator {
         explanation: "",
         error: error.message
       };
+    }
+  }
+  
+  /**
+   * Process user message with the AI guide
+   * @param projectId Project ID
+   * @param message User message
+   * @returns AI guide response
+   */
+  async processUserMessage(projectId: string, message: string): Promise<string> {
+    try {
+      // For local projects, we use the embedded AI guide
+      if (projectId.startsWith('local-')) {
+        // We would need to retrieve the guide object from storage
+        // For this example, we'll return a simple response
+        return "I'm here to help you with your coding challenges. Could you tell me which specific challenge you're working on?";
+      }
+      
+      // For Gemini-generated projects, we would call the API
+      const { data, error } = await supabase.functions.invoke('guide-conversation', {
+        body: { 
+          projectId,
+          message
+        }
+      });
+      
+      if (error) {
+        throw new Error(`Error calling guide-conversation function: ${error.message}`);
+      }
+      
+      return data.response;
+    } catch (error: any) {
+      this.log('Error processing message with guide:', error.message);
+      return "I'm having trouble processing your request. Please try again later.";
     }
   }
   
@@ -298,6 +328,13 @@ export class GeminiCodeGenerator {
    */
   setApiKey(apiKey: string): void {
     this.apiKey = apiKey;
+  }
+  
+  /**
+   * Get the API key
+   */
+  getApiKey(): string | undefined {
+    return this.apiKey;
   }
   
   /**

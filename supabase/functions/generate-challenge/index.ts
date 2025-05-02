@@ -8,6 +8,28 @@ interface GenerateChallengeRequest {
   challengeType?: 'frontend' | 'backend' | 'fullstack';
 }
 
+interface Challenge {
+  id: string;
+  title: string;
+  description: string;
+  difficulty: string;
+  type: 'implementation' | 'bugfix' | 'feature';
+  filesPaths: string[];
+}
+
+interface FileChallenge {
+  description: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  hints: string[];
+}
+
+interface ProjectFile {
+  path: string;
+  content: string;
+  isComplete: boolean;
+  challenges?: FileChallenge[];
+}
+
 serve(async (req) => {
   console.log("Generate challenge function called");
   
@@ -180,6 +202,36 @@ serve(async (req) => {
       // If we couldn't get a user_id, use a placeholder
       if (!userId) {
         userId = "00000000-0000-0000-0000-000000000000"; // Anonymous user
+      }
+      
+      // Validate and normalize the challenges
+      // This ensures all challenges have valid IDs and appropriate difficulty levels
+      if (challengeResult.challenges && Array.isArray(challengeResult.challenges)) {
+        challengeResult.challenges = challengeResult.challenges.map((challenge: Challenge, index: number) => {
+          // Ensure challenge has a valid ID
+          if (!challenge.id || challenge.id === "challenge-1") {
+            challenge.id = `${projectId}-challenge-${index}`;
+          }
+          
+          // Map difficulty levels if needed
+          if (!["beginner", "intermediate", "advanced"].includes(challenge.difficulty)) {
+            switch (challenge.difficulty) {
+              case "easy":
+                challenge.difficulty = "beginner";
+                break;
+              case "medium":
+                challenge.difficulty = "intermediate";
+                break;
+              case "hard":
+                challenge.difficulty = "advanced";
+                break;
+              default:
+                challenge.difficulty = "intermediate";
+            }
+          }
+          
+          return challenge;
+        });
       }
       
       // Store project in database using service role
