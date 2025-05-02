@@ -11,6 +11,8 @@ import ChatHistory from "./pages/ChatHistory";
 import GitHubCallback from "./pages/GitHubCallback";
 import Auth from "./pages/Auth";
 import Landing from "./pages/Landing";
+import ChallengeGenerator from "./pages/ChallengeGenerator";
+import ChallengeWorkspace from "./pages/ChallengeWorkspace";
 import "./components/artifact/ArtifactSystem.css";
 
 const App = () => {
@@ -46,6 +48,11 @@ const App = () => {
             <Route path="github-callback" element={<GitHubCallback />} />
             <Route path="/callback/github" element={<GitHubCallback />} />
             <Route path="callback/github" element={<GitHubCallback />} />
+            
+            {/* New CodeCraft Challenge routes */}
+            <Route path="/challenges" element={<ChallengeGenerator />} />
+            <Route path="/challenge/:projectId" element={<ChallengeWorkspace />} />
+            <Route path="/challenge/:projectId/:challengeId" element={<ChallengeWorkspace />} />
             
             {/* Catch-all route for 404s */}
             <Route path="*" element={<NotFound />} />

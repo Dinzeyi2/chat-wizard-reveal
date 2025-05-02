@@ -30,6 +30,16 @@ interface ProjectFile {
   challenges?: FileChallenge[];
 }
 
+// Map for standardizing difficulty levels
+const difficultyMapping = {
+  'beginner': 'easy',
+  'intermediate': 'medium',
+  'advanced': 'hard',
+  'easy': 'easy',
+  'medium': 'medium',
+  'hard': 'hard'
+};
+
 serve(async (req) => {
   console.log("Generate challenge function called");
   
@@ -96,7 +106,7 @@ serve(async (req) => {
                   "challenges": [
                     {
                       "description": "Challenge description",
-                      "difficulty": "medium",
+                      "difficulty": "easy",
                       "hints": ["Hint 1", "Hint 2"]
                     }
                   ]
@@ -107,7 +117,7 @@ serve(async (req) => {
                   "id": "challenge-1",
                   "title": "Implement User Authentication",
                   "description": "Detailed description of the challenge",
-                  "difficulty": "medium",
+                  "difficulty": "easy",
                   "type": "implementation",
                   "filesPaths": ["src/components/Auth.tsx"]
                 }
@@ -205,7 +215,6 @@ serve(async (req) => {
       }
       
       // Validate and normalize the challenges
-      // This ensures all challenges have valid IDs and appropriate difficulty levels
       if (challengeResult.challenges && Array.isArray(challengeResult.challenges)) {
         challengeResult.challenges = challengeResult.challenges.map((challenge: Challenge, index: number) => {
           // Ensure challenge has a valid ID
@@ -213,24 +222,30 @@ serve(async (req) => {
             challenge.id = `${projectId}-challenge-${index}`;
           }
           
-          // Map difficulty levels if needed
-          if (!["beginner", "intermediate", "advanced"].includes(challenge.difficulty)) {
-            switch (challenge.difficulty) {
-              case "easy":
-                challenge.difficulty = "beginner";
-                break;
-              case "medium":
-                challenge.difficulty = "intermediate";
-                break;
-              case "hard":
-                challenge.difficulty = "advanced";
-                break;
-              default:
-                challenge.difficulty = "intermediate";
-            }
+          // Map difficulty levels to standardized format
+          if (challenge.difficulty) {
+            challenge.difficulty = difficultyMapping[challenge.difficulty] || 'medium';
           }
           
           return challenge;
+        });
+      }
+      
+      // Normalize file challenges
+      if (challengeResult.files && Array.isArray(challengeResult.files)) {
+        challengeResult.files = challengeResult.files.map((file: ProjectFile) => {
+          if (file.challenges && Array.isArray(file.challenges)) {
+            file.challenges = file.challenges.map((challenge: FileChallenge) => {
+              // Map difficulty levels to standardized format
+              if (challenge.difficulty) {
+                challenge.difficulty = difficultyMapping[challenge.difficulty] || 'medium';
+              }
+              
+              return challenge;
+            });
+          }
+          
+          return file;
         });
       }
       
