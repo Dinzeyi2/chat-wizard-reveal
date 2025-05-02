@@ -1,14 +1,9 @@
 
 /**
- * Project Templates for CodeCraft Challenges
- * These templates define the structure and challenges for generated projects
+ * Project Templates - Defines structure and challenges for generated projects
+ * This module contains templates for different types of projects that can be generated
+ * with intentional gaps for educational purposes
  */
-
-export interface IntentionalGap {
-  description: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
-  hints: string[];
-}
 
 export interface Feature {
   name: string;
@@ -25,6 +20,16 @@ export interface ProjectTemplate {
   features: Feature[];
 }
 
+export interface Challenge {
+  id: string;
+  featureName: string;
+  description: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  completed?: boolean;
+  hints: string[];
+  filesPaths: string[];
+}
+
 export interface GeneratedProject {
   projectName: string;
   description: string;
@@ -34,22 +39,72 @@ export interface GeneratedProject {
   challenges: Challenge[];
 }
 
-export interface Challenge {
-  id: string;
-  featureName: string;
-  description: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
-  completed: boolean;
-  hints: string[];
-  filesPaths: string[];
+/**
+ * Get hints for a specific challenge
+ * @param challenge The challenge description
+ * @param featureName The feature name
+ * @returns Array of hints
+ */
+export function getHintsForChallenge(challenge: string, featureName: string): string[] {
+  // Define common hints for different challenge types
+  const hintTemplates: Record<string, string[]> = {
+    "Profile image upload": [
+      "You'll need to set up file upload middleware on the backend",
+      "Consider using a package like multer for handling file uploads",
+      "Don't forget to validate the file type and size",
+      "You'll need to update the user model to store the image URL",
+      "Consider security implications of user-uploaded files"
+    ],
+    "Password reset functionality": [
+      "You'll need to create a route for requesting a password reset",
+      "Consider using email to send a reset token",
+      "The token should be time-limited for security",
+      "You'll need a form for users to enter their new password",
+      "Don't forget to hash the new password before saving"
+    ],
+    "Follow API implementation": [
+      "You'll need to create a model to track follower/following relationships",
+      "Consider using MongoDB's references to link users",
+      "Implement endpoints for follow/unfollow actions",
+      "You'll need to update the UI to reflect follow status",
+      "Think about how to efficiently query for a user's followers"
+    ],
+    "Search functionality": [
+      "Consider using database text search capabilities",
+      "You'll need to create an endpoint that accepts search queries",
+      "Think about how to handle partial matches",
+      "You might want to implement debouncing for the search input",
+      "Consider how to rank and sort search results"
+    ],
+    "Payment processing integration": [
+      "Research payment gateway options like Stripe or PayPal",
+      "You'll need to implement the client-side integration",
+      "Consider security best practices for handling payment data",
+      "You'll need to handle successful and failed payment scenarios",
+      "Don't forget to update the order status after payment"
+    ]
+  };
+  
+  // Return specific hints if available, or generate generic ones
+  if (hintTemplates[challenge]) {
+    return hintTemplates[challenge];
+  }
+  
+  // Generate generic hints based on the challenge and feature
+  return [
+    `Start by analyzing the existing ${featureName} code to understand the current implementation`,
+    `You'll need to modify both frontend and backend components for this challenge`,
+    `Consider how this feature would be implemented in a real-world application`,
+    `Don't forget to test your implementation thoroughly`,
+    `Think about edge cases and error handling`
+  ];
 }
 
-// Template definitions for different project types
 const projectTemplates: Record<string, ProjectTemplate> = {
   twitterClone: {
     name: "Twitter Clone",
     description: "A social media platform with tweet functionality",
-    stack: "MERN", // MongoDB, Express, React, Node
+    stack: "React + TypeScript",
     features: [
       {
         name: "Authentication",
@@ -93,7 +148,7 @@ const projectTemplates: Record<string, ProjectTemplate> = {
   ecommerceStore: {
     name: "E-commerce Store",
     description: "An online shop with product listings and shopping cart",
-    stack: "MERN",
+    stack: "React + TypeScript",
     features: [
       {
         name: "Product Catalog",
@@ -137,7 +192,7 @@ const projectTemplates: Record<string, ProjectTemplate> = {
   taskManager: {
     name: "Task Manager",
     description: "A productivity app for managing tasks and projects",
-    stack: "MERN",
+    stack: "React + TypeScript",
     features: [
       {
         name: "Task Creation",
@@ -177,64 +232,6 @@ const projectTemplates: Record<string, ProjectTemplate> = {
       }
     ]
   }
-};
-
-/**
- * Get specific hints for a challenge
- */
-export const getHintsForChallenge = (challenge: string, featureName: string): string[] => {
-  // Define common hints for different challenge types
-  const hintTemplates: Record<string, string[]> = {
-    "Profile image upload": [
-      "You'll need to set up file upload middleware on the backend",
-      "Consider using a package like multer for handling file uploads",
-      "Don't forget to validate the file type and size",
-      "You'll need to update the user model to store the image URL",
-      "Consider security implications of user-uploaded files"
-    ],
-    "Password reset functionality": [
-      "You'll need to create a route for requesting a password reset",
-      "Consider using email to send a reset token",
-      "The token should be time-limited for security",
-      "You'll need a form for users to enter their new password",
-      "Don't forget to hash the new password before saving"
-    ],
-    "Follow API implementation": [
-      "You'll need to create a model to track follower/following relationships",
-      "Consider using MongoDB's references to link users",
-      "Implement endpoints for follow/unfollow actions",
-      "You'll need to update the UI to reflect follow status",
-      "Think about how to efficiently query for a user's followers"
-    ],
-    "Search functionality": [
-      "Consider using MongoDB's text search capabilities",
-      "You'll need to create an endpoint that accepts search queries",
-      "Think about how to handle partial matches",
-      "You might want to implement debouncing for the search input",
-      "Consider how to rank and sort search results"
-    ],
-    "Payment processing integration": [
-      "Research payment gateway options like Stripe or PayPal",
-      "You'll need to implement the client-side integration",
-      "Consider security best practices for handling payment data",
-      "You'll need to handle successful and failed payment scenarios",
-      "Don't forget to update the order status after payment"
-    ]
-  };
-  
-  // Return specific hints if available, or generate generic ones
-  if (hintTemplates[challenge]) {
-    return hintTemplates[challenge];
-  }
-  
-  // Generate generic hints based on the challenge and feature
-  return [
-    `Start by analyzing the existing ${featureName} code to understand the current implementation`,
-    `You'll need to modify both frontend and backend components for this challenge`,
-    `Consider how this feature would be implemented in a real-world application`,
-    `Don't forget to test your implementation thoroughly`,
-    `Think about edge cases and error handling`
-  ];
 };
 
 export default projectTemplates;
