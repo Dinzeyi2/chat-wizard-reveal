@@ -135,7 +135,7 @@ serve(async (req) => {
             - Each challenge should have clear error patterns that are educational to solve
             - IMPORTANT: Include comments that explain what needs to be fixed as TODOs
             
-            Format your response as a valid, complete JSON object with the following structure:
+            Format your response as a valid JSON object (without any markdown formatting) with the following structure:
             {
               "projectName": "name-of-project",
               "description": "Brief description of the application",
@@ -197,18 +197,39 @@ serve(async (req) => {
     try {
       const textContent = geminiData.candidates[0].content.parts[0].text;
       
-      // Try to extract JSON from the response
-      const jsonMatch = textContent.match(/```json\n([\s\S]*?)\n```/) || 
-                    textContent.match(/{[\s\S]*"projectName"[\s\S]*}/);
-      
+      // Extract JSON content - improve the extraction by finding the JSON object more reliably
       let jsonContent = textContent;
-      if (jsonMatch) {
-        jsonContent = jsonMatch[1] || jsonMatch[0];
+      
+      // Find the position of the first '{' and the last '}'
+      const startPos = textContent.indexOf('{');
+      const endPos = textContent.lastIndexOf('}');
+      
+      if (startPos !== -1 && endPos !== -1 && endPos > startPos) {
+        jsonContent = textContent.substring(startPos, endPos + 1);
       }
+      
       console.log("Cleaned JSON for parsing:", jsonContent.substring(0, 100) + "...");
       
-      appData = JSON.parse(jsonContent.trim());
-      console.log("Successfully parsed JSON");
+      try {
+        appData = JSON.parse(jsonContent.trim());
+        console.log("Successfully parsed JSON");
+      } catch (jsonError) {
+        console.error("First JSON parse attempt failed:", jsonError);
+        
+        // Second attempt: Try to fix common JSON issues
+        const fixedJson = jsonContent
+          .replace(/`{3}json\n/g, '') // Remove markdown code block indicators
+          .replace(/\n`{3}/g, '')
+          .replace(/\\n/g, '\n')      // Fix escaped newlines
+          .replace(/\\"/g, '"');      // Fix escaped quotes
+          
+        try {
+          appData = JSON.parse(fixedJson.trim());
+          console.log("Successfully parsed JSON after fixing");
+        } catch (secondError) {
+          throw new Error(`JSON parsing failed: ${secondError.message}`);
+        }
+      }
     } catch (jsonError) {
       console.error("Failed to parse JSON response:", jsonError);
       return new Response(JSON.stringify({ error: "Failed to parse application data" }), {
