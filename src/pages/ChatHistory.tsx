@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,17 +29,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
+import { Message } from "@/types/chat";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ChatHistoryItem {
   id: string;
   title: string;
-  lastMessage: string;
+  last_message?: string;
   timestamp: string;
+  messages?: Message[]; // Add messages array to store full conversation
 }
 
 const ChatHistory = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatHistoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
@@ -48,22 +51,85 @@ const ChatHistory = () => {
   const [selectedChat, setSelectedChat] = useState<ChatHistoryItem | null>(null);
   const [newTitle, setNewTitle] = useState("");
   
-  // Load chat history from localStorage when component mounts
+  // Load chat history from Supabase when component mounts
   useEffect(() => {
-    const storedHistory = localStorage.getItem('chatHistory');
-    if (storedHistory) {
+    const fetchChatHistory = async () => {
+      setLoading(true);
       try {
-        setChatHistory(JSON.parse(storedHistory));
+        const { data: session } = await supabase.auth.getSession();
+        
+        if (!session.session) {
+          // If no session (user not logged in), try to get from localStorage as fallback
+          const storedHistory = localStorage.getItem('chatHistory');
+          if (storedHistory) {
+            try {
+              setChatHistory(JSON.parse(storedHistory));
+            } catch (error) {
+              console.error("Error parsing chat history from localStorage:", error);
+            }
+          }
+        } else {
+          // User is logged in, fetch from Supabase
+          const { data, error } = await supabase
+            .from('chat_history')
+            .select('*')
+            .order('updated_at', { ascending: false });
+          
+          if (error) {
+            console.error("Error fetching chat history:", error);
+            toast({
+              variant: "destructive",
+              title: "Error",
+              description: `Failed to load chat history: ${error.message}`,
+            });
+            
+            // Try fallback to localStorage
+            const storedHistory = localStorage.getItem('chatHistory');
+            if (storedHistory) {
+              try {
+                setChatHistory(JSON.parse(storedHistory));
+              } catch (error) {
+                console.error("Error parsing chat history from localStorage:", error);
+              }
+            }
+          } else if (data) {
+            // Format data from Supabase to match our ChatHistoryItem interface
+            const formattedHistory = data.map((item: any) => ({
+              id: item.id,
+              title: item.title,
+              lastMessage: item.last_message || "No messages",
+              timestamp: formatTimestamp(item.updated_at || item.created_at),
+              messages: item.messages || []
+            }));
+            
+            setChatHistory(formattedHistory);
+          }
+        }
       } catch (error) {
-        console.error("Error parsing chat history from localStorage:", error);
-        // Fall back to mock data if parsing fails
-        setChatHistory(mockChatHistory);
+        console.error("Error loading chat history:", error);
+      } finally {
+        setLoading(false);
       }
-    } else {
-      // Use mock data if nothing found in localStorage
-      setChatHistory(mockChatHistory);
-    }
+    };
+    
+    fetchChatHistory();
   }, []);
+
+  const formatTimestamp = (timestamp: string) => {
+    try {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+      
+      if (diffInHours < 1) return 'Just now';
+      if (diffInHours === 1) return '1 hour ago';
+      if (diffInHours < 24) return `${diffInHours} hours ago`;
+      if (diffInHours < 48) return '1 day ago';
+      return `${Math.floor(diffInHours / 24)} days ago`;
+    } catch (e) {
+      return 'Unknown time';
+    }
+  };
 
   const filteredChats = chatHistory.filter(chat => 
     chat.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -93,81 +159,119 @@ const ChatHistory = () => {
     setIsDeleteDialogOpen(true);
   };
   
-  const handleRename = () => {
+  const handleRename = async () => {
     if (selectedChat && newTitle.trim()) {
-      const updatedHistory = chatHistory.map(chat => 
-        chat.id === selectedChat.id ? { ...chat, title: newTitle.trim() } : chat
-      );
-      
-      setChatHistory(updatedHistory);
-      localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
-      setIsRenameDialogOpen(false);
-      toast({
-        title: "Chat renamed",
-        description: "Chat title has been updated successfully.",
-      });
+      try {
+        const { data: session } = await supabase.auth.getSession();
+        
+        if (session.session) {
+          // Update in Supabase
+          const { error } = await supabase
+            .from('chat_history')
+            .update({ title: newTitle.trim(), updated_at: new Date().toISOString() })
+            .eq('id', selectedChat.id);
+            
+          if (error) {
+            console.error("Error updating chat title:", error);
+            toast({
+              variant: "destructive",
+              title: "Error",
+              description: `Failed to update chat title: ${error.message}`,
+            });
+            return;
+          }
+        } else {
+          // Update in localStorage as fallback
+          const storedHistory = localStorage.getItem('chatHistory');
+          if (storedHistory) {
+            try {
+              const historyArray = JSON.parse(storedHistory);
+              const updatedHistory = historyArray.map((chat: any) => 
+                chat.id === selectedChat.id ? { ...chat, title: newTitle.trim() } : chat
+              );
+              localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
+            } catch (error) {
+              console.error("Error updating chat history in localStorage:", error);
+            }
+          }
+        }
+        
+        // Update local state
+        const updatedHistory = chatHistory.map(chat => 
+          chat.id === selectedChat.id ? { ...chat, title: newTitle.trim() } : chat
+        );
+        
+        setChatHistory(updatedHistory);
+        setIsRenameDialogOpen(false);
+        toast({
+          title: "Chat renamed",
+          description: "Chat title has been updated successfully.",
+        });
+      } catch (error) {
+        console.error("Error in rename operation:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to rename chat. Please try again.",
+        });
+      }
     }
   };
   
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (selectedChat) {
-      const updatedHistory = chatHistory.filter(chat => chat.id !== selectedChat.id);
-      
-      setChatHistory(updatedHistory);
-      localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
-      setIsDeleteDialogOpen(false);
-      toast({
-        title: "Chat deleted",
-        description: "Chat has been deleted successfully.",
-      });
+      try {
+        const { data: session } = await supabase.auth.getSession();
+        
+        if (session.session) {
+          // Delete from Supabase
+          const { error } = await supabase
+            .from('chat_history')
+            .delete()
+            .eq('id', selectedChat.id);
+            
+          if (error) {
+            console.error("Error deleting chat:", error);
+            toast({
+              variant: "destructive",
+              title: "Error",
+              description: `Failed to delete chat: ${error.message}`,
+            });
+            return;
+          }
+        } else {
+          // Delete from localStorage as fallback
+          const storedHistory = localStorage.getItem('chatHistory');
+          if (storedHistory) {
+            try {
+              const historyArray = JSON.parse(storedHistory);
+              const updatedHistory = historyArray.filter((chat: any) => chat.id !== selectedChat.id);
+              localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
+            } catch (error) {
+              console.error("Error updating chat history in localStorage:", error);
+            }
+          }
+        }
+        
+        // Update local state
+        const updatedHistory = chatHistory.filter(chat => chat.id !== selectedChat.id);
+        
+        setChatHistory(updatedHistory);
+        setIsDeleteDialogOpen(false);
+        toast({
+          title: "Chat deleted",
+          description: "Chat has been deleted successfully.",
+        });
+      } catch (error) {
+        console.error("Error in delete operation:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to delete chat. Please try again.",
+        });
+      }
     }
   };
-
-  // Mock data for chat history
-  const mockChatHistory: ChatHistoryItem[] = [
-    {
-      id: "1",
-      title: "Chatbot to Generate Full Stack Apps with Anthropic API",
-      lastMessage: "Last message 15 hours ago",
-      timestamp: "15 hours ago"
-    },
-    {
-      id: "2",
-      title: "Enhancing AI Responses with Deep Reasoning",
-      lastMessage: "Last message 16 hours ago",
-      timestamp: "16 hours ago"
-    },
-    {
-      id: "3",
-      title: "Enhancing AI Conversational Awareness",
-      lastMessage: "Last message 18 hours ago",
-      timestamp: "18 hours ago"
-    },
-    {
-      id: "4",
-      title: "Enabling User Customization of AI-Generated Web Apps",
-      lastMessage: "Last message 18 hours ago",
-      timestamp: "18 hours ago"
-    },
-    {
-      id: "5",
-      title: "Chatbot for Customizing AI-Generated Webapps",
-      lastMessage: "Last message 18 hours ago",
-      timestamp: "18 hours ago"
-    },
-    {
-      id: "6",
-      title: "AI-Powered Full Stack App Builder",
-      lastMessage: "Last message 1 day ago",
-      timestamp: "1 day ago"
-    },
-    {
-      id: "7",
-      title: "Intelligent Project Management System with Contextual AI",
-      lastMessage: "Last message 1 day ago",
-      timestamp: "1 day ago"
-    }
-  ];
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
@@ -201,52 +305,70 @@ const ChatHistory = () => {
         You have {filteredChats.length} previous chats with Claude. <span className="text-blue-500 cursor-pointer">Select</span>
       </p>
       
-      <div className="space-y-4">
-        {filteredChats.map(chat => (
-          <Card 
-            key={chat.id}
-            className="cursor-pointer hover:bg-gray-50 p-4 transition-colors relative"
-            onClick={() => handleChatSelection(chat.id)}
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <h2 className="font-medium text-gray-800">{chat.title}</h2>
-                <p className="text-sm text-gray-500">{chat.lastMessage}</p>
+      {loading ? (
+        <div className="flex justify-center items-center h-40">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        </div>
+      ) : filteredChats.length === 0 ? (
+        <div className="text-center py-10">
+          <p className="text-gray-500">No chat history found.</p>
+          <Button onClick={handleNewChat} variant="link" className="text-blue-500 mt-2">
+            Start a new chat
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredChats.map(chat => (
+            <Card 
+              key={chat.id}
+              className="cursor-pointer hover:bg-gray-50 p-4 transition-colors relative"
+              onClick={() => handleChatSelection(chat.id)}
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <h2 className="font-medium text-gray-800">{chat.title}</h2>
+                  <p className="text-sm text-gray-500">{chat.last_message || "No messages"}</p>
+                  {chat.messages && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      {chat.messages.length} messages
+                    </p>
+                  )}
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 rounded-full"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <span className="sr-only">Open menu</span>
+                      <svg width="15" height="3" viewBox="0 0 15 3" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-gray-600">
+                        <path d="M2.5 2.5C3.32843 2.5 4 1.82843 4 1C4 0.171573 3.32843 -0.5 2.5 -0.5C1.67157 -0.5 1 0.171573 1 1C1 1.82843 1.67157 2.5 2.5 2.5Z" fill="currentColor"/>
+                        <path d="M7.5 2.5C8.32843 2.5 9 1.82843 9 1C9 0.171573 8.32843 -0.5 7.5 -0.5C6.67157 -0.5 6 0.171573 6 1C6 1.82843 6.67157 2.5 7.5 2.5Z" fill="currentColor"/>
+                        <path d="M14 1C14 1.82843 13.3284 2.5 12.5 2.5C11.6716 2.5 11 1.82843 11 1C11 0.171573 11.6716 -0.5 12.5 -0.5C13.3284 -0.5 14 0.171573 14 1Z" fill="currentColor"/>
+                      </svg>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={(e) => openRenameDialog(chat, e)}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Rename
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                      onClick={(e) => openDeleteDialog(chat, e)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 rounded-full"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <span className="sr-only">Open menu</span>
-                    <svg width="15" height="3" viewBox="0 0 15 3" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-gray-600">
-                      <path d="M2.5 2.5C3.32843 2.5 4 1.82843 4 1C4 0.171573 3.32843 -0.5 2.5 -0.5C1.67157 -0.5 1 0.171573 1 1C1 1.82843 1.67157 2.5 2.5 2.5Z" fill="currentColor"/>
-                      <path d="M7.5 2.5C8.32843 2.5 9 1.82843 9 1C9 0.171573 8.32843 -0.5 7.5 -0.5C6.67157 -0.5 6 0.171573 6 1C6 1.82843 6.67157 2.5 7.5 2.5Z" fill="currentColor"/>
-                      <path d="M14 1C14 1.82843 13.3284 2.5 12.5 2.5C11.6716 2.5 11 1.82843 11 1C11 0.171573 11.6716 -0.5 12.5 -0.5C13.3284 -0.5 14 0.171573 14 1Z" fill="currentColor"/>
-                    </svg>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={(e) => openRenameDialog(chat, e)}>
-                    <Edit className="mr-2 h-4 w-4" />
-                    Rename
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                    onClick={(e) => openDeleteDialog(chat, e)}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </Card>
-        ))}
-      </div>
+            </Card>
+          ))}
+        </div>
+      )}
       
       {/* Rename Dialog */}
       <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>

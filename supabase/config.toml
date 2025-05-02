@@ -1,41 +1,14 @@
 
-project_id = "vcywiyvbfrylffwfzsny"
+project_id = "lovable-app"
 
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "storage"]
+schemas = ["public", "storage", "graphql_public"]
 
 [db]
 port = 54322
 
-[studio]
-enabled = true
-port = 54323
-
-[auth]
-enabled = true
-port = 54324
-
-[storage]
-enabled = true
-port = 54325
-
-[realtime]
-enabled = true
-port = 54326
-
-[functions.chat]
-verify_jwt = false
-
-[functions.generate-app]
-verify_jwt = false
-
-[functions.modify-app]
-verify_jwt = false
-
-[functions.generate-challenge-app]
-verify_jwt = false
-
-[functions.analyze-code]
+[functions]
+[functions.generate-challenge]
 verify_jwt = false

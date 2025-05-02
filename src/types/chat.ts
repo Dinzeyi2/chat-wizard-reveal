@@ -6,16 +6,8 @@ export interface Message {
   timestamp: Date;
   metadata?: {
     projectId?: string;
-    challengeInfo?: ChallengeInfo;
     [key: string]: any;
   };
-}
-
-export interface ChallengeInfo {
-  title: string;
-  description: string;
-  missingFeatures: string[];
-  difficultyLevel: "beginner" | "intermediate" | "advanced";
 }
 
 export interface SidebarItem {
@@ -29,4 +21,22 @@ export interface ActionButton {
   id: string;
   label: string;
   icon: string;
+}
+
+// Add a Json type to help with Supabase compatibility
+export type Json = 
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
+// ChatHistoryItem interface with consistent property naming
+export interface ChatHistoryItem {
+  id: string;
+  title: string;
+  last_message?: string;
+  timestamp: string;
+  messages?: Message[]; 
 }
