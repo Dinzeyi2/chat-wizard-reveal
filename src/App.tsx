@@ -10,6 +10,7 @@ import NotFound from "./pages/NotFound";
 import ChatHistory from "./pages/ChatHistory";
 import GitHubCallback from "./pages/GitHubCallback";
 import Auth from "./pages/Auth";
+import Landing from "./pages/Landing";
 import "./components/artifact/ArtifactSystem.css";
 
 const App = () => {
@@ -23,7 +24,13 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Index />} />
+            {/* New landing page as the default route */}
+            <Route path="/" element={<Landing />} />
+            
+            {/* Original Index page now at /app route */}
+            <Route path="/app" element={<Index />} />
+            
+            {/* All other existing routes preserved */}
             <Route path="/auth" element={<Auth />} />
             <Route path="/history" element={<ChatHistory />} />
             

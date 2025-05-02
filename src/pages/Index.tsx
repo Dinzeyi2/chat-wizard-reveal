@@ -34,6 +34,17 @@ const Index = () => {
   const { toast } = useToast();
   const location = useLocation();
 
+  // Check for initial prompt from landing page
+  useEffect(() => {
+    const initialPrompt = localStorage.getItem("initialPrompt");
+    if (initialPrompt) {
+      // Clear the stored prompt to prevent reusing it on page refresh
+      localStorage.removeItem("initialPrompt");
+      // Send the initial prompt
+      handleSendMessage(initialPrompt);
+    }
+  }, []);
+  
   // Check authentication status
   useEffect(() => {
     const checkAuth = async () => {
