@@ -19,7 +19,7 @@ interface ChatHistoryItem {
   title: string;
   last_message?: string;
   timestamp: string;
-  messages?: Message[]; // Add messages array to store full conversation
+  messages?: Message[] | string; // Add messages array to store full conversation
 }
 
 const Index = () => {
@@ -93,45 +93,54 @@ const Index = () => {
     console.log(`Loading chat history for chat ID: ${chatId}`);
     
     try {
+      // First try to load from Supabase if authenticated
       if (isAuthenticated) {
-        // Try to load from Supabase
-        const { data, error } = await supabase
-          .from('chat_history')
-          .select('*')
-          .eq('id', chatId)
-          .single();
-        
-        if (error) {
-          console.error("Error fetching chat from Supabase:", error);
-          throw error;
-        }
-        
-        if (data) {
-          console.log("Found chat in Supabase:", data);
-          if (data.messages && Array.isArray(data.messages)) {
-            // Format dates in the messages
-            const formattedMessages = data.messages.map((msg: any) => ({
-              ...msg,
-              timestamp: new Date(msg.timestamp)
-            }));
+        try {
+          const { data, error } = await supabase
+            .from('chat_history')
+            .select('*')
+            .eq('id', chatId)
+            .single();
+          
+          if (error) {
+            console.log("Error fetching chat from Supabase:", error);
+            // Don't throw, we'll try localStorage as fallback
+          }
+          
+          if (data) {
+            console.log("Found chat in Supabase:", data);
             
-            setMessages(formattedMessages);
+            // Handle messages array based on its type
+            let formattedMessages: Message[] = [];
             
-            // If this chat had a project ID, restore it
-            const projectMsg = formattedMessages.find((msg: Message) => msg.metadata?.projectId);
-            if (projectMsg && projectMsg.metadata?.projectId) {
-              setCurrentProjectId(projectMsg.metadata.projectId);
-            }
-            
-            return;
-          } else if (data.messages && typeof data.messages === 'string') {
-            // Handle case where messages might be stored as a JSON string
-            try {
-              const parsedMessages = JSON.parse(data.messages);
-              const formattedMessages = parsedMessages.map((msg: any) => ({
-                ...msg,
-                timestamp: new Date(msg.timestamp)
-              }));
+            if (data.messages) {
+              // Handle array format
+              if (Array.isArray(data.messages)) {
+                formattedMessages = data.messages.map((msg: any) => ({
+                  ...msg,
+                  timestamp: new Date(msg.timestamp)
+                }));
+              } 
+              // Handle JSON string format
+              else if (typeof data.messages === 'string') {
+                try {
+                  const parsedMessages = JSON.parse(data.messages);
+                  formattedMessages = parsedMessages.map((msg: any) => ({
+                    ...msg,
+                    timestamp: new Date(msg.timestamp)
+                  }));
+                } catch (e) {
+                  console.error("Error parsing messages from string:", e);
+                  formattedMessages = [];
+                }
+              } 
+              // Handle JSONB format from Supabase
+              else {
+                formattedMessages = Object.values(data.messages).map((msg: any) => ({
+                  ...msg,
+                  timestamp: new Date(msg.timestamp)
+                }));
+              }
               
               setMessages(formattedMessages);
               
@@ -141,91 +150,93 @@ const Index = () => {
                 setCurrentProjectId(projectMsg.metadata.projectId);
               }
               
-              return;
-            } catch (e) {
-              console.error("Error parsing messages from string:", e);
+              return; // Successfully loaded from Supabase
             }
           }
+        } catch (supabaseError) {
+          console.error("Error in Supabase chat retrieval:", supabaseError);
+          // Continue to localStorage fallback
         }
       }
       
-      // Fall back to localStorage if not found in Supabase or not authenticated
+      // Fallback to localStorage if not found in Supabase or not authenticated
       const storedHistory = localStorage.getItem('chatHistory');
-      let localChatHistory = storedHistory ? JSON.parse(storedHistory) : [];
+      if (!storedHistory) {
+        throw new Error(`No chat history found in localStorage`);
+      }
+      
+      let localChatHistory: ChatHistoryItem[] = [];
+      try {
+        localChatHistory = JSON.parse(storedHistory);
+      } catch (parseError) {
+        console.error("Error parsing chat history from localStorage:", parseError);
+        throw new Error("Could not parse chat history from localStorage");
+      }
       
       const selectedChat = localChatHistory.find((chat: ChatHistoryItem) => chat.id === chatId);
       
-      if (selectedChat) {
-        console.log("Found chat in localStorage:", selectedChat);
-        if (selectedChat.messages && selectedChat.messages.length > 0) {
-          // Use stored message history if available
-          console.log("Loading saved conversation with", 
-            Array.isArray(selectedChat.messages) ? selectedChat.messages.length : 
-            typeof selectedChat.messages === 'string' ? JSON.parse(selectedChat.messages).length : 0, 
-            "messages from localStorage");
-          
-          let messagesToUse;
-          if (Array.isArray(selectedChat.messages)) {
-            messagesToUse = selectedChat.messages;
-          } else if (typeof selectedChat.messages === 'string') {
-            try {
-              messagesToUse = JSON.parse(selectedChat.messages);
-            } catch (e) {
-              console.error("Error parsing messages string:", e);
-              messagesToUse = [];
-            }
-          } else {
+      if (!selectedChat) {
+        throw new Error(`Chat with ID ${chatId} not found in localStorage`);
+      }
+      
+      console.log("Found chat in localStorage:", selectedChat);
+      
+      // Handle messages based on their format
+      if (selectedChat.messages) {
+        // Process messages based on their type
+        let messagesToUse: Message[] = [];
+        
+        if (Array.isArray(selectedChat.messages)) {
+          messagesToUse = selectedChat.messages;
+        } else if (typeof selectedChat.messages === 'string') {
+          try {
+            messagesToUse = JSON.parse(selectedChat.messages);
+          } catch (e) {
+            console.error("Error parsing messages string:", e);
             messagesToUse = [];
           }
-          
-          // Format dates in the messages
-          const formattedMessages = messagesToUse.map((msg: any) => ({
-            ...msg,
-            timestamp: new Date(msg.timestamp)
-          }));
-          
-          setMessages(formattedMessages);
-          
-          // If this chat had a project ID, restore it
-          const projectMsg = formattedMessages.find((msg: Message) => msg.metadata?.projectId);
-          if (projectMsg && projectMsg.metadata?.projectId) {
-            setCurrentProjectId(projectMsg.metadata.projectId);
-          }
-        } else {
-          // Fallback to creating placeholder messages if no saved messages
-          console.log("No stored messages found, creating placeholder messages");
-          const userMessage: Message = {
-            id: "user-" + Date.now().toString(),
-            role: "user",
-            content: selectedChat.title,
-            timestamp: new Date(Date.now() - 3600000) // 1 hour ago
-          };
-          
-          const assistantMessage: Message = {
-            id: "assistant-" + Date.now().toString(),
-            role: "assistant",
-            content: `This is a previous conversation about "${selectedChat.title}". I'm here to continue helping you with this topic.`,
-            timestamp: new Date(Date.now() - 3500000) // A bit less than 1 hour ago
-          };
-          
-          setMessages([userMessage, assistantMessage]);
+        }
+        
+        // Format dates in the messages
+        const formattedMessages = messagesToUse.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        }));
+        
+        setMessages(formattedMessages);
+        
+        // If this chat had a project ID, restore it
+        const projectMsg = formattedMessages.find((msg: Message) => msg.metadata?.projectId);
+        if (projectMsg && projectMsg.metadata?.projectId) {
+          setCurrentProjectId(projectMsg.metadata.projectId);
         }
       } else {
-        console.error(`Chat with ID ${chatId} not found in localStorage or Supabase`);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Could not find the requested chat. Starting a new conversation.",
-        });
-        navigate('/app');
+        // Fallback to creating placeholder messages if no saved messages
+        console.log("No stored messages found, creating placeholder messages");
+        const userMessage: Message = {
+          id: "user-" + Date.now().toString(),
+          role: "user",
+          content: selectedChat.title,
+          timestamp: new Date(Date.now() - 3600000) // 1 hour ago
+        };
+        
+        const assistantMessage: Message = {
+          id: "assistant-" + Date.now().toString(),
+          role: "assistant",
+          content: `This is a previous conversation about "${selectedChat.title}". I'm here to continue helping you with this topic.`,
+          timestamp: new Date(Date.now() - 3500000) // A bit less than 1 hour ago
+        };
+        
+        setMessages([userMessage, assistantMessage]);
       }
     } catch (error) {
       console.error("Error loading chat history:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to load chat history. Please try again.",
+        description: "Could not find the requested chat. Starting a new conversation.",
       });
+      navigate('/app');
     }
   };
 

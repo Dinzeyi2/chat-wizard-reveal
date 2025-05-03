@@ -272,6 +272,22 @@ const ChatHistory = () => {
     }
   };
 
+  const getMessageCount = (chat: ChatHistoryItem) => {
+    if (!chat.messages) return 0;
+    
+    if (Array.isArray(chat.messages)) {
+      return chat.messages.length;
+    } else if (typeof chat.messages === 'string') {
+      try {
+        const parsedMessages = JSON.parse(chat.messages);
+        return Array.isArray(parsedMessages) ? parsedMessages.length : 0;
+      } catch (e) {
+        return 0;
+      }
+    }
+    return 0;
+  };
+
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <div className="flex justify-between items-center mb-8">
@@ -327,12 +343,9 @@ const ChatHistory = () => {
                 <div>
                   <h2 className="font-medium text-gray-800">{chat.title}</h2>
                   <p className="text-sm text-gray-500">{chat.last_message || "No messages"}</p>
-                  {chat.messages && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      {Array.isArray(chat.messages) ? chat.messages.length : 
-                      typeof chat.messages === 'string' ? JSON.parse(chat.messages).length : 0} messages
-                    </p>
-                  )}
+                  <p className="text-xs text-gray-400 mt-1">
+                    {getMessageCount(chat)} messages
+                  </p>
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
