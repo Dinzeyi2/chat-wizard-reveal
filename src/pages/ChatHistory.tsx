@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -135,13 +134,13 @@ const ChatHistory = () => {
 
   const handleChatSelection = (chatId: string) => {
     // Here we navigate to the main chat page with the specific chat ID
-    navigate(`/?chat=${chatId}`);
+    navigate(`/app?chat=${chatId}`);
   };
 
   // Function to handle creating a new chat
   const handleNewChat = () => {
     // Navigate to the home page without any chat ID parameter to start fresh
-    navigate('/');
+    navigate('/app');
   };
   
   const openRenameDialog = (chat: ChatHistoryItem, e: React.MouseEvent) => {
@@ -275,7 +274,7 @@ const ChatHistory = () => {
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <div className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-3">
-          <Link to="/">
+          <Link to="/app">
             <Button variant="outline" size="icon" className="rounded-full">
               <ArrowLeft className="h-4 w-4" />
             </Button>

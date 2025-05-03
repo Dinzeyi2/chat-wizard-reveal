@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -11,6 +12,7 @@ import { ArtifactProvider, ArtifactLayout } from "@/components/artifact/Artifact
 import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
 import { useLocation } from "react-router-dom";
 import { UserProfileMenu } from "@/components/UserProfileMenu";
+import { v4 as uuidv4 } from 'uuid';
 
 // Interface for chat history items
 interface ChatHistoryItem {
@@ -192,14 +194,14 @@ const Index = () => {
       
       // Add new messages to the history
       const userMessage: Message = {
-        id: Date.now().toString(),
+        id: uuidv4(),
         role: "user",
         content,
         timestamp: now
       };
       
       const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: uuidv4(),
         role: "assistant",
         content: responseContent,
         timestamp: now,
@@ -262,8 +264,9 @@ const Index = () => {
       } else {
         // Save to localStorage if not authenticated
         // Create new chat history item
+        const newChatId = uuidv4();
         const newChat: ChatHistoryItem = {
-          id: currentChatId || Date.now().toString(),
+          id: currentChatId || newChatId,
           title: chatTitle,
           last_message: responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : ""),
           timestamp: timeString,
@@ -294,7 +297,6 @@ const Index = () => {
           }
         } else {
           // Set the current chat ID to the new chat's ID
-          const newChatId = Date.now().toString();
           setCurrentChatId(newChatId);
           newChat.id = newChatId;
           
