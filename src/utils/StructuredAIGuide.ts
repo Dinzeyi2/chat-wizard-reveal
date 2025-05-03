@@ -30,7 +30,7 @@ export class StructuredAIGuide {
   }
   
   // Get specific implementation steps for the current challenge
-  getChallengeSteps() {
+  getChallengeSteps(): ImplementationStep[] {
     const challenge = this.getCurrentChallenge();
     
     // Define steps based on the challenge type
@@ -40,31 +40,31 @@ export class StructuredAIGuide {
           id: 'frontend-ui',
           name: 'Frontend UI Components',
           description: 'Implement the file input and preview UI elements',
-          status: 'not_started'
+          status: 'not_started' as const
         },
         {
           id: 'frontend-logic',
           name: 'Frontend Upload Logic',
           description: 'Implement the JavaScript logic for handling file selection and upload',
-          status: 'not_started'
+          status: 'not_started' as const
         },
         {
           id: 'backend-middleware',
           name: 'Backend File Upload Middleware',
           description: 'Set up the file upload middleware (e.g., Multer) on the server',
-          status: 'not_started'
+          status: 'not_started' as const
         },
         {
           id: 'backend-storage',
           name: 'Backend Storage Implementation',
           description: 'Implement file storage and database updating',
-          status: 'not_started'
+          status: 'not_started' as const
         },
         {
           id: 'security-validation',
           name: 'Security and Validation',
           description: 'Add file validation and security measures',
-          status: 'not_started'
+          status: 'not_started' as const
         }
       ];
     } else if (challenge.description.includes('Follow API')) {
@@ -73,31 +73,31 @@ export class StructuredAIGuide {
           id: 'data-model',
           name: 'Follow Data Model',
           description: 'Create the database model for follower relationships',
-          status: 'not_started'
+          status: 'not_started' as const
         },
         {
           id: 'follow-endpoints',
           name: 'Follow/Unfollow Endpoints',
           description: 'Implement the API endpoints for following and unfollowing users',
-          status: 'not_started'
+          status: 'not_started' as const
         },
         {
           id: 'frontend-buttons',
           name: 'Frontend Follow Buttons',
           description: 'Implement the UI components for follow/unfollow actions',
-          status: 'not_started'
+          status: 'not_started' as const
         },
         {
           id: 'follow-state',
           name: 'Follow State Management',
           description: 'Implement the logic to track and display follow status',
-          status: 'not_started'
+          status: 'not_started' as const
         },
         {
           id: 'follower-lists',
           name: 'Followers/Following Lists',
           description: 'Create views to display followers and following lists',
-          status: 'not_started'
+          status: 'not_started' as const
         }
       ];
     } else if (challenge.description.includes('search')) {
@@ -106,31 +106,31 @@ export class StructuredAIGuide {
           id: 'search-ui',
           name: 'Search UI Components',
           description: 'Create the search input and results display components',
-          status: 'not_started'
+          status: 'not_started' as const
         },
         {
           id: 'search-endpoint',
           name: 'Search API Endpoint',
           description: 'Implement the backend API endpoint for search queries',
-          status: 'not_started'
+          status: 'not_started' as const
         },
         {
           id: 'search-algorithm',
           name: 'Search Algorithm',
           description: 'Implement the search algorithm (text matching, relevance sorting, etc.)',
-          status: 'not_started'
+          status: 'not_started' as const
         },
         {
           id: 'result-display',
           name: 'Results Display',
           description: 'Implement the display of search results with proper formatting',
-          status: 'not_started'
+          status: 'not_started' as const
         },
         {
           id: 'search-optimization',
           name: 'Search Optimization',
           description: 'Optimize the search for performance (indexing, caching, etc.)',
-          status: 'not_started'
+          status: 'not_started' as const
         }
       ];
     } else {
@@ -140,31 +140,31 @@ export class StructuredAIGuide {
           id: 'frontend-components',
           name: 'Frontend Components',
           description: 'Implement the UI components needed for this feature',
-          status: 'not_started'
+          status: 'not_started' as const
         },
         {
           id: 'frontend-logic',
           name: 'Frontend Logic',
           description: 'Implement the JavaScript logic for the feature',
-          status: 'not_started'
+          status: 'not_started' as const
         },
         {
           id: 'backend-models',
           name: 'Backend Data Models',
           description: 'Create or update the database models',
-          status: 'not_started'
+          status: 'not_started' as const
         },
         {
           id: 'backend-endpoints',
           name: 'Backend API Endpoints',
           description: 'Implement the API endpoints for the feature',
-          status: 'not_started'
+          status: 'not_started' as const
         },
         {
           id: 'testing-validation',
           name: 'Testing and Validation',
           description: 'Add validation, error handling, and testing',
-          status: 'not_started'
+          status: 'not_started' as const
         }
       ];
     }
@@ -756,10 +756,12 @@ const storage = multer.diskStorage({
 
 // File filter
 const fileFilter = (req, file, cb) => {
-  // Accept only images
+  // Check if the file's MIME type starts with 'image/'
   if (file.mimetype.startsWith('image/')) {
+    // Accept the file
     cb(null, true);
   } else {
+    // Reject the file
     cb(new Error('Only image files are allowed!'), false);
   }
 };
