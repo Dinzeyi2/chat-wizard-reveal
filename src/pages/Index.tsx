@@ -9,9 +9,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Loader2 } from "lucide-react";
 import { ArtifactProvider, ArtifactLayout } from "@/components/artifact/ArtifactSystem";
 import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { UserProfileMenu } from "@/components/UserProfileMenu";
-import { v4 as uuidv4 } from "uuid";
 
 // Interface for chat history items
 interface ChatHistoryItem {
@@ -35,7 +34,6 @@ const Index = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const location = useLocation();
-  const navigate = useNavigate();
 
   // Check for initial prompt from landing page
   useEffect(() => {
@@ -194,14 +192,14 @@ const Index = () => {
       
       // Add new messages to the history
       const userMessage: Message = {
-        id: "user-" + uuidv4(),
+        id: Date.now().toString(),
         role: "user",
         content,
         timestamp: now
       };
       
       const assistantMessage: Message = {
-        id: "assistant-" + uuidv4(),
+        id: (Date.now() + 1).toString(),
         role: "assistant",
         content: responseContent,
         timestamp: now,
@@ -213,68 +211,100 @@ const Index = () => {
       setMessages(updatedMessages);
       
       if (isAuthenticated) {
-        try {
-          // Save to Supabase if authenticated
-          const { data: session } = await supabase.auth.getSession();
+        // Save to Supabase if authenticated
+        const { data: session } = await supabase.auth.getSession();
+        
+        if (session.session) {
+          // Convert Message[] to a JSON-compatible structure for Supabase
+          const serializableMessages = updatedMessages.map(msg => ({
+            ...msg,
+            timestamp: msg.timestamp.toISOString()
+          }));
           
-          if (session.session) {
-            // Convert Message[] to a JSON-compatible structure for Supabase
-            const serializableMessages = updatedMessages.map(msg => ({
-              ...msg,
-              timestamp: msg.timestamp.toISOString()
-            }));
+          if (currentChatId) {
+            // Update existing chat
+            const { error } = await supabase
+              .from('chat_history')
+              .update({
+                last_message: responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : ""),
+                messages: serializableMessages as unknown as Json,
+                updated_at: now.toISOString()
+              })
+              .eq('id', currentChatId);
             
-            if (currentChatId) {
-              // Update existing chat
-              const { error } = await supabase
-                .from('chat_history')
-                .update({
-                  last_message: responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : ""),
-                  messages: serializableMessages as unknown as Json,
-                  updated_at: now.toISOString()
-                })
-                .eq('id', currentChatId);
-              
-              if (error) {
-                console.error("Error updating chat in Supabase:", error);
-                throw error;
-              }
-            } else {
-              // Create new chat with proper UUID
-              const newChatId = uuidv4();
-              
-              const { data, error } = await supabase
-                .from('chat_history')
-                .insert({
-                  id: newChatId,
-                  user_id: session.session.user.id,
-                  title: chatTitle,
-                  last_message: responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : ""),
-                  messages: serializableMessages as unknown as Json
-                })
-                .select();
-              
-              if (error) {
-                console.error("Error creating chat in Supabase:", error);
-                throw error;
-              }
-              
-              if (data && data[0]) {
-                setCurrentChatId(data[0].id);
-                // Update URL to include chat ID
-                navigate(`/app?chat=${data[0].id}`);
-                console.log("Created new chat with ID:", data[0].id);
-              }
+            if (error) {
+              console.error("Error updating chat in Supabase:", error);
+              throw error;
+            }
+          } else {
+            // Create new chat
+            const { data, error } = await supabase
+              .from('chat_history')
+              .insert({
+                user_id: session.session.user.id,
+                title: chatTitle,
+                last_message: responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : ""),
+                messages: serializableMessages as unknown as Json
+              })
+              .select();
+            
+            if (error) {
+              console.error("Error creating chat in Supabase:", error);
+              throw error;
+            }
+            
+            if (data && data[0]) {
+              setCurrentChatId(data[0].id);
+              console.log("Created new chat with ID:", data[0].id);
             }
           }
-        } catch (dbError) {
-          console.error("Error storing chat history in Supabase:", dbError);
-          // Fall back to localStorage if Supabase fails
-          saveToLocalStorage(chatTitle, updatedMessages, responseContent);
         }
       } else {
         // Save to localStorage if not authenticated
-        saveToLocalStorage(chatTitle, updatedMessages, responseContent);
+        // Create new chat history item
+        const newChat: ChatHistoryItem = {
+          id: currentChatId || Date.now().toString(),
+          title: chatTitle,
+          last_message: responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : ""),
+          timestamp: timeString,
+          messages: updatedMessages
+        };
+        
+        // Get existing history or initialize empty array
+        const storedHistory = localStorage.getItem('chatHistory');
+        let chatHistoryArray: ChatHistoryItem[] = [];
+        
+        try {
+          if (storedHistory) {
+            chatHistoryArray = JSON.parse(storedHistory);
+          }
+        } catch (error) {
+          console.error("Error parsing chat history:", error);
+        }
+        
+        // If we have a current chat ID, update that chat
+        if (currentChatId) {
+          const existingIndex = chatHistoryArray.findIndex(chat => chat.id === currentChatId);
+          if (existingIndex >= 0) {
+            chatHistoryArray[existingIndex].last_message = responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : "");
+            chatHistoryArray[existingIndex].timestamp = timeString;
+            chatHistoryArray[existingIndex].messages = updatedMessages;
+          } else {
+            chatHistoryArray.unshift(newChat);
+          }
+        } else {
+          // Set the current chat ID to the new chat's ID
+          const newChatId = Date.now().toString();
+          setCurrentChatId(newChatId);
+          newChat.id = newChatId;
+          
+          // Add new chat to beginning of array
+          chatHistoryArray.unshift(newChat);
+        }
+        
+        // Save updated history back to localStorage
+        localStorage.setItem('chatHistory', JSON.stringify(chatHistoryArray));
+        console.log("Saved chat to localStorage, history now contains", chatHistoryArray.length, "chats");
       }
     } catch (error) {
       console.error("Error saving chat history:", error);
@@ -284,56 +314,6 @@ const Index = () => {
         description: "Failed to save chat history."
       });
     }
-  };
-  
-  // Helper function to save to localStorage
-  const saveToLocalStorage = (chatTitle: string, updatedMessages: Message[], responseContent: string) => {
-    // Create new chat history item with proper UUID
-    const newChat: ChatHistoryItem = {
-      id: currentChatId || uuidv4(),
-      title: chatTitle,
-      last_message: responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : ""),
-      timestamp: "Just now",
-      messages: updatedMessages
-    };
-    
-    // Get existing history or initialize empty array
-    const storedHistory = localStorage.getItem('chatHistory');
-    let chatHistoryArray: ChatHistoryItem[] = [];
-    
-    try {
-      if (storedHistory) {
-        chatHistoryArray = JSON.parse(storedHistory);
-      }
-    } catch (error) {
-      console.error("Error parsing chat history:", error);
-    }
-    
-    // If we have a current chat ID, update that chat
-    if (currentChatId) {
-      const existingIndex = chatHistoryArray.findIndex(chat => chat.id === currentChatId);
-      if (existingIndex >= 0) {
-        chatHistoryArray[existingIndex].last_message = responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : "");
-        chatHistoryArray[existingIndex].timestamp = "Just now";
-        chatHistoryArray[existingIndex].messages = updatedMessages;
-      } else {
-        chatHistoryArray.unshift(newChat);
-      }
-    } else {
-      // Set the current chat ID to the new chat's ID
-      const newChatId = newChat.id;
-      setCurrentChatId(newChatId);
-      
-      // Update URL to include chat ID
-      navigate(`/app?chat=${newChatId}`);
-      
-      // Add new chat to beginning of array
-      chatHistoryArray.unshift(newChat);
-    }
-    
-    // Save updated history back to localStorage
-    localStorage.setItem('chatHistory', JSON.stringify(chatHistoryArray));
-    console.log("Saved chat to localStorage, history now contains", chatHistoryArray.length, "chats");
   };
 
   useEffect(() => {

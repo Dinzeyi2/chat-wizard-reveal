@@ -32,7 +32,6 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { Message, ChatHistoryItem } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
-import { v4 as uuidv4 } from "uuid";
 
 const ChatHistory = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -135,14 +134,14 @@ const ChatHistory = () => {
   );
 
   const handleChatSelection = (chatId: string) => {
-    // Navigate to the main chat page with the specific chat ID
-    navigate(`/app?chat=${chatId}`);
+    // Here we navigate to the main chat page with the specific chat ID
+    navigate(`/?chat=${chatId}`);
   };
 
   // Function to handle creating a new chat
   const handleNewChat = () => {
     // Navigate to the home page without any chat ID parameter to start fresh
-    navigate('/app');
+    navigate('/');
   };
   
   const openRenameDialog = (chat: ChatHistoryItem, e: React.MouseEvent) => {
@@ -276,7 +275,7 @@ const ChatHistory = () => {
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <div className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-3">
-          <Link to="/app">
+          <Link to="/">
             <Button variant="outline" size="icon" className="rounded-full">
               <ArrowLeft className="h-4 w-4" />
             </Button>
