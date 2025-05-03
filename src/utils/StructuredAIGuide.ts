@@ -32,7 +32,7 @@ export interface ProjectData {
 }
 
 export interface ConversationMessage {
-  type: 'user' | 'guide' | 'codeSnippet';
+  type: 'user' | 'guide' | 'codeSnippet' | 'hint';
   content: string;
   challengeId: string;
 }

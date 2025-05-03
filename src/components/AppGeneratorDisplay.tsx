@@ -11,6 +11,7 @@ import { CheckCircle, Circle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import StepProgressDisplay from './challenge/StepProgressDisplay';
 import { StructuredAIGuide } from '@/utils/StructuredAIGuide';
+import { Message } from '@/types/chat';
 
 interface GeneratedAppData {
   projectId: string;
@@ -22,18 +23,13 @@ interface GeneratedAppData {
   designInfo: any;
 }
 
-interface Message {
-  id: string;
-  content: string;
-  role: 'user' | 'assistant';
-  createdAt: string;
-}
-
 interface AppGeneratorDisplayProps {
   onSendMessage?: (message: Message) => void;
+  message?: Message;
+  projectId?: string;
 }
 
-const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ onSendMessage }) => {
+const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ onSendMessage, message, projectId: externalProjectId }) => {
   const [prompt, setPrompt] = useState<string>('');
   const [completionLevel, setCompletionLevel] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
   const [isLoading, setIsLoading] = useState<boolean>(false);
