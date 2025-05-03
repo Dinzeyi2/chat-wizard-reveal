@@ -226,7 +226,7 @@ const Index = () => {
             const { error } = await supabase
               .from('chat_history')
               .update({
-                last_message: `Last message ${timeString}`,
+                last_message: responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : ""),
                 messages: serializableMessages as unknown as Json,
                 updated_at: now.toISOString()
               })
@@ -243,7 +243,7 @@ const Index = () => {
               .insert({
                 user_id: session.session.user.id,
                 title: chatTitle,
-                last_message: `Last message ${timeString}`,
+                last_message: responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : ""),
                 messages: serializableMessages as unknown as Json
               })
               .select();
@@ -255,6 +255,7 @@ const Index = () => {
             
             if (data && data[0]) {
               setCurrentChatId(data[0].id);
+              console.log("Created new chat with ID:", data[0].id);
             }
           }
         }
@@ -264,7 +265,7 @@ const Index = () => {
         const newChat: ChatHistoryItem = {
           id: currentChatId || Date.now().toString(),
           title: chatTitle,
-          last_message: `Last message ${timeString}`,
+          last_message: responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : ""),
           timestamp: timeString,
           messages: updatedMessages
         };
@@ -285,7 +286,7 @@ const Index = () => {
         if (currentChatId) {
           const existingIndex = chatHistoryArray.findIndex(chat => chat.id === currentChatId);
           if (existingIndex >= 0) {
-            chatHistoryArray[existingIndex].last_message = `Last message ${timeString}`;
+            chatHistoryArray[existingIndex].last_message = responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : "");
             chatHistoryArray[existingIndex].timestamp = timeString;
             chatHistoryArray[existingIndex].messages = updatedMessages;
           } else {
@@ -303,6 +304,7 @@ const Index = () => {
         
         // Save updated history back to localStorage
         localStorage.setItem('chatHistory', JSON.stringify(chatHistoryArray));
+        console.log("Saved chat to localStorage, history now contains", chatHistoryArray.length, "chats");
       }
     } catch (error) {
       console.error("Error saving chat history:", error);

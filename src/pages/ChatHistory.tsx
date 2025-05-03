@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,16 +30,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
-import { Message } from "@/types/chat";
+import { Message, ChatHistoryItem } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
-
-interface ChatHistoryItem {
-  id: string;
-  title: string;
-  last_message?: string;
-  timestamp: string;
-  messages?: Message[]; // Add messages array to store full conversation
-}
 
 const ChatHistory = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -59,17 +52,21 @@ const ChatHistory = () => {
         const { data: session } = await supabase.auth.getSession();
         
         if (!session.session) {
-          // If no session (user not logged in), try to get from localStorage as fallback
+          // If no session (user not logged in), get from localStorage as fallback
           const storedHistory = localStorage.getItem('chatHistory');
+          console.log("Fetching from localStorage, found:", storedHistory ? "yes" : "no");
           if (storedHistory) {
             try {
-              setChatHistory(JSON.parse(storedHistory));
+              const parsedHistory = JSON.parse(storedHistory);
+              console.log("Parsed history:", parsedHistory);
+              setChatHistory(parsedHistory);
             } catch (error) {
               console.error("Error parsing chat history from localStorage:", error);
             }
           }
         } else {
           // User is logged in, fetch from Supabase
+          console.log("User is logged in, fetching from Supabase");
           const { data, error } = await supabase
             .from('chat_history')
             .select('*')
@@ -97,11 +94,12 @@ const ChatHistory = () => {
             const formattedHistory = data.map((item: any) => ({
               id: item.id,
               title: item.title,
-              lastMessage: item.last_message || "No messages",
+              last_message: item.last_message || "No messages",
               timestamp: formatTimestamp(item.updated_at || item.created_at),
               messages: item.messages || []
             }));
             
+            console.log("Formatted history from Supabase:", formattedHistory);
             setChatHistory(formattedHistory);
           }
         }
@@ -302,7 +300,7 @@ const ChatHistory = () => {
       </div>
       
       <p className="text-gray-600 mb-6">
-        You have {filteredChats.length} previous chats with Claude. <span className="text-blue-500 cursor-pointer">Select</span>
+        You have {filteredChats.length} previous chats. <span className="text-blue-500 cursor-pointer">Select one to continue</span>
       </p>
       
       {loading ? (
