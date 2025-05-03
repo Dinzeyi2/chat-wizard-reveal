@@ -72,6 +72,11 @@ export class StructuredAIGuide {
     return this.steps;
   }
   
+  // Add the missing getChallengeSteps method that's being called in AppGeneratorDisplay.tsx
+  getChallengeSteps(): ImplementationStep[] {
+    return this.steps;
+  }
+  
   // Select a step to work on
   selectStep(stepId: string): ImplementationStep | null {
     const step = this.steps.find(s => s.id === stepId);
