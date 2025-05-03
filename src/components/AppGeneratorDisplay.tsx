@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { CodeEditor } from '@/components/challenge/CodeEditor';
+import CodeEditor from '@/components/challenge/CodeEditor';
 import { ChevronDownIcon, ChevronUpIcon, Code2Icon, PlayIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
