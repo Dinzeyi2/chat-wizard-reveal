@@ -235,10 +235,11 @@ const AppGeneratorDisplay = ({ appData, projectId }) => {
       <div className="h-full">
         <div className="bg-gray-100 px-3 py-1 text-xs font-mono border-b">{activeFile}</div>
         <CodeEditor
-          value={fileContent}
-          language={language}
+          content={fileContent}
+          onChange={() => {}} // Dummy onChange handler since it's readOnly
+          filename={activeFile}
           readOnly={true}
-          height="calc(100% - 26px)"
+          projectId={projectId}
         />
       </div>
     );
