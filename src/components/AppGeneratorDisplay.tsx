@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Message } from "@/types/chat";
 import { Button } from "@/components/ui/button";
@@ -16,8 +17,6 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { UICodeGenerator } from "@/utils/UICodeGenerator";
-import { ImplementationStep } from "@/utils/StructuredAIGuide";
-import StepProgressDisplay from "./StepProgressDisplay";
 import { Card } from "@/components/ui/card";
 
 // Implementation enhancement options
@@ -76,15 +75,6 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
   const { toast } = useToast();
   const [showEnhancementOptions, setShowEnhancementOptions] = useState(false);
   const [selectedEnhancement, setSelectedEnhancement] = useState<string | null>(null);
-  const [guidanceState, setGuidanceState] = useState<{
-    currentStep: ImplementationStep | null;
-    steps: ImplementationStep[];
-    stepProgress: Record<string, any>;
-  }>({
-    currentStep: null,
-    steps: [],
-    stepProgress: {}
-  });
   const [uiCodeGenerator, setUiCodeGenerator] = useState<UICodeGenerator | null>(null);
   
   useEffect(() => {
@@ -136,16 +126,6 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
                 
                 // Log this message to console for the AI to use
                 console.log("AI FIRST TASK:", firstTaskMessage);
-                
-                // Get available steps for the current challenge
-                const steps = guide.getChallengeSteps();
-                
-                // Update guidance state
-                setGuidanceState({
-                  currentStep: selectedStep,
-                  steps,
-                  stepProgress: guide.getStepProgress()
-                });
                 
                 // Send automatic first task message
                 setTimeout(() => {
@@ -620,94 +600,6 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
     });
   };
   
-  // Handle step selection
-  const handleSelectStep = (step: ImplementationStep) => {
-    if (uiCodeGenerator) {
-      const guide = uiCodeGenerator.getStructuredGuide();
-      if (guide) {
-        // Update step progress
-        const message = `I want to work on the ${step.name} step`;
-        const response = guide.processUserMessage(message);
-        
-        // Update local guidance state
-        setGuidanceState(prev => ({
-          ...prev,
-          currentStep: step,
-          waitingForStepSelection: false,
-          stepProgress: {
-            ...prev.stepProgress,
-            [step.id]: {
-              status: 'in_progress',
-              startedAt: new Date()
-            }
-          }
-        }));
-        
-        // Notify the user
-        toast({
-          title: `Working on: ${step.name}`,
-          description: "Ask the AI for guidance on implementing this step",
-        });
-      }
-    }
-  };
-  
-  // Handle marking a step as complete
-  const handleCompleteStep = (stepId: string) => {
-    if (uiCodeGenerator) {
-      const guide = uiCodeGenerator.getStructuredGuide();
-      if (guide) {
-        // Update step progress
-        const completeResult = guide.completeStep(stepId);
-        
-        if (completeResult) {
-          // Auto-select next step
-          const nextStep = guide.autoSelectNextStep();
-          
-          // Update local guidance state
-          setGuidanceState(prev => ({
-            ...prev,
-            currentStep: nextStep,
-            stepProgress: guide.getStepProgress()
-          }));
-          
-          // Show toast based on whether there's another task
-          if (nextStep) {
-            // Generate next step guidance
-            const nextStepGuidance = guide.getStepGuidance(nextStep.id);
-            
-            // Log this for AI to use
-            console.log("AI NEXT TASK:", JSON.stringify({
-              stepId: nextStep.id,
-              guidance: nextStepGuidance
-            }));
-            
-            toast({
-              title: `Moving to next task: ${nextStep.name}`,
-              description: "The AI will guide you through the implementation",
-            });
-            
-            // Simulate sending a message to the chat with next task
-            setTimeout(() => {
-              console.log("AUTO SENDING NEXT TASK:", nextStepGuidance);
-            }, 500);
-          } else {
-            // All steps completed
-            toast({
-              title: `All tasks completed!`,
-              description: "Congratulations on completing all project tasks!",
-            });
-            
-            // Simulate sending a completion message
-            setTimeout(() => {
-              console.log("AUTO SENDING COMPLETION MESSAGE: Congratulations! You've completed all the tasks for this project!");
-            }, 500);
-          }
-        }
-      }
-    }
-  };
-  
   // If no app data could be extracted, show a simple message
   if (!appData) {
     return (
@@ -798,29 +690,6 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
               </div>
             </ScrollArea>
           )}
-        </div>
-      )}
-      
-      {/* Application Enhancements Section - Only show for new generations */}
-      {!isModification && appData.challenges && appData.challenges.length > 0 && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-lg p-5">
-          <h4 className="text-lg font-semibold mb-3 text-blue-800">AI-Guided Implementation</h4>
-          <p className="text-sm text-blue-700 mb-4">
-            The AI will guide you through implementing this application step by step.
-          </p>
-
-          {guidanceState.steps.length > 0 && (
-            <StepProgressDisplay 
-              steps={guidanceState.steps}
-              currentStep={guidanceState.currentStep}
-              stepProgress={guidanceState.stepProgress}
-              onCompleteStep={handleCompleteStep}
-            />
-          )}
-          
-          <div className="mt-4 text-sm text-blue-700">
-            <p>Follow the AI's guidance in the chat. Complete each task and click "I've completed this" when done.</p>
-          </div>
         </div>
       )}
       
