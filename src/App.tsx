@@ -53,7 +53,6 @@ const App = () => {
             <Route path="/challenges" element={<ChallengeGenerator />} />
             <Route path="/challenge/:projectId" element={<ChallengeWorkspace />} />
             <Route path="/challenge/:projectId/:challengeId" element={<ChallengeWorkspace />} />
-            <Route path="/implementation-steps/:stepId" element={<ChallengeWorkspace />} />
             
             {/* Catch-all route for 404s */}
             <Route path="*" element={<NotFound />} />

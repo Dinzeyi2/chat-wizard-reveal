@@ -1,3 +1,4 @@
+
 /**
  * UI Code Generator - Main Integration
  * This module integrates the Perplexity AI Design Scraper with the Claude Code Customizer
@@ -10,7 +11,6 @@ import {
 } from "@/utils/EnhancedPerplexityUIScraper";
 import { ClaudeCodeCustomizer } from "@/utils/ClaudeCodeCustomizer";
 import { supabase } from "@/integrations/supabase/client";
-import { StructuredAIGuide } from "@/utils/StructuredAIGuide";
 
 interface UICodeGeneratorConfig {
   perplexityApiKey?: string;
@@ -53,7 +53,6 @@ export class UICodeGenerator {
   private scraper: EnhancedPerplexityUIScraper | null = null;
   private customizer: ClaudeCodeCustomizer | null = null;
   private generationHistory: GenerationHistoryItem[];
-  private structuredGuide: StructuredAIGuide | null = null;
   
   constructor(config: UICodeGeneratorConfig = {}) {
     // Extract configuration
@@ -90,32 +89,6 @@ export class UICodeGenerator {
   }
   
   /**
-   * Initialize a structured AI guide for a project
-   */
-  initializeStructuredGuide(projectData: any): StructuredAIGuide {
-    this.structuredGuide = new StructuredAIGuide(projectData);
-    return this.structuredGuide;
-  }
-  
-  /**
-   * Get the structured AI guide for a project
-   */
-  getStructuredGuide(): StructuredAIGuide | null {
-    return this.structuredGuide;
-  }
-  
-  /**
-   * Process a message using the structured AI guide
-   */
-  processGuideMessage(message: string): string | null {
-    if (!this.structuredGuide) {
-      return null;
-    }
-    
-    return this.structuredGuide.processUserMessage(message);
-  }
-  
-  /**
    * Generate UI code based on a user prompt
    * @param userPrompt - User's design request
    * @returns Generated code and metadata
@@ -142,11 +115,6 @@ export class UICodeGenerator {
         
         // 5. Save to history
         this.saveToHistory(userPrompt, response);
-        
-        // 6. Initialize structured guide if project data is available
-        if (response.project) {
-          this.initializeStructuredGuide(response.project);
-        }
         
         return this.formatResult(userPrompt, response);
       } else {
