@@ -1,27 +1,37 @@
+
+import { ProjectData, Challenge } from './projectTemplates';
+
+// Define Step interface used for implementation steps
 export interface ImplementationStep {
   id: string;
   name: string;
   description: string;
-  difficulty?: string;
-  type?: string;
-  status?: 'not_started' | 'in_progress' | 'completed';
+  status: "not_started" | "in_progress" | "completed";
+}
+
+// Define ConversationMessage interface
+interface ConversationMessage {
+  type: 'user' | 'guide' | 'hint' | 'codeSnippet';
+  content: string;
+  challengeId: string;
+  stepId?: string;
 }
 
 export class StructuredAIGuide {
-  private project: any;
+  private project: ProjectData;
   private currentChallengeIndex: number;
-  private conversationHistory: any[];
+  private conversationHistory: ConversationMessage[];
   public currentStep: ImplementationStep | null;
-  public waitingForStepSelection: boolean;
   public stepProgress: Record<string, any>;
+  public waitingForStepSelection: boolean;
   
-  constructor(projectData: any) {
+  constructor(projectData: ProjectData) {
     this.project = projectData;
     this.currentChallengeIndex = 0;
     this.conversationHistory = [];
-    this.currentStep = null;
-    this.waitingForStepSelection = false;
-    this.stepProgress = {};
+    this.currentStep = null; // Tracks which specific step the user is working on
+    this.stepProgress = {}; // Tracks progress on each step
+    this.waitingForStepSelection = false; // Flag to track if waiting for user to select a step
   }
   
   // Get the current challenge
@@ -40,31 +50,31 @@ export class StructuredAIGuide {
           id: 'frontend-ui',
           name: 'Frontend UI Components',
           description: 'Implement the file input and preview UI elements',
-          status: 'not_started' as const
+          status: "not_started" as const
         },
         {
           id: 'frontend-logic',
           name: 'Frontend Upload Logic',
           description: 'Implement the JavaScript logic for handling file selection and upload',
-          status: 'not_started' as const
+          status: "not_started" as const
         },
         {
           id: 'backend-middleware',
           name: 'Backend File Upload Middleware',
           description: 'Set up the file upload middleware (e.g., Multer) on the server',
-          status: 'not_started' as const
+          status: "not_started" as const
         },
         {
           id: 'backend-storage',
           name: 'Backend Storage Implementation',
           description: 'Implement file storage and database updating',
-          status: 'not_started' as const
+          status: "not_started" as const
         },
         {
           id: 'security-validation',
           name: 'Security and Validation',
           description: 'Add file validation and security measures',
-          status: 'not_started' as const
+          status: "not_started" as const
         }
       ];
     } else if (challenge.description.includes('Follow API')) {
@@ -73,31 +83,31 @@ export class StructuredAIGuide {
           id: 'data-model',
           name: 'Follow Data Model',
           description: 'Create the database model for follower relationships',
-          status: 'not_started' as const
+          status: "not_started" as const
         },
         {
           id: 'follow-endpoints',
           name: 'Follow/Unfollow Endpoints',
           description: 'Implement the API endpoints for following and unfollowing users',
-          status: 'not_started' as const
+          status: "not_started" as const
         },
         {
           id: 'frontend-buttons',
           name: 'Frontend Follow Buttons',
           description: 'Implement the UI components for follow/unfollow actions',
-          status: 'not_started' as const
+          status: "not_started" as const
         },
         {
           id: 'follow-state',
           name: 'Follow State Management',
           description: 'Implement the logic to track and display follow status',
-          status: 'not_started' as const
+          status: "not_started" as const
         },
         {
           id: 'follower-lists',
           name: 'Followers/Following Lists',
           description: 'Create views to display followers and following lists',
-          status: 'not_started' as const
+          status: "not_started" as const
         }
       ];
     } else if (challenge.description.includes('search')) {
@@ -106,31 +116,31 @@ export class StructuredAIGuide {
           id: 'search-ui',
           name: 'Search UI Components',
           description: 'Create the search input and results display components',
-          status: 'not_started' as const
+          status: "not_started" as const
         },
         {
           id: 'search-endpoint',
           name: 'Search API Endpoint',
           description: 'Implement the backend API endpoint for search queries',
-          status: 'not_started' as const
+          status: "not_started" as const
         },
         {
           id: 'search-algorithm',
           name: 'Search Algorithm',
           description: 'Implement the search algorithm (text matching, relevance sorting, etc.)',
-          status: 'not_started' as const
+          status: "not_started" as const
         },
         {
           id: 'result-display',
           name: 'Results Display',
           description: 'Implement the display of search results with proper formatting',
-          status: 'not_started' as const
+          status: "not_started" as const
         },
         {
           id: 'search-optimization',
           name: 'Search Optimization',
           description: 'Optimize the search for performance (indexing, caching, etc.)',
-          status: 'not_started' as const
+          status: "not_started" as const
         }
       ];
     } else {
@@ -140,31 +150,31 @@ export class StructuredAIGuide {
           id: 'frontend-components',
           name: 'Frontend Components',
           description: 'Implement the UI components needed for this feature',
-          status: 'not_started' as const
+          status: "not_started" as const
         },
         {
           id: 'frontend-logic',
           name: 'Frontend Logic',
           description: 'Implement the JavaScript logic for the feature',
-          status: 'not_started' as const
+          status: "not_started" as const
         },
         {
           id: 'backend-models',
           name: 'Backend Data Models',
           description: 'Create or update the database models',
-          status: 'not_started' as const
+          status: "not_started" as const
         },
         {
           id: 'backend-endpoints',
           name: 'Backend API Endpoints',
           description: 'Implement the API endpoints for the feature',
-          status: 'not_started' as const
+          status: "not_started" as const
         },
         {
           id: 'testing-validation',
           name: 'Testing and Validation',
           description: 'Add validation, error handling, and testing',
-          status: 'not_started' as const
+          status: "not_started" as const
         }
       ];
     }
@@ -205,7 +215,7 @@ export class StructuredAIGuide {
   }
   
   // Generate an introduction message for a challenge with steps
-  _generateIntroMessage(challenge: any) {
+  _generateIntroMessage(challenge: Challenge) {
     const steps = this.getChallengeSteps();
     
     // Basic intro
@@ -227,7 +237,7 @@ export class StructuredAIGuide {
     // Add step details
     let stepsText = `\n\nTo implement this feature, we'll need to complete the following steps:\n\n`;
     
-    steps.forEach((step: any, index: number) => {
+    steps.forEach((step, index) => {
       stepsText += `${index + 1}. ${step.name}: ${step.description}\n`;
     });
     
@@ -364,7 +374,7 @@ export class StructuredAIGuide {
       const keywords = step.name.toLowerCase().split(' ');
       
       // Check if multiple keywords are present in the message
-      const matchingKeywords = keywords.filter((keyword: string) => 
+      const matchingKeywords = keywords.filter(keyword => 
         keyword.length > 3 && lowerMessage.includes(keyword)
       );
       
@@ -412,7 +422,7 @@ export class StructuredAIGuide {
   _handleStepCompletion() {
     const completedStep = this.currentStep;
     
-    if (!completedStep) return "I'm not sure which step you've completed. Please let me know which specific implementation step you're working on.";
+    if (!completedStep) return "No step is currently selected.";
     
     // Mark the step as completed
     this.stepProgress[completedStep.id] = {
@@ -591,7 +601,7 @@ Let's start by examining the relevant code. What questions do you have about thi
   _provideStepHelp() {
     const step = this.currentStep;
     
-    if (!step) return "I'm not sure which step you need help with. Please let me know which specific implementation step you're working on.";
+    if (!step) return "No step is currently selected.";
     
     // Step-specific help
     if (step.id === 'frontend-ui') {
@@ -658,7 +668,8 @@ Could you tell me more specifically what you're struggling with, and I can provi
   // Answer a user question based on the current step context
   _answerQuestion(question: string) {
     const step = this.currentStep;
-    if (!step) return "I'm not sure which step you're asking about. Please let me know which specific implementation step you're working on.";
+    
+    if (!step) return "No step is currently selected. Please select a step first.";
     
     const lowerQuestion = question.toLowerCase();
     
@@ -756,12 +767,10 @@ const storage = multer.diskStorage({
 
 // File filter
 const fileFilter = (req, file, cb) => {
-  // Check if the file's MIME type starts with 'image/'
+  // Accept only images
   if (file.mimetype.startsWith('image/')) {
-    // Accept the file
     cb(null, true);
   } else {
-    // Reject the file
     cb(new Error('Only image files are allowed!'), false);
   }
 };
@@ -838,7 +847,7 @@ Remember that validating on both frontend and backend is important for security 
   _provideCodeSnippet() {
     const step = this.currentStep;
     
-    if (!step) return "I'm not sure which step you need code for. Please let me know which specific implementation step you're working on.";
+    if (!step) return "No step is currently selected. Please select a step first.";
     
     // Step-specific code snippets
     if (step.id === 'frontend-ui') {
@@ -1322,7 +1331,7 @@ Let me know what specific aspect you're working on, and I can provide a more tar
   _generateEncouragementMessage() {
     const step = this.currentStep;
     
-    if (!step) return "I'm here to help you implement this feature. Which specific step would you like to work on?";
+    if (!step) return "What would you like to focus on first? Choose a step to get started.";
     
     const messages = [
       `How's your implementation of the ${step.name} coming along? Remember to break it down into smaller steps if it feels overwhelming.`,
