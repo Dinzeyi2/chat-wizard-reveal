@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { CheckSquare, Square, ArrowRight } from "lucide-react";
+import { CheckSquare, ArrowRight } from "lucide-react";
 import { ImplementationStep } from '@/utils/StructuredAIGuide';
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";

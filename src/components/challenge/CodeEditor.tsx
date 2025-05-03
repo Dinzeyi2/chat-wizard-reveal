@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
-import { Card } from '@/components/ui/card';
 
 interface CodeEditorProps {
   content: string;

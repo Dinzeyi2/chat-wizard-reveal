@@ -78,12 +78,10 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
   const [selectedEnhancement, setSelectedEnhancement] = useState<string | null>(null);
   const [guidanceState, setGuidanceState] = useState<{
     currentStep: ImplementationStep | null;
-    waitingForStepSelection: boolean;
     steps: ImplementationStep[];
     stepProgress: Record<string, any>;
   }>({
     currentStep: null,
-    waitingForStepSelection: false,
     steps: [],
     stepProgress: {}
   });
@@ -145,10 +143,15 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
                 // Update guidance state
                 setGuidanceState({
                   currentStep: selectedStep,
-                  waitingForStepSelection: false,
                   steps,
                   stepProgress: guide.getStepProgress()
                 });
+                
+                // Send automatic first task message
+                setTimeout(() => {
+                  // Simulate sending a message to the chat
+                  console.log("AUTO SENDING FIRST TASK:", firstTaskMessage);
+                }, 1000);
               }
             }
             
@@ -683,12 +686,22 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
               title: `Moving to next task: ${nextStep.name}`,
               description: "The AI will guide you through the implementation",
             });
+            
+            // Simulate sending a message to the chat with next task
+            setTimeout(() => {
+              console.log("AUTO SENDING NEXT TASK:", nextStepGuidance);
+            }, 500);
           } else {
             // All steps completed
             toast({
               title: `All tasks completed!`,
               description: "Congratulations on completing all project tasks!",
             });
+            
+            // Simulate sending a completion message
+            setTimeout(() => {
+              console.log("AUTO SENDING COMPLETION MESSAGE: Congratulations! You've completed all the tasks for this project!");
+            }, 500);
           }
         }
       }

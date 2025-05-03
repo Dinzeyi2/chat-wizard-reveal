@@ -32,6 +32,30 @@ export class StructuredAIGuide {
         completionTime: null
       };
     });
+    
+    // Automatically set dependencies if not explicitly defined
+    this._setupImplicitDependencies();
+  }
+  
+  // Add a method to set up implicit dependencies based on step order
+  private _setupImplicitDependencies() {
+    // If explicit dependencies are not defined, assume sequential dependencies
+    for (let i = 1; i < this.steps.length; i++) {
+      const currentStep = this.steps[i];
+      
+      // If no prerequisites are defined yet, create the array
+      if (!currentStep.prerequisites) {
+        currentStep.prerequisites = [];
+      }
+      
+      // If this step has no prerequisites yet, make it depend on the previous step
+      if (currentStep.prerequisites.length === 0) {
+        const previousStep = this.steps[i-1];
+        if (previousStep) {
+          currentStep.prerequisites.push(previousStep.id);
+        }
+      }
+    }
   }
   
   private _convertChallengeToStep(challenge: any): ImplementationStep {
@@ -72,7 +96,7 @@ export class StructuredAIGuide {
     return this.steps;
   }
   
-  // Add the missing getChallengeSteps method that's being called in AppGeneratorDisplay.tsx
+  // Get challenge steps method that's being called in AppGeneratorDisplay.tsx
   getChallengeSteps(): ImplementationStep[] {
     return this.steps;
   }
@@ -94,7 +118,7 @@ export class StructuredAIGuide {
     return null;
   }
   
-  // Select next logical step for the user automatically
+  // Enhanced auto-selection of next logical step for the user
   autoSelectNextStep(): ImplementationStep | null {
     // First try to find a step that's already in progress
     const inProgressStep = this.steps.find(
@@ -106,35 +130,49 @@ export class StructuredAIGuide {
       return inProgressStep;
     }
     
-    // Next try to find a step that's not started and has no prerequisites
-    // or all prerequisites are completed
-    const availableStep = this.steps.find(step => {
+    // Next, find the earliest step in the sequence that's not completed and has all prerequisites met
+    for (const step of this.steps) {
       const stepInfo = this.stepProgress[step.id];
       
       if (stepInfo.status === 'not_started') {
         // Check prerequisites
         if (!step.prerequisites || step.prerequisites.length === 0) {
-          return true;
+          // No prerequisites, this step can be started
+          this.currentStep = step;
+          this.stepProgress[step.id].status = 'in_progress';
+          return step;
         }
         
         // Check if all prerequisites are completed
         const allPrerequisitesMet = step.prerequisites.every(prereqId => {
-          const prereqStep = this.steps.find(s => s.id === prereqId);
-          return prereqStep && this.stepProgress[prereqId].status === 'completed';
+          return this.stepProgress[prereqId]?.status === 'completed';
         });
         
-        return allPrerequisitesMet;
+        if (allPrerequisitesMet) {
+          // All prerequisites are met, this step can be started
+          this.currentStep = step;
+          this.stepProgress[step.id].status = 'in_progress';
+          return step;
+        }
       }
-      
-      return false;
-    });
-    
-    if (availableStep) {
-      this.currentStep = availableStep;
-      this.stepProgress[availableStep.id].status = 'in_progress';
-      return availableStep;
     }
     
+    // If we get here, there are no steps that can be started right now
+    // Let's check if there are any steps remaining that aren't completed
+    const nonCompletedStep = this.steps.find(
+      step => this.stepProgress[step.id].status !== 'completed'
+    );
+    
+    // If there's a non-completed step with blocking prerequisites,
+    // we should suggest it anyway with a warning
+    if (nonCompletedStep) {
+      console.log("Warning: Starting step with incomplete prerequisites:", nonCompletedStep.name);
+      this.currentStep = nonCompletedStep;
+      this.stepProgress[nonCompletedStep.id].status = 'in_progress';
+      return nonCompletedStep;
+    }
+    
+    // No steps remaining
     return null;
   }
   
@@ -180,7 +218,7 @@ ${this.steps
   
   // Generate first task message for AI to send to user
   generateFirstTaskMessage(): string {
-    const step = this.autoSelectNextStep();
+    const step = this.currentStep || this.autoSelectNextStep();
     
     if (!step) {
       return "All tasks have been completed! Great job on finishing the project!";
@@ -257,7 +295,12 @@ ${this.steps
     }
     
     // Default response if no specific context
-    return `I'm ready to help you implement features for ${this.projectName}. Let me select a task for you to work on, and I'll provide specific guidance.`;
+    const nextStep = this.autoSelectNextStep();
+    if (nextStep) {
+      return `Let me help you implement features for ${this.projectName}. I've selected the first task for you: ${nextStep.name}\n\n${this.getStepGuidance(nextStep.id)}`;
+    } else {
+      return `I'm ready to help you with ${this.projectName}, but there don't seem to be any tasks defined. Let's discuss what you'd like to implement next.`;
+    }
   }
   
   // Get detailed guidance for a specific step
