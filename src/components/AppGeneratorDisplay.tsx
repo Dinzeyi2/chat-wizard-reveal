@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -175,8 +176,6 @@ Let me know how you'd like to proceed!
   // Function to send AI message
   const sendAiMessage = (message: string) => {
     // This function sends a message from the AI to the chat
-    // You would need to implement this based on how your chat component works
-    // For now, we'll just log it to console
     console.log('AI Message:', message);
     
     // If using a chat system with a messages state, you might do something like:
@@ -185,7 +184,7 @@ Let me know how you'd like to proceed!
         id: `msg-${Date.now()}`,
         content: message,
         role: 'assistant',
-        createdAt: new Date().toISOString()
+        timestamp: new Date()
       });
     }
   };
