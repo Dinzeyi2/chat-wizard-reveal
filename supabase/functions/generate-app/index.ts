@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -194,9 +195,16 @@ I've created this application with some challenges for you to solve. Let's tackl
 **What you need to do:**
 ${firstChallenge.description}
 
-**Files to examine:** ${firstChallenge.filesPaths.join(', ')}
+`;
 
-Take a look at the code, find the issues marked with TODO comments, and make the necessary fixes.
+  // Add file paths information if available
+  if (firstChallenge.filesPaths && Array.isArray(firstChallenge.filesPaths) && firstChallenge.filesPaths.length > 0) {
+    guidance += `**Files to examine:** ${firstChallenge.filesPaths.join(', ')}\n\n`;
+  } else {
+    guidance += `**Examine the project files** to understand the structure.\n\n`;
+  }
+
+  guidance += `Take a look at the code, find the issues marked with TODO comments, and make the necessary fixes.
 When you've completed this task, let me know and I'll guide you to the next challenge.
   `;
   
