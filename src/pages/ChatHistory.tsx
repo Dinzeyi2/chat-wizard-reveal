@@ -62,6 +62,11 @@ const ChatHistory = () => {
               setChatHistory(parsedHistory);
             } catch (error) {
               console.error("Error parsing chat history from localStorage:", error);
+              toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to load chat history from local storage."
+              });
             }
           }
         } else {
@@ -105,6 +110,11 @@ const ChatHistory = () => {
         }
       } catch (error) {
         console.error("Error loading chat history:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load chat history."
+        });
       } finally {
         setLoading(false);
       }
@@ -135,7 +145,8 @@ const ChatHistory = () => {
 
   const handleChatSelection = (chatId: string) => {
     console.log(`Navigating to chat with ID: ${chatId}`);
-    // Navigate to the chat page with the chatId as a URL parameter
+    
+    // Use navigate instead of changing window.location for a smoother transition
     navigate(`/app?chat=${chatId}`);
   };
 
@@ -284,6 +295,9 @@ const ChatHistory = () => {
       } catch (e) {
         return 0;
       }
+    } else if (typeof chat.messages === 'object') {
+      // Handle case where messages might be a JSONB object from Supabase
+      return Object.keys(chat.messages).length;
     }
     return 0;
   };

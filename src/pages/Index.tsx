@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -32,6 +33,7 @@ const Index = () => {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [firstStepGuidanceSent, setFirstStepGuidanceSent] = useState<boolean>(false);
+  const [chatLoadingAttempted, setChatLoadingAttempted] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const location = useLocation();
@@ -82,20 +84,24 @@ const Index = () => {
       setCurrentChatId(chatId);
       // Load the specific chat history
       loadChatHistory(chatId);
+      setChatLoadingAttempted(true);
     } else {
       // Clear messages if starting a new chat
       setMessages([]);
       setCurrentChatId(null);
     }
-  }, [location]);
+  }, [location.search]);
 
   const loadChatHistory = async (chatId: string) => {
     console.log(`Loading chat history for chat ID: ${chatId}`);
     
     try {
       // First try to load from Supabase if authenticated
-      if (isAuthenticated) {
+      const { data: session } = await supabase.auth.getSession();
+      
+      if (session.session) {
         try {
+          console.log("User is authenticated, fetching from Supabase");
           const { data, error } = await supabase
             .from('chat_history')
             .select('*')
@@ -103,8 +109,8 @@ const Index = () => {
             .single();
           
           if (error) {
-            console.log("Error fetching chat from Supabase:", error);
-            // Don't throw, we'll try localStorage as fallback
+            console.error("Error fetching chat from Supabase:", error);
+            throw new Error(`Failed to fetch chat: ${error.message}`);
           }
           
           if (data) {
@@ -114,7 +120,7 @@ const Index = () => {
             let formattedMessages: Message[] = [];
             
             if (data.messages) {
-              // Handle array format
+              // Handle different formats of messages from Supabase
               if (Array.isArray(data.messages)) {
                 formattedMessages = data.messages.map((msg: any) => ({
                   ...msg,
@@ -135,23 +141,38 @@ const Index = () => {
                 }
               } 
               // Handle JSONB format from Supabase
-              else {
-                formattedMessages = Object.values(data.messages).map((msg: any) => ({
-                  ...msg,
-                  timestamp: new Date(msg.timestamp)
-                }));
+              else if (typeof data.messages === 'object') {
+                // Try to extract values if it's a JSONB object
+                if (Object.values(data.messages).length > 0) {
+                  formattedMessages = Object.values(data.messages).map((msg: any) => ({
+                    ...msg,
+                    timestamp: new Date(msg.timestamp)
+                  }));
+                }
               }
               
-              setMessages(formattedMessages);
+              console.log("Formatted messages from Supabase:", formattedMessages);
               
-              // If this chat had a project ID, restore it
-              const projectMsg = formattedMessages.find((msg: Message) => msg.metadata?.projectId);
-              if (projectMsg && projectMsg.metadata?.projectId) {
-                setCurrentProjectId(projectMsg.metadata.projectId);
+              if (formattedMessages.length > 0) {
+                setMessages(formattedMessages);
+                
+                // If this chat had a project ID, restore it
+                const projectMsg = formattedMessages.find((msg: Message) => msg.metadata?.projectId);
+                if (projectMsg && projectMsg.metadata?.projectId) {
+                  setCurrentProjectId(projectMsg.metadata.projectId);
+                }
+                
+                return; // Successfully loaded from Supabase
+              } else {
+                // Create placeholder messages if formatting failed
+                createPlaceholderMessages(data.title);
               }
-              
-              return; // Successfully loaded from Supabase
+            } else {
+              // Create placeholder messages if no messages found
+              createPlaceholderMessages(data.title);
             }
+          } else {
+            throw new Error("No chat found with that ID in Supabase");
           }
         } catch (supabaseError) {
           console.error("Error in Supabase chat retrieval:", supabaseError);
@@ -203,31 +224,21 @@ const Index = () => {
           timestamp: new Date(msg.timestamp)
         }));
         
-        setMessages(formattedMessages);
-        
-        // If this chat had a project ID, restore it
-        const projectMsg = formattedMessages.find((msg: Message) => msg.metadata?.projectId);
-        if (projectMsg && projectMsg.metadata?.projectId) {
-          setCurrentProjectId(projectMsg.metadata.projectId);
+        if (formattedMessages.length > 0) {
+          setMessages(formattedMessages);
+          
+          // If this chat had a project ID, restore it
+          const projectMsg = formattedMessages.find((msg: Message) => msg.metadata?.projectId);
+          if (projectMsg && projectMsg.metadata?.projectId) {
+            setCurrentProjectId(projectMsg.metadata.projectId);
+          }
+        } else {
+          // Create placeholder messages if no valid messages found
+          createPlaceholderMessages(selectedChat.title);
         }
       } else {
-        // Fallback to creating placeholder messages if no saved messages
-        console.log("No stored messages found, creating placeholder messages");
-        const userMessage: Message = {
-          id: "user-" + Date.now().toString(),
-          role: "user",
-          content: selectedChat.title,
-          timestamp: new Date(Date.now() - 3600000) // 1 hour ago
-        };
-        
-        const assistantMessage: Message = {
-          id: "assistant-" + Date.now().toString(),
-          role: "assistant",
-          content: `This is a previous conversation about "${selectedChat.title}". I'm here to continue helping you with this topic.`,
-          timestamp: new Date(Date.now() - 3500000) // A bit less than 1 hour ago
-        };
-        
-        setMessages([userMessage, assistantMessage]);
+        // Create placeholder messages if no saved messages
+        createPlaceholderMessages(selectedChat.title);
       }
     } catch (error) {
       console.error("Error loading chat history:", error);
@@ -236,8 +247,28 @@ const Index = () => {
         title: "Error",
         description: "Could not find the requested chat. Starting a new conversation.",
       });
-      navigate('/app');
+      navigate('/app', { replace: true });
     }
+  };
+
+  // Helper function to create placeholder messages for a chat
+  const createPlaceholderMessages = (chatTitle: string) => {
+    console.log("Creating placeholder messages for chat title:", chatTitle);
+    const userMessage: Message = {
+      id: "user-" + Date.now().toString(),
+      role: "user",
+      content: chatTitle,
+      timestamp: new Date(Date.now() - 3600000) // 1 hour ago
+    };
+    
+    const assistantMessage: Message = {
+      id: "assistant-" + Date.now().toString(),
+      role: "assistant",
+      content: `This is a previous conversation about "${chatTitle}". I'm here to continue helping you with this topic.`,
+      timestamp: new Date(Date.now() - 3500000) // A bit less than 1 hour ago
+    };
+    
+    setMessages([userMessage, assistantMessage]);
   };
 
   // Function to save the current conversation to chat history
@@ -724,6 +755,14 @@ If you were trying to generate an app, this might be due to limits with our AI m
                   </p>
                   <p className="text-xs text-red-600 mt-1">
                     Try refreshing the page and using a simpler prompt.
+                  </p>
+                </div>
+              )}
+              
+              {chatLoadingAttempted && messages.length === 0 && (
+                <div className="px-4 py-3 mx-auto my-4 max-w-3xl bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-700">
+                    <strong>Couldn't find the requested chat.</strong> Starting a new conversation.
                   </p>
                 </div>
               )}
