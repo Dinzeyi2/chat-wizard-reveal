@@ -66,6 +66,74 @@ async function processInput(prompt: string, maxTokens: number = 800): Promise<st
   return await summarizeWithOpenAI(prompt);
 }
 
+// Function to get app design using Perplexity API
+async function getDesignWithPerplexity(prompt: string): Promise<any> {
+  // Get the Perplexity API key from environment variables
+  const perplexityApiKey = Deno.env.get("PERPLEXITY_API_KEY");
+  if (!perplexityApiKey) {
+    console.error("Perplexity API key not configured");
+    throw new Error("Perplexity API key not configured");
+  }
+  
+  console.log("Calling Perplexity API to get application design");
+  
+  const response = await fetch("https://api.perplexity.ai/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${perplexityApiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "llama-3.1-sonar-small-128k-online",
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert software architect who designs modern web applications. 
+                   You create detailed, well-structured application designs based on user requests.
+                   Focus on clarity, modern best practices, and a comprehensive understanding of the requirements.`
+        },
+        {
+          role: "user",
+          content: `Design a modern web application based on this request: "${prompt}"
+                   
+                   Provide your response in the following JSON format:
+                   {
+                     "projectName": "name-of-project",
+                     "description": "Detailed description of the application",
+                     "features": ["Feature 1", "Feature 2", "..."],
+                     "techStack": ["React", "Tailwind CSS", "..."],
+                     "mainComponents": ["Component1", "Component2", "..."],
+                     "dataStructure": "Description of how data should be structured"
+                   }`
+        }
+      ],
+      temperature: 0.6,
+      max_tokens: 1000
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Perplexity API error (${response.status}): ${errorText}`);
+    throw new Error(`Perplexity API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const designText = data.choices[0].message.content;
+  
+  // Extract JSON from response
+  try {
+    // Try to find JSON block in the response
+    const jsonMatch = designText.match(/{[\s\S]*"projectName"[\s\S]*}/);
+    const jsonContent = jsonMatch ? jsonMatch[0] : designText;
+    
+    return JSON.parse(jsonContent);
+  } catch (error) {
+    console.error("Failed to parse Perplexity JSON response:", error);
+    throw new Error("Failed to parse application design");
+  }
+}
+
 serve(async (req) => {
   console.log("Generate app function called");
   
@@ -101,6 +169,20 @@ serve(async (req) => {
       });
     }
     
+    // Step 1: Get application design from Perplexity
+    let appDesign;
+    try {
+      console.log("Getting app design from Perplexity");
+      appDesign = await getDesignWithPerplexity(processedPrompt);
+      console.log("Successfully received app design from Perplexity:", appDesign.projectName);
+    } catch (error) {
+      console.error("Error getting app design from Perplexity:", error);
+      return new Response(JSON.stringify({ error: `Error getting app design: ${error.message}` }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
     const projectId = crypto.randomUUID();
 
     // Get the Gemini API key from environment variables
@@ -113,8 +195,8 @@ serve(async (req) => {
       });
     }
     
-    // Generate architecture using Gemini API instead of Claude
-    console.log("Calling Gemini API to generate application with intentional challenges");
+    // Step 2: Generate implementation with challenges using Gemini API
+    console.log("Calling Gemini API to generate application with intentional challenges based on Perplexity design");
     
     const geminiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent", {
       method: "POST",
@@ -126,7 +208,13 @@ serve(async (req) => {
         contents: [{
           parts: [{
             text: `You are an expert software engineer creating educational coding challenges for a learning platform. 
-            Please create an intentionally incomplete application based on the following prompt: "${processedPrompt}".
+            Please create an intentionally incomplete application based on the following design: 
+            
+            Project Name: ${appDesign.projectName}
+            Description: ${appDesign.description}
+            Features: ${JSON.stringify(appDesign.features || [])}
+            Tech Stack: ${JSON.stringify(appDesign.techStack || ["React", "JavaScript", "CSS"])}
+            Main Components: ${JSON.stringify(appDesign.mainComponents || [])}
             
             The application should have the following characteristics:
             - Completion Level: ${completionLevel}
@@ -137,8 +225,8 @@ serve(async (req) => {
             
             Format your response as a valid JSON object (without any markdown formatting) with the following structure:
             {
-              "projectName": "name-of-project",
-              "description": "Brief description of the application",
+              "projectName": "${appDesign.projectName}",
+              "description": "${appDesign.description}",
               "fileStructure": {
                 "src": {
                   "components": {
@@ -236,6 +324,13 @@ serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
+    }
+
+    // Merge Perplexity design info with Gemini implementation
+    // Use Perplexity data for high-level info if Gemini didn't provide it
+    if (appData) {
+      if (!appData.projectName) appData.projectName = appDesign.projectName;
+      if (!appData.description) appData.description = appDesign.description;
     }
 
     // Convert file structure to actual files
@@ -344,7 +439,7 @@ serve(async (req) => {
         userId = "00000000-0000-0000-0000-000000000000"; // Anonymous user
       }
       
-      // Store project in database
+      // Store project in database with both Perplexity design and Gemini implementation
       const response = await fetch(`${supabaseUrl}/rest/v1/app_projects`, {
         method: "POST",
         headers: {
@@ -362,7 +457,10 @@ serve(async (req) => {
             description: appData.description,
             files: files,
             challenges: appData.challenges || [],
-            explanation: appData.explanation || "Learn by fixing the issues in this application"
+            explanation: appData.explanation || "Learn by fixing the issues in this application",
+            designInfo: {
+              perplexityDesign: appDesign
+            }
           },
           creation_prompt: prompt,
           created_at: new Date().toISOString()
@@ -385,7 +483,10 @@ serve(async (req) => {
       description: appData.description,
       files: files,
       challenges: appData.challenges || [],
-      explanation: appData.explanation || "Learn by fixing the issues in this application"
+      explanation: appData.explanation || "Learn by fixing the issues in this application",
+      designInfo: {
+        perplexityDesign: appDesign
+      }
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
