@@ -27,7 +27,7 @@ const StepProgressDisplay: React.FC<StepProgressDisplayProps> = ({
     return stepProgress[stepId].status;
   };
   
-  const getDifficultyColor = (difficulty: string) => {
+  const getDifficultyColor = (difficulty?: string) => {
     switch (difficulty) {
       case 'beginner':
         return 'bg-green-100 text-green-800';
@@ -40,7 +40,7 @@ const StepProgressDisplay: React.FC<StepProgressDisplayProps> = ({
     }
   };
   
-  const getTypeIcon = (type: string) => {
+  const getTypeIcon = (type?: string) => {
     switch (type) {
       case 'frontend':
         return '🖌️';
@@ -110,12 +110,16 @@ const StepProgressDisplay: React.FC<StepProgressDisplayProps> = ({
                   <div className="flex justify-between items-start">
                     <h4 className="font-medium text-base">{step.name}</h4>
                     <div className="flex space-x-2">
-                      <Badge variant="outline" className={`text-xs ${getDifficultyColor(step.difficulty)}`}>
-                        {step.difficulty}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {getTypeIcon(step.type)} {step.type}
-                      </Badge>
+                      {step.difficulty && (
+                        <Badge variant="outline" className={`text-xs ${getDifficultyColor(step.difficulty)}`}>
+                          {step.difficulty}
+                        </Badge>
+                      )}
+                      {step.type && (
+                        <Badge variant="outline" className="text-xs">
+                          {getTypeIcon(step.type)} {step.type}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   
