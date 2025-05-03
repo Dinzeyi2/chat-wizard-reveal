@@ -123,6 +123,32 @@ const ChatHistory = () => {
     fetchChatHistory();
   }, []);
 
+  // Helper function to properly format app generation messages for display
+  const formatLastMessage = (message: any): string => {
+    if (!message) return "No messages";
+    
+    // Check if this is an app generation message
+    if (typeof message === 'object' && message.metadata?.projectId) {
+      return "App creation: " + (message.metadata?.projectName || "New application");
+    }
+    
+    // Handle string messages
+    if (typeof message === 'string') {
+      // Trim and limit length for display
+      return message.length > 60 ? message.substring(0, 60) + "..." : message;
+    }
+    
+    // Handle object messages with content property
+    if (typeof message === 'object' && message.content) {
+      const content = message.content;
+      // Remove markdown formatting
+      const plainText = content.replace(/\*\*/g, '').replace(/`/g, '').replace(/\n/g, ' ');
+      return plainText.length > 60 ? plainText.substring(0, 60) + "..." : plainText;
+    }
+    
+    return "No messages";
+  };
+
   const formatTimestamp = (timestamp: string) => {
     try {
       const date = new Date(timestamp);
@@ -302,6 +328,35 @@ const ChatHistory = () => {
     return 0;
   };
 
+  // Get last message from chat for display
+  const getLastMessage = (chat: ChatHistoryItem) => {
+    if (!chat.messages) return "No messages";
+    
+    try {
+      let messages;
+      if (Array.isArray(chat.messages)) {
+        messages = chat.messages;
+      } else if (typeof chat.messages === 'string') {
+        messages = JSON.parse(chat.messages);
+      } else if (typeof chat.messages === 'object') {
+        messages = Object.values(chat.messages);
+      } else {
+        return "No messages";
+      }
+      
+      if (!Array.isArray(messages) || messages.length === 0) {
+        return "No messages";
+      }
+      
+      // Get the last message
+      const lastMessage = messages[messages.length - 1];
+      return formatLastMessage(lastMessage);
+    } catch (e) {
+      console.error("Error parsing last message:", e);
+      return chat.last_message || "No messages";
+    }
+  };
+
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <div className="flex justify-between items-center mb-8">
@@ -356,7 +411,7 @@ const ChatHistory = () => {
               <div className="flex justify-between items-start">
                 <div>
                   <h2 className="font-medium text-gray-800">{chat.title}</h2>
-                  <p className="text-sm text-gray-500">{chat.last_message || "No messages"}</p>
+                  <p className="text-sm text-gray-500">{getLastMessage(chat)}</p>
                   <p className="text-xs text-gray-400 mt-1">
                     {getMessageCount(chat)} messages
                   </p>
