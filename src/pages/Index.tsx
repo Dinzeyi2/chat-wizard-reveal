@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -10,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Loader2 } from "lucide-react";
 import { ArtifactProvider, ArtifactLayout } from "@/components/artifact/ArtifactSystem";
 import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { UserProfileMenu } from "@/components/UserProfileMenu";
 import { v4 as uuidv4 } from 'uuid';
 
@@ -36,6 +35,7 @@ const Index = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Check for initial prompt from landing page
   useEffect(() => {
@@ -69,10 +69,14 @@ const Index = () => {
     checkAuth();
   }, []);
 
+  // Parse chat ID from URL if present
   useEffect(() => {
     // Parse chat ID from URL if present
     const searchParams = new URLSearchParams(location.search);
     const chatId = searchParams.get('chat');
+    
+    console.log("URL search params:", location.search);
+    console.log("Chat ID from URL:", chatId);
     
     if (chatId) {
       setCurrentChatId(chatId);
@@ -120,6 +124,27 @@ const Index = () => {
             }
             
             return;
+          } else if (data.messages && typeof data.messages === 'string') {
+            // Handle case where messages might be stored as a JSON string
+            try {
+              const parsedMessages = JSON.parse(data.messages);
+              const formattedMessages = parsedMessages.map((msg: any) => ({
+                ...msg,
+                timestamp: new Date(msg.timestamp)
+              }));
+              
+              setMessages(formattedMessages);
+              
+              // If this chat had a project ID, restore it
+              const projectMsg = formattedMessages.find((msg: Message) => msg.metadata?.projectId);
+              if (projectMsg && projectMsg.metadata?.projectId) {
+                setCurrentProjectId(projectMsg.metadata.projectId);
+              }
+              
+              return;
+            } catch (e) {
+              console.error("Error parsing messages from string:", e);
+            }
           }
         }
       }
@@ -131,12 +156,30 @@ const Index = () => {
       const selectedChat = localChatHistory.find((chat: ChatHistoryItem) => chat.id === chatId);
       
       if (selectedChat) {
+        console.log("Found chat in localStorage:", selectedChat);
         if (selectedChat.messages && selectedChat.messages.length > 0) {
           // Use stored message history if available
-          console.log("Loading saved conversation with", selectedChat.messages.length, "messages from localStorage");
+          console.log("Loading saved conversation with", 
+            Array.isArray(selectedChat.messages) ? selectedChat.messages.length : 
+            typeof selectedChat.messages === 'string' ? JSON.parse(selectedChat.messages).length : 0, 
+            "messages from localStorage");
+          
+          let messagesToUse;
+          if (Array.isArray(selectedChat.messages)) {
+            messagesToUse = selectedChat.messages;
+          } else if (typeof selectedChat.messages === 'string') {
+            try {
+              messagesToUse = JSON.parse(selectedChat.messages);
+            } catch (e) {
+              console.error("Error parsing messages string:", e);
+              messagesToUse = [];
+            }
+          } else {
+            messagesToUse = [];
+          }
           
           // Format dates in the messages
-          const formattedMessages = selectedChat.messages.map((msg: any) => ({
+          const formattedMessages = messagesToUse.map((msg: any) => ({
             ...msg,
             timestamp: new Date(msg.timestamp)
           }));
@@ -167,6 +210,14 @@ const Index = () => {
           
           setMessages([userMessage, assistantMessage]);
         }
+      } else {
+        console.error(`Chat with ID ${chatId} not found in localStorage or Supabase`);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Could not find the requested chat. Starting a new conversation.",
+        });
+        navigate('/app');
       }
     } catch (error) {
       console.error("Error loading chat history:", error);
