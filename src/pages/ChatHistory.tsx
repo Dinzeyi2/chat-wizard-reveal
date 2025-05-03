@@ -123,7 +123,7 @@ const ChatHistory = () => {
     fetchChatHistory();
   }, []);
 
-  // Helper function to properly format app generation messages for display
+  // Helper function to properly format all message types for display
   const formatLastMessage = (message: any): string => {
     if (!message) return "No messages";
     
@@ -330,7 +330,7 @@ const ChatHistory = () => {
 
   // Get last message from chat for display
   const getLastMessage = (chat: ChatHistoryItem) => {
-    if (!chat.messages) return "No messages";
+    if (!chat.messages) return chat.last_message || "No messages";
     
     try {
       let messages;
@@ -341,11 +341,11 @@ const ChatHistory = () => {
       } else if (typeof chat.messages === 'object') {
         messages = Object.values(chat.messages);
       } else {
-        return "No messages";
+        return chat.last_message || "No messages";
       }
       
       if (!Array.isArray(messages) || messages.length === 0) {
-        return "No messages";
+        return chat.last_message || "No messages";
       }
       
       // Get the last message

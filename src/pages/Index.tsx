@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -27,7 +26,7 @@ const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
-  const [isGeneratingApp, setIsGeneratingApp] = useState(false);
+  const [isGeneratingApp, setIsGeneratingApp] = useState<boolean>(false);
   const [generationDialog, setGenerationDialog] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
