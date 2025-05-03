@@ -94,6 +94,50 @@ export class StructuredAIGuide {
     return null;
   }
   
+  // Select next logical step for the user automatically
+  autoSelectNextStep(): ImplementationStep | null {
+    // First try to find a step that's already in progress
+    const inProgressStep = this.steps.find(
+      step => this.stepProgress[step.id].status === 'in_progress'
+    );
+    
+    if (inProgressStep) {
+      this.currentStep = inProgressStep;
+      return inProgressStep;
+    }
+    
+    // Next try to find a step that's not started and has no prerequisites
+    // or all prerequisites are completed
+    const availableStep = this.steps.find(step => {
+      const stepInfo = this.stepProgress[step.id];
+      
+      if (stepInfo.status === 'not_started') {
+        // Check prerequisites
+        if (!step.prerequisites || step.prerequisites.length === 0) {
+          return true;
+        }
+        
+        // Check if all prerequisites are completed
+        const allPrerequisitesMet = step.prerequisites.every(prereqId => {
+          const prereqStep = this.steps.find(s => s.id === prereqId);
+          return prereqStep && this.stepProgress[prereqId].status === 'completed';
+        });
+        
+        return allPrerequisitesMet;
+      }
+      
+      return false;
+    });
+    
+    if (availableStep) {
+      this.currentStep = availableStep;
+      this.stepProgress[availableStep.id].status = 'in_progress';
+      return availableStep;
+    }
+    
+    return null;
+  }
+  
   // Mark a step as complete
   completeStep(stepId: string): boolean {
     if (this.stepProgress[stepId]) {
@@ -134,6 +178,46 @@ ${this.steps
 `;
   }
   
+  // Generate first task message for AI to send to user
+  generateFirstTaskMessage(): string {
+    const step = this.autoSelectNextStep();
+    
+    if (!step) {
+      return "All tasks have been completed! Great job on finishing the project!";
+    }
+    
+    let message = `# Let's start building: ${this.projectName}\n\n`;
+    message += `I'll be guiding you through implementing this project step by step.\n\n`;
+    message += `## Your first task: ${step.name}\n\n`;
+    message += `${step.description}\n\n`;
+    
+    if (step.difficulty) {
+      message += `**Difficulty:** ${step.difficulty}\n`;
+    }
+    
+    if (step.type) {
+      message += `**Type:** ${step.type}\n`;
+    }
+    
+    if (step.filePaths && step.filePaths.length > 0) {
+      message += `\n**Files to work with:** ${step.filePaths.join(', ')}\n`;
+    }
+    
+    message += `\n**Expected outcome:** ${step.expectedOutcome}\n\n`;
+    
+    if (step.hints && step.hints.length > 0) {
+      message += `**Hints to help you:**\n`;
+      step.hints.forEach((hint, index) => {
+        message += `${index + 1}. ${hint}\n`;
+      });
+      message += '\n';
+    }
+    
+    message += `When you've completed this task, let me know and I'll check your implementation and provide guidance for the next step.`;
+    
+    return message;
+  }
+  
   // Handle user message and provide guidance
   processUserMessage(message: string): string {
     const lowerMessage = message.toLowerCase();
@@ -146,13 +230,34 @@ ${this.steps
       return this.getProjectOverview();
     }
     
+    // Check if user is indicating task completion
+    if (lowerMessage.includes('done') ||
+        lowerMessage.includes('completed') ||
+        lowerMessage.includes('finished') ||
+        (lowerMessage.includes('next') && lowerMessage.includes('task'))) {
+      
+      // Mark current step as complete if there is one
+      if (this.currentStep) {
+        this.completeStep(this.currentStep.id);
+        
+        // Select next task
+        const nextStep = this.autoSelectNextStep();
+        
+        if (nextStep) {
+          return `Great job completing the previous task!\n\n**Next task: ${nextStep.name}**\n\n${this.getStepGuidance(nextStep.id)}`;
+        } else {
+          return "Congratulations! You've completed all the tasks for this project!";
+        }
+      }
+    }
+    
     // If we have a current step, provide guidance for that step
     if (this.currentStep) {
       return this.getStepGuidance(this.currentStep.id);
     }
     
     // Default response if no specific context
-    return `I'm ready to help you implement features for ${this.projectName}. Please select a step to work on, and I'll provide specific guidance.`;
+    return `I'm ready to help you implement features for ${this.projectName}. Let me select a task for you to work on, and I'll provide specific guidance.`;
   }
   
   // Get detailed guidance for a specific step
@@ -160,7 +265,7 @@ ${this.steps
     const step = this.steps.find(s => s.id === stepId);
     
     if (!step) {
-      return "I couldn't find that step. Please select a valid step to work on.";
+      return "I couldn't find that step. Let me select another task for you to work on.";
     }
     
     let guidance = `## Let's implement: ${step.name}
@@ -210,7 +315,7 @@ ${step.description}
         break;
     }
     
-    guidance += `\nLet me know when you're ready to start coding, or if you need more specific help with any part of the implementation!`;
+    guidance += `\nI'm here to help if you have any questions. Just let me know when you're done with this task, and I'll check your implementation and provide guidance for the next step.`;
     
     return guidance;
   }

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { CheckSquare, Square } from "lucide-react";
+import { CheckSquare, Square, ArrowRight } from "lucide-react";
 import { ImplementationStep } from '@/utils/StructuredAIGuide';
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -11,7 +11,6 @@ interface StepProgressDisplayProps {
   steps: ImplementationStep[];
   currentStep: ImplementationStep | null;
   stepProgress: Record<string, any>;
-  onSelectStep: (step: ImplementationStep) => void;
   onCompleteStep: (stepId: string) => void;
 }
 
@@ -19,7 +18,6 @@ const StepProgressDisplay: React.FC<StepProgressDisplayProps> = ({
   steps,
   currentStep,
   stepProgress,
-  onSelectStep,
   onCompleteStep
 }) => {
   const { toast } = useToast();
@@ -75,67 +73,33 @@ const StepProgressDisplay: React.FC<StepProgressDisplayProps> = ({
     console.log("File validated:", file.name);
   };
   
-  // Enhanced handle work on step button click
-  const handleWorkOnStep = (step: ImplementationStep) => {
-    // First, call the original onSelectStep function
-    onSelectStep(step);
+  // Handle complete step
+  const handleCompleteStep = (step: ImplementationStep) => {
+    onCompleteStep(step.id);
     
-    // Show toast notification to indicate AI focus has changed
+    // Show toast notification to indicate task completion
     toast({
-      title: `Now focusing on: ${step.name}`,
-      description: `The AI will help you implement this step: ${step.description}`,
+      title: `Task completed: ${step.name}`,
+      description: `The AI will now provide your next task to implement`,
       duration: 3000,
     });
     
-    // Get related files for this step
-    const relatedFiles = step.filePaths || [];
-    
-    // Get prerequisites for this step if available
-    const prerequisites = step.prerequisites || [];
-    
-    // Get expected outcome for this step
-    const expectedOutcome = step.expectedOutcome || "Completing functionality as described";
-    
-    // Get hints for this step
-    const hints = step.hints || [];
-    
-    // Create a comprehensive AI message with all step details
+    // Create a comprehensive AI message with task completion
     const aiMessage = {
-      type: "focus_step",
+      type: "complete_step",
       step: {
         id: step.id,
-        name: step.name,
-        description: step.description,
-        difficulty: step.difficulty,
-        type: step.type,
-        relatedFiles: relatedFiles,
-        prerequisites: prerequisites,
-        expectedOutcome: expectedOutcome,
-        hints: hints,
-        status: getStepStatus(step.id)
+        name: step.name
       }
     };
     
-    // Log all the step information for the AI to use
-    console.log("AI FOCUS STEP:", JSON.stringify(aiMessage));
+    // Log the task completion for the AI to use
+    console.log("AI TASK COMPLETED:", JSON.stringify(aiMessage));
     
     // Simulate sending a message to the chat
-    // In a real implementation, this would add a message to the chat window
     const chatMessage = {
       sender: "system",
-      content: `You've selected to work on **${step.name}** (${step.type}, ${step.difficulty} level).
-      
-**What to implement:** ${step.description}
-
-${relatedFiles.length > 0 ? `**Related files:** ${relatedFiles.join(', ')}` : ''}
-
-${prerequisites.length > 0 ? `**Prerequisites:** ${prerequisites.join(', ')}` : ''}
-
-**Expected outcome:** ${expectedOutcome}
-
-${hints.length > 0 ? `**Hints to get started:**\n${hints.map((hint, i) => `${i+1}. ${hint}`).join('\n')}` : ''}
-
-Let's start coding! I'll guide you through the implementation. Ask me if you have any questions.`,
+      content: `Great job completing **${step.name}**! Let me check your implementation and provide the next task.`,
       timestamp: new Date().toISOString()
     };
     
@@ -144,9 +108,9 @@ Let's start coding! I'll guide you through the implementation. Ask me if you hav
   
   return (
     <div className="space-y-4 mt-4">
-      <h3 className="text-lg font-medium">Implementation Steps</h3>
+      <h3 className="text-lg font-medium">Implementation Progress</h3>
       <p className="text-sm text-gray-500 mb-4">
-        Select a step to work on or mark your progress as you implement each feature.
+        The AI is guiding you through implementing this project step by step.
       </p>
       
       <div className="space-y-3">
@@ -200,32 +164,21 @@ Let's start coding! I'll guide you through the implementation. Ask me if you hav
                       {status === 'completed' ? (
                         <span className="text-green-600">✓ Completed</span>
                       ) : status === 'in_progress' ? (
-                        <span className="text-blue-600">In progress...</span>
+                        <span className="text-blue-600">Current task assigned by AI</span>
                       ) : (
-                        <span>Not started</span>
+                        <span>Upcoming task</span>
                       )}
                     </div>
                     
                     <div className="flex space-x-2">
-                      {status !== 'completed' && (
-                        <Button
-                          variant={isActive ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => handleWorkOnStep(step)}
-                          className={`text-xs h-7 px-3 ${isActive ? 'bg-blue-600' : ''}`}
-                        >
-                          {isActive ? 'Currently Selected' : 'Work on This Step'}
-                        </Button>
-                      )}
-                      
                       {isActive && status === 'in_progress' && (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => onCompleteStep(step.id)}
+                          onClick={() => handleCompleteStep(step)}
                           className="text-xs h-7 px-3 border-green-500 text-green-600 hover:bg-green-50"
                         >
-                          Mark Complete
+                          I've completed this <ArrowRight className="ml-1 h-3 w-3" />
                         </Button>
                       )}
                     </div>

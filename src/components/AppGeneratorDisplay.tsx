@@ -130,15 +130,24 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
               });
               
               if (guide) {
+                // Let the AI automatically select the first step
+                const selectedStep = guide.autoSelectNextStep();
+                
+                // Generate the initial guidance message
+                const firstTaskMessage = guide.generateFirstTaskMessage();
+                
+                // Log this message to console for the AI to use
+                console.log("AI FIRST TASK:", firstTaskMessage);
+                
                 // Get available steps for the current challenge
                 const steps = guide.getChallengeSteps();
                 
                 // Update guidance state
                 setGuidanceState({
-                  currentStep: null,
-                  waitingForStepSelection: true,
+                  currentStep: selectedStep,
+                  waitingForStepSelection: false,
                   steps,
-                  stepProgress: {}
+                  stepProgress: guide.getStepProgress()
                 });
               }
             }
@@ -569,7 +578,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
       </div>
     );
   };
-
+  
   const getMainFeatures = () => {
     if (!appData) return [];
     
@@ -646,40 +655,46 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
       const guide = uiCodeGenerator.getStructuredGuide();
       if (guide) {
         // Update step progress
-        const message = `I've completed the ${guidanceState.currentStep?.name} step`;
-        const response = guide.processUserMessage(message);
+        const completeResult = guide.completeStep(stepId);
         
-        // Update local guidance state
-        setGuidanceState(prev => ({
-          ...prev,
-          currentStep: null,
-          waitingForStepSelection: true,
-          stepProgress: {
-            ...prev.stepProgress,
-            [stepId]: {
-              status: 'completed',
-              completedAt: new Date()
-            }
+        if (completeResult) {
+          // Auto-select next step
+          const nextStep = guide.autoSelectNextStep();
+          
+          // Update local guidance state
+          setGuidanceState(prev => ({
+            ...prev,
+            currentStep: nextStep,
+            stepProgress: guide.getStepProgress()
+          }));
+          
+          // Show toast based on whether there's another task
+          if (nextStep) {
+            // Generate next step guidance
+            const nextStepGuidance = guide.getStepGuidance(nextStep.id);
+            
+            // Log this for AI to use
+            console.log("AI NEXT TASK:", JSON.stringify({
+              stepId: nextStep.id,
+              guidance: nextStepGuidance
+            }));
+            
+            toast({
+              title: `Moving to next task: ${nextStep.name}`,
+              description: "The AI will guide you through the implementation",
+            });
+          } else {
+            // All steps completed
+            toast({
+              title: `All tasks completed!`,
+              description: "Congratulations on completing all project tasks!",
+            });
           }
-        }));
-        
-        // Check if all steps are complete
-        const allComplete = prev => 
-          guidanceState.steps.every(step => 
-            prev.stepProgress[step.id]?.status === 'completed'
-          );
-        
-        // Notify the user
-        toast({
-          title: `Step completed!`,
-          description: allComplete ? 
-            "All steps completed! Great job!" : 
-            "Choose another step to work on next",
-        });
+        }
       }
     }
   };
-
+  
   // If no app data could be extracted, show a simple message
   if (!appData) {
     return (
@@ -776,9 +791,9 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
       {/* Application Enhancements Section - Only show for new generations */}
       {!isModification && appData.challenges && appData.challenges.length > 0 && (
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-lg p-5">
-          <h4 className="text-lg font-semibold mb-3 text-blue-800">Complete Your Application</h4>
+          <h4 className="text-lg font-semibold mb-3 text-blue-800">AI-Guided Implementation</h4>
           <p className="text-sm text-blue-700 mb-4">
-            This application has intentional gaps designed for learning. Let's complete it step by step.
+            The AI will guide you through implementing this application step by step.
           </p>
 
           {guidanceState.steps.length > 0 && (
@@ -786,13 +801,12 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
               steps={guidanceState.steps}
               currentStep={guidanceState.currentStep}
               stepProgress={guidanceState.stepProgress}
-              onSelectStep={handleSelectStep}
               onCompleteStep={handleCompleteStep}
             />
           )}
           
           <div className="mt-4 text-sm text-blue-700">
-            <p>Each step helps you learn a specific part of software development. Ask me for guidance on your selected step!</p>
+            <p>Follow the AI's guidance in the chat. Complete each task and click "I've completed this" when done.</p>
           </div>
         </div>
       )}
