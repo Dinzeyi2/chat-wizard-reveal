@@ -5,6 +5,7 @@ import { CheckSquare, Square } from "lucide-react";
 import { ImplementationStep } from '@/utils/StructuredAIGuide';
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { useToast } from '@/components/ui/use-toast';
 
 interface StepProgressDisplayProps {
   steps: ImplementationStep[];
@@ -21,6 +22,8 @@ const StepProgressDisplay: React.FC<StepProgressDisplayProps> = ({
   onSelectStep,
   onCompleteStep
 }) => {
+  const { toast } = useToast();
+  
   // Helper function to get step status
   const getStepStatus = (stepId: string) => {
     if (!stepProgress[stepId]) return 'not_started';
@@ -70,6 +73,35 @@ const StepProgressDisplay: React.FC<StepProgressDisplayProps> = ({
     
     // Continue with file processing...
     console.log("File validated:", file.name);
+  };
+  
+  // Handle work on step button click
+  const handleWorkOnStep = (step: ImplementationStep) => {
+    // First, call the original onSelectStep function
+    onSelectStep(step);
+    
+    // Show toast notification to indicate AI focus has changed
+    toast({
+      title: `Now focusing on: ${step.name}`,
+      description: `The AI will help you implement this step: ${step.description}`,
+      duration: 3000,
+    });
+    
+    // Simulate sending a message to the AI
+    // In a real implementation, this would send a message through your AI messaging system
+    console.log("AI FOCUS STEP:", JSON.stringify({
+      type: "focus_step",
+      step: {
+        id: step.id,
+        name: step.name,
+        description: step.description,
+        difficulty: step.difficulty,
+        type: step.type
+      }
+    }));
+    
+    // This log will be visible in the console and can be used by the AI system
+    // to understand which step the user is working on
   };
   
   return (
@@ -141,7 +173,7 @@ const StepProgressDisplay: React.FC<StepProgressDisplayProps> = ({
                         <Button
                           variant={isActive ? "default" : "outline"}
                           size="sm"
-                          onClick={() => onSelectStep(step)}
+                          onClick={() => handleWorkOnStep(step)}
                           className={`text-xs h-7 px-3 ${isActive ? 'bg-blue-600' : ''}`}
                         >
                           {isActive ? 'Currently Selected' : 'Work on This Step'}
