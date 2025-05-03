@@ -15,9 +15,6 @@ import { useArtifact } from "./artifact/ArtifactSystem";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface GeneratedFile {
   path: string;
@@ -39,13 +36,6 @@ interface AppGeneratorDisplayProps {
   projectId?: string | null;
 }
 
-interface IssueOption {
-  id: string;
-  title: string;
-  description: string;
-  type: 'implementation' | 'bugfix' | 'feature';
-}
-
 const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, projectId: propProjectId }) => {
   const [isOpen, setIsOpen] = useState(false);
   const { openArtifact } = useArtifact();
@@ -53,30 +43,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [versionHistory, setVersionHistory] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const { toast } = useToast();
-  
-  // Common app issues that need addressing
-  const commonIssues: IssueOption[] = [
-    {
-      id: 'auth-implementation',
-      title: 'Implement Authentication',
-      description: 'Implement shadcn/ui design for sign-in, sign-up, and login functionality',
-      type: 'implementation'
-    },
-    {
-      id: 'profile-settings',
-      title: 'Set Up Profile Settings',
-      description: 'Create a page where users can manage their profile information',
-      type: 'feature'
-    },
-    {
-      id: 'ui-fixes',
-      title: 'Fix UI Issues',
-      description: 'Address styling and responsiveness issues in the generated application',
-      type: 'bugfix'
-    }
-  ];
   
   useEffect(() => {
     const extractAppData = (): GeneratedApp | null => {
@@ -288,16 +255,6 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
     return langMap[lang.toLowerCase()] || 'txt';
   };
 
-  // Function to handle issue selection
-  const handleIssueSelect = (issueId: string) => {
-    setSelectedIssue(issueId);
-    // Notify the user about their selection
-    toast({
-      title: "Option selected",
-      description: `You've selected: ${commonIssues.find(issue => issue.id === issueId)?.title}. Tell the assistant to begin implementation.`,
-    });
-  };
-
   // Enhanced version of formatExplanationText to completely remove all markdown symbols
   const formatExplanationText = (text: string) => {
     if (!text) return null;
@@ -465,164 +422,268 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
       toast({
         variant: "destructive",
         title: "Error opening code viewer",
-        description: "Failed to open the code viewer. Please try again."
+        description: "There was a problem displaying the code. Please try again."
       });
     }
   };
 
-  // Function to get the language from file path
-  const getLanguageFromPath = (path: string) => {
-    const extension = path.split('.').pop()?.toLowerCase() || '';
-    const extensionMap: Record<string, string> = {
-      'js': 'javascript',
-      'jsx': 'jsx',
-      'ts': 'typescript',
-      'tsx': 'tsx',
-      'md': 'markdown',
-      'html': 'html',
-      'css': 'css',
-      'json': 'json',
-      'py': 'python',
-      'rb': 'ruby'
-    };
-    
-    return extensionMap[extension] || 'plaintext';
+  const handleDownload = () => {
+    alert("Download functionality would be implemented here");
   };
 
-  // If no app data, don't render the component
+  const getLanguageFromPath = (path: string): string => {
+    const extension = path.split('.').pop()?.toLowerCase() || '';
+    const languageMap: Record<string, string> = {
+      'js': 'javascript',
+      'jsx': 'javascript',
+      'ts': 'typescript',
+      'tsx': 'typescript',
+      'css': 'css',
+      'scss': 'scss',
+      'html': 'html',
+      'json': 'json',
+      'md': 'markdown',
+    };
+    return languageMap[extension] || 'plaintext';
+  };
+
+  const generateSummary = () => {
+    if (!appData) return null;
+    
+    const fileTypes = appData.files
+      .map(file => file.path.split('.').pop()?.toLowerCase())
+      .filter((value, index, self) => value && self.indexOf(value) === index);
+    
+    const frontendFiles = appData.files.filter(file => 
+      file.path.includes('pages') || 
+      file.path.includes('components') || 
+      file.path.includes('.jsx') || 
+      file.path.includes('.tsx'));
+    
+    const backendFiles = appData.files.filter(file => 
+      file.path.includes('api') || 
+      file.path.includes('server') || 
+      file.path.includes('routes'));
+
+    return (
+      <div className="text-sm space-y-3">
+        <p className="text-base font-medium">{appData.description}</p>
+        
+        <div className="flex flex-wrap gap-2 my-2">
+          {appData.technologies?.map(tech => (
+            <Badge key={tech} variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100">{tech}</Badge>
+          ))}
+          {!appData.technologies && fileTypes.map(type => (
+            <Badge key={type} variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100">{type}</Badge>
+          ))}
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4 mt-3">
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <p className="font-medium text-gray-700">Frontend</p>
+            <p className="text-gray-600">{frontendFiles.length} files</p>
+          </div>
+          
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <p className="font-medium text-gray-700">Backend</p>
+            <p className="text-gray-600">{backendFiles.length > 0 ? `${backendFiles.length} files` : 'Frontend only'}</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const getMainFeatures = () => {
+    if (!appData) return [];
+    
+    const isEcommerce = 
+      appData.description.toLowerCase().includes('ecommerce') || 
+      appData.description.toLowerCase().includes('e-commerce') ||
+      appData.projectName.toLowerCase().includes('shop') ||
+      appData.projectName.toLowerCase().includes('store');
+      
+    if (isEcommerce) {
+      return [
+        "Product catalog with search and filtering",
+        "Shopping cart and checkout process",
+        "User authentication and profiles",
+        "Order management and payment processing"
+      ];
+    }
+    
+    return [
+      "User authentication",
+      "Interactive UI components",
+      "Data management",
+      "Responsive design"
+    ];
+  };
+
+  // If no app data could be extracted, show a simple message
   if (!appData) {
-    return null;
+    return (
+      <div className="my-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+        <p className="text-gray-600">Unable to extract application data. Click the button below to view any code that might be available.</p>
+        <Button 
+          variant="outline" 
+          className="mt-3" 
+          onClick={handleViewFullProject}
+        >
+          <Code className="mr-2 h-4 w-4" /> View Available Code
+        </Button>
+      </div>
+    );
   }
 
-  return (
-    <div className="my-4 border border-gray-200 rounded-lg">
-      <div className="p-4 bg-white rounded-t-lg">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Code className="w-4 h-4" /> {appData.projectName || "Generated Application"}
-        </h3>
-        <p className="text-sm text-gray-600 mt-1">{appData.description}</p>
-        
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={handleViewFullProject}>
-            <FileCode className="w-4 h-4 mr-1" /> View Code
-          </Button>
-          
-          <Button 
-            size="sm" 
-            variant="outline"
-            onClick={() => setShowVersionHistory(!showVersionHistory)}
-          >
-            <History className="w-4 h-4 mr-1" /> 
-            {showVersionHistory ? "Hide Version History" : "Show Version History"}
-          </Button>
-        </div>
+  // Detect if this is a modified app or an original generation
+  const isModification = message.content.toLowerCase().includes('modified') || 
+                        message.content.toLowerCase().includes('updated') || 
+                        message.content.toLowerCase().includes('changed') ||
+                        message.content.toLowerCase().includes("i've updated your app");
 
-        {showVersionHistory && (
-          <div className="mt-4 border border-gray-100 rounded p-3 bg-gray-50">
-            <h4 className="text-sm font-medium mb-2">Version History</h4>
-            {isLoadingHistory ? (
-              <div className="flex space-x-2 py-2">
-                <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "0ms" }}></div>
-                <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "150ms" }}></div>
-                <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "300ms" }}></div>
-              </div>
-            ) : versionHistory.length > 0 ? (
-              <ul className="space-y-2 max-h-64 overflow-y-auto text-sm">
-                {versionHistory.map((version) => (
-                  <li key={version.id} className="flex items-center justify-between border-b border-gray-100 pb-2">
+  return (
+    <div className="my-6 space-y-6">
+      <div>
+        <h3 className="text-xl font-semibold mb-2">
+          {isModification 
+            ? `Your app has been updated with the requested changes` 
+            : `I've generated a full-stack application: ${appData.projectName}`}
+        </h3>
+        <p className="text-gray-600">{isModification 
+          ? "The changes you requested have been applied to your existing application."
+          : appData.description}
+        </p>
+        
+        {appData.version && (
+          <div className="flex items-center gap-2 mt-2">
+            <Badge variant="outline" className="text-xs font-normal">
+              Version {appData.version}
+            </Badge>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 px-2 text-xs bg-gray-50 hover:bg-gray-100"
+              onClick={() => setShowVersionHistory(!showVersionHistory)}
+            >
+              <History className="h-3 w-3 mr-1" />
+              {showVersionHistory ? "Hide History" : "Version History"}
+            </Button>
+          </div>
+        )}
+      </div>
+      
+      {showVersionHistory && (
+        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+          <h4 className="font-medium mb-3">Version History</h4>
+          {isLoadingHistory ? (
+            <div className="flex items-center justify-center p-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+              <span className="ml-2 text-sm text-gray-500">Loading version history...</span>
+            </div>
+          ) : versionHistory.length === 0 ? (
+            <p className="text-sm text-gray-500 p-2">No version history available</p>
+          ) : (
+            <ScrollArea className="h-[250px]">
+              <div className="space-y-3">
+                {versionHistory.map((version, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-white rounded-md border border-gray-100">
                     <div>
-                      <span className="font-medium">Version {version.version}</span>
-                      <div className="text-xs text-gray-500">
-                        {new Date(version.created_at).toLocaleString()}
-                      </div>
+                      <p className="text-sm font-medium">Version {version.version}</p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(version.created_at).toLocaleDateString()} {new Date(version.created_at).toLocaleTimeString()}
+                      </p>
                       {version.modification_prompt && (
-                        <div className="text-xs italic mt-0.5 text-gray-600">
-                          "{version.modification_prompt.length > 50 
-                            ? version.modification_prompt.substring(0, 50) + "..." 
-                            : version.modification_prompt}"
-                        </div>
+                        <p className="text-xs text-gray-600 mt-1 italic max-w-[300px] truncate">"{version.modification_prompt}"</p>
                       )}
                     </div>
                     <Button 
+                      variant="secondary" 
                       size="sm" 
-                      variant="ghost" 
-                      className="text-xs h-7"
+                      className="h-8 ml-2"
                       onClick={() => handleRestoreVersion(version)}
                     >
                       Restore
                     </Button>
-                  </li>
+                  </div>
                 ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-gray-500">No version history available.</p>
-            )}
-          </div>
-        )}
-
-        {/* App Explanation Section */}
-        <Collapsible
-          open={isOpen}
-          onOpenChange={setIsOpen}
-          className="mt-4 border border-gray-100 rounded"
-        >
-          <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-2 bg-gray-50 rounded-t cursor-pointer hover:bg-gray-100">
-              <h4 className="text-sm font-medium">About this App</h4>
-              {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </div>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="p-3 text-sm space-y-2">
-            {appData.explanation ? (
-              <ScrollArea className="h-64 rounded-md border p-4">
-                {formatExplanationText(appData.explanation)}
-              </ScrollArea>
-            ) : (
-              <p className="text-gray-500">No additional information available for this application.</p>
-            )}
-          </CollapsibleContent>
-        </Collapsible>
-        
-        {/* New section: Common app improvement options */}
-        <div className="mt-6 mb-2">
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>App generation complete</AlertTitle>
-            <AlertDescription>
-              Your application needs some improvements. Choose an option below to get started:
-            </AlertDescription>
-          </Alert>
-          
-          <div className="grid gap-4 mt-4 md:grid-cols-3 sm:grid-cols-2 grid-cols-1">
-            {commonIssues.map((issue) => (
-              <Card 
-                key={issue.id} 
-                className={`cursor-pointer transition-all ${selectedIssue === issue.id ? 'border-primary ring-1 ring-primary' : 'hover:border-gray-300'}`}
-                onClick={() => handleIssueSelect(issue.id)}
-              >
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">{issue.title}</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <p className="text-sm text-muted-foreground">{issue.description}</p>
-                </CardContent>
-                <CardFooter className="pt-0">
-                  <Badge variant={selectedIssue === issue.id ? "default" : "outline"}>
-                    {selectedIssue === issue.id ? "Selected" : issue.type}
-                  </Badge>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
-          
-          {selectedIssue && (
-            <p className="mt-4 text-sm text-muted-foreground">
-              You've selected: <span className="font-medium">{commonIssues.find(i => i.id === selectedIssue)?.title}</span>. 
-              Tell the assistant to begin implementing this feature.
-            </p>
+              </div>
+            </ScrollArea>
           )}
         </div>
+      )}
+      
+      <div className="bg-white border border-gray-200 rounded-full shadow-sm p-4 flex items-center justify-between">
+        <div className="flex items-center">
+          <SquareDashed className="mr-3 h-5 w-5 text-gray-500" />
+          <span className="font-medium text-lg">{isModification ? "View updated code" : "View code"}</span>
+        </div>
+        <Button 
+          variant="default" 
+          size="sm" 
+          className="bg-blue-600 hover:bg-blue-700" 
+          onClick={() => {
+            console.log("View Code button clicked");
+            handleViewFullProject();
+          }}
+        >
+          View Code <ChevronRight className="h-4 w-4 ml-1" />
+        </Button>
       </div>
+      
+      {!isModification && (
+        <div className="space-y-4">
+          <h4 className="font-semibold">This application includes:</h4>
+          <ol className="list-decimal pl-6 space-y-2">
+            {appData.files.length > 0 && (
+              <li>
+                <span className="font-medium">{appData.files.length} files</span> organized in a structured project
+              </li>
+            )}
+            {appData.technologies && appData.technologies.length > 0 && (
+              <li>
+                <span className="font-medium">Technologies used:</span> {appData.technologies.join(', ')}
+              </li>
+            )}
+            <li>
+              <span className="font-medium">Main features:</span>
+              <ul className="list-disc pl-6 pt-1">
+                {getMainFeatures().map((feature, index) => (
+                  <li key={index}>{feature}</li>
+                ))}
+              </ul>
+            </li>
+          </ol>
+        </div>
+      )}
+      
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="explanation">
+          <AccordionTrigger className="px-5 py-3 hover:bg-gray-50">Application Details</AccordionTrigger>
+          <AccordionContent className="px-5 pb-4">
+            <div className="text-sm space-y-2">
+              {appData?.explanation ? (
+                formatExplanationText(appData.explanation)
+              ) : (
+                <div className="space-y-4">
+                  <p><strong>Architecture Overview:</strong> This {appData?.projectName || "generated"} application follows a modern web architecture with a clean separation of concerns.</p>
+                  
+                  <p><strong>Frontend:</strong> The UI is built with React components organized in a logical hierarchy, with pages for different views and reusable components for common elements.</p>
+                  
+                  <p><strong>Data Management:</strong> The application handles data through state management and API calls to backend services.</p>
+                  
+                  <h4 className="text-md font-semibold mt-4">Key Technical Features:</h4>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>React components for UI building blocks</li>
+                    <li>State management for application data</li>
+                    <li>API integration for data fetching</li>
+                    <li>Responsive design for all device sizes</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 };
