@@ -75,7 +75,7 @@ const StepProgressDisplay: React.FC<StepProgressDisplayProps> = ({
     console.log("File validated:", file.name);
   };
   
-  // Handle work on step button click
+  // Enhanced handle work on step button click
   const handleWorkOnStep = (step: ImplementationStep) => {
     // First, call the original onSelectStep function
     onSelectStep(step);
@@ -87,21 +87,59 @@ const StepProgressDisplay: React.FC<StepProgressDisplayProps> = ({
       duration: 3000,
     });
     
-    // Simulate sending a message to the AI
-    // In a real implementation, this would send a message through your AI messaging system
-    console.log("AI FOCUS STEP:", JSON.stringify({
+    // Get related files for this step
+    const relatedFiles = step.filePaths || [];
+    
+    // Get prerequisites for this step if available
+    const prerequisites = step.prerequisites || [];
+    
+    // Get expected outcome for this step
+    const expectedOutcome = step.expectedOutcome || "Completing functionality as described";
+    
+    // Get hints for this step
+    const hints = step.hints || [];
+    
+    // Create a comprehensive AI message with all step details
+    const aiMessage = {
       type: "focus_step",
       step: {
         id: step.id,
         name: step.name,
         description: step.description,
         difficulty: step.difficulty,
-        type: step.type
+        type: step.type,
+        relatedFiles: relatedFiles,
+        prerequisites: prerequisites,
+        expectedOutcome: expectedOutcome,
+        hints: hints,
+        status: getStepStatus(step.id)
       }
-    }));
+    };
     
-    // This log will be visible in the console and can be used by the AI system
-    // to understand which step the user is working on
+    // Log all the step information for the AI to use
+    console.log("AI FOCUS STEP:", JSON.stringify(aiMessage));
+    
+    // Simulate sending a message to the chat
+    // In a real implementation, this would add a message to the chat window
+    const chatMessage = {
+      sender: "system",
+      content: `You've selected to work on **${step.name}** (${step.type}, ${step.difficulty} level).
+      
+**What to implement:** ${step.description}
+
+${relatedFiles.length > 0 ? `**Related files:** ${relatedFiles.join(', ')}` : ''}
+
+${prerequisites.length > 0 ? `**Prerequisites:** ${prerequisites.join(', ')}` : ''}
+
+**Expected outcome:** ${expectedOutcome}
+
+${hints.length > 0 ? `**Hints to get started:**\n${hints.map((hint, i) => `${i+1}. ${hint}`).join('\n')}` : ''}
+
+Let's start coding! I'll guide you through the implementation. Ask me if you have any questions.`,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log("CHAT MESSAGE:", JSON.stringify(chatMessage));
   };
   
   return (
