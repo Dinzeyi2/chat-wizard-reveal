@@ -9,6 +9,7 @@ export interface ImplementationStep {
   prerequisites?: string[];
   expectedOutcome?: string;
   hints?: string[];
+  helpText?: string;
 }
 
 export class StructuredAIGuide {

@@ -140,12 +140,13 @@ export class UICodeGenerator {
       return null;
     }
     
-    const firstStep = this.structuredGuide.getFirstStep();
+    // Use autoSelectNextStep instead of getFirstStep
+    const firstStep = this.structuredGuide.autoSelectNextStep();
     if (!firstStep) {
       return null;
     }
     
-    this.structuredGuide.setCurrentStep(firstStep.id);
+    // No need to call setCurrentStep as autoSelectNextStep already sets it
     
     return `
 ## Let's Start Building! Your First Task
@@ -159,7 +160,7 @@ ${firstStep.description}
 
 ${firstStep.helpText || ''}
 
-**File(s) to modify:** ${firstStep.files?.join(', ') || 'Check the code to identify the issues'}
+**File(s) to modify:** ${firstStep.filePaths?.join(', ') || 'Check the code to identify the issues'}
 
 When you've completed this task, click the "I've completed this" button and I'll guide you to the next step.
     `;
