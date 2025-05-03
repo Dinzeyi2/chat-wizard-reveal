@@ -58,21 +58,6 @@ const StepProgressDisplay: React.FC<StepProgressDisplayProps> = ({
     }
   };
 
-  // File validation function for integration
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    // Check file type
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
-      return;
-    }
-    
-    // Continue with file processing...
-    console.log("File validated:", file.name);
-  };
-  
   // Handle complete step
   const handleCompleteStep = (step: ImplementationStep) => {
     onCompleteStep(step.id);
@@ -189,15 +174,6 @@ const StepProgressDisplay: React.FC<StepProgressDisplayProps> = ({
           );
         })}
       </div>
-      
-      {/* Hidden file input for demonstration purposes */}
-      <input 
-        type="file"
-        id="file-upload"
-        className="hidden"
-        accept="image/*"
-        onChange={handleFileChange}
-      />
     </div>
   );
 };
