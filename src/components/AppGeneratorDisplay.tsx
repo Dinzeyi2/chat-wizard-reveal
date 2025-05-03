@@ -15,6 +15,35 @@ import { useArtifact } from "./artifact/ArtifactSystem";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { UICodeGenerator } from "@/utils/UICodeGenerator";
+import { ImplementationStep } from "@/utils/StructuredAIGuide";
+import StepProgressDisplay from "./StepProgressDisplay";
+import { Card } from "@/components/ui/card";
+
+// Implementation enhancement options
+const enhancementOptions = [
+  {
+    id: "authentication",
+    title: "Authentication System",
+    description: "Add user registration, login, and profile management",
+    difficulty: "Intermediate",
+    icon: "🔐"
+  },
+  {
+    id: "profile-settings",
+    title: "Profile Settings",
+    description: "Implement profile customization and user preferences",
+    difficulty: "Beginner",
+    icon: "👤"
+  },
+  {
+    id: "ui-improvements",
+    title: "UI Enhancements",
+    description: "Improve the visual design and user experience",
+    difficulty: "Intermediate",
+    icon: "✨"
+  }
+];
 
 interface GeneratedFile {
   path: string;
@@ -29,6 +58,7 @@ interface GeneratedApp {
   technologies?: string[];
   projectId?: string;
   version?: number;
+  challenges?: any[];
 }
 
 interface AppGeneratorDisplayProps {
@@ -44,6 +74,29 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
   const [versionHistory, setVersionHistory] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const { toast } = useToast();
+  const [showEnhancementOptions, setShowEnhancementOptions] = useState(false);
+  const [selectedEnhancement, setSelectedEnhancement] = useState<string | null>(null);
+  const [guidanceState, setGuidanceState] = useState<{
+    currentStep: ImplementationStep | null;
+    waitingForStepSelection: boolean;
+    steps: ImplementationStep[];
+    stepProgress: Record<string, any>;
+  }>({
+    currentStep: null,
+    waitingForStepSelection: false,
+    steps: [],
+    stepProgress: {}
+  });
+  const [uiCodeGenerator, setUiCodeGenerator] = useState<UICodeGenerator | null>(null);
+  
+  useEffect(() => {
+    // Initialize the UICodeGenerator for guidance
+    if (!uiCodeGenerator) {
+      setUiCodeGenerator(new UICodeGenerator({
+        debug: true
+      }));
+    }
+  }, []);
   
   useEffect(() => {
     const extractAppData = (): GeneratedApp | null => {
@@ -67,6 +120,29 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
               projectId: propProjectId || jsonData.projectId || null
             };
             
+            // Initialize structured guidance if challenges are available
+            if (extractedData.challenges && extractedData.challenges.length > 0 && uiCodeGenerator) {
+              const guide = uiCodeGenerator.initializeStructuredGuide({
+                name: extractedData.projectName,
+                description: extractedData.description,
+                stack: extractedData.technologies?.join(", ") || "React",
+                challenges: extractedData.challenges
+              });
+              
+              if (guide) {
+                // Get available steps for the current challenge
+                const steps = guide.getChallengeSteps();
+                
+                // Update guidance state
+                setGuidanceState({
+                  currentStep: null,
+                  waitingForStepSelection: true,
+                  steps,
+                  stepProgress: {}
+                });
+              }
+            }
+            
             return extractedData;
           }
         }
@@ -85,7 +161,8 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
                 files: jsonData.files,
                 technologies: jsonData.technologies || [],
                 projectId: propProjectId || jsonData.projectId || null,
-                version: jsonData.version || 1
+                version: jsonData.version || 1,
+                challenges: jsonData.challenges || []
               };
             }
           } catch (e) {
@@ -101,7 +178,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
     };
     
     setAppData(extractAppData());
-  }, [message, propProjectId]);
+  }, [message, propProjectId, uiCodeGenerator]);
   
   useEffect(() => {
     // Load version history when project ID is available and when showVersionHistory becomes true
@@ -518,6 +595,90 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
       "Responsive design"
     ];
   };
+  
+  // Handle selection of enhancement option
+  const handleSelectEnhancement = (enhancementId: string) => {
+    setSelectedEnhancement(enhancementId);
+    setShowEnhancementOptions(false);
+    
+    // Notify the user about their selection
+    toast({
+      title: "Enhancement selected",
+      description: "Ask the AI to help you implement this feature",
+    });
+  };
+  
+  // Handle step selection
+  const handleSelectStep = (step: ImplementationStep) => {
+    if (uiCodeGenerator) {
+      const guide = uiCodeGenerator.getStructuredGuide();
+      if (guide) {
+        // Update step progress
+        const message = `I want to work on the ${step.name} step`;
+        const response = guide.processUserMessage(message);
+        
+        // Update local guidance state
+        setGuidanceState(prev => ({
+          ...prev,
+          currentStep: step,
+          waitingForStepSelection: false,
+          stepProgress: {
+            ...prev.stepProgress,
+            [step.id]: {
+              status: 'in_progress',
+              startedAt: new Date()
+            }
+          }
+        }));
+        
+        // Notify the user
+        toast({
+          title: `Working on: ${step.name}`,
+          description: "Ask the AI for guidance on implementing this step",
+        });
+      }
+    }
+  };
+  
+  // Handle marking a step as complete
+  const handleCompleteStep = (stepId: string) => {
+    if (uiCodeGenerator) {
+      const guide = uiCodeGenerator.getStructuredGuide();
+      if (guide) {
+        // Update step progress
+        const message = `I've completed the ${guidanceState.currentStep?.name} step`;
+        const response = guide.processUserMessage(message);
+        
+        // Update local guidance state
+        setGuidanceState(prev => ({
+          ...prev,
+          currentStep: null,
+          waitingForStepSelection: true,
+          stepProgress: {
+            ...prev.stepProgress,
+            [stepId]: {
+              status: 'completed',
+              completedAt: new Date()
+            }
+          }
+        }));
+        
+        // Check if all steps are complete
+        const allComplete = prev => 
+          guidanceState.steps.every(step => 
+            prev.stepProgress[step.id]?.status === 'completed'
+          );
+        
+        // Notify the user
+        toast({
+          title: `Step completed!`,
+          description: allComplete ? 
+            "All steps completed! Great job!" : 
+            "Choose another step to work on next",
+        });
+      }
+    }
+  };
 
   // If no app data could be extracted, show a simple message
   if (!appData) {
@@ -608,6 +769,70 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
                 ))}
               </div>
             </ScrollArea>
+          )}
+        </div>
+      )}
+      
+      {/* Application Enhancements Section - Only show for new generations */}
+      {!isModification && appData.challenges && appData.challenges.length > 0 && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-lg p-5">
+          <h4 className="text-lg font-semibold mb-3 text-blue-800">Complete Your Application</h4>
+          <p className="text-sm text-blue-700 mb-4">
+            This application has intentional gaps designed for learning. Let's complete it step by step.
+          </p>
+
+          {guidanceState.steps.length > 0 && (
+            <StepProgressDisplay 
+              steps={guidanceState.steps}
+              currentStep={guidanceState.currentStep}
+              stepProgress={guidanceState.stepProgress}
+              onSelectStep={handleSelectStep}
+              onCompleteStep={handleCompleteStep}
+            />
+          )}
+          
+          <div className="mt-4 text-sm text-blue-700">
+            <p>Each step helps you learn a specific part of software development. Ask me for guidance on your selected step!</p>
+          </div>
+        </div>
+      )}
+      
+      {/* Show enhancement options if there are no challenges or for modified apps */}
+      {(!appData.challenges || appData.challenges.length === 0 || isModification) && (
+        <div className="border border-blue-200 rounded-lg p-5 bg-blue-50">
+          <h4 className="text-lg font-semibold mb-2 text-blue-800">Enhance Your Application</h4>
+          <p className="text-sm text-blue-700 mb-4">What would you like to add to your application next?</p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {enhancementOptions.map((option) => (
+              <Card 
+                key={option.id}
+                className={`p-4 border hover:border-blue-300 cursor-pointer transition-all ${
+                  selectedEnhancement === option.id ? 'border-blue-400 bg-blue-100' : ''
+                }`}
+                onClick={() => handleSelectEnhancement(option.id)}
+              >
+                <div className="flex items-start">
+                  <div className="text-2xl mr-3">{option.icon}</div>
+                  <div>
+                    <h5 className="font-medium">{option.title}</h5>
+                    <p className="text-xs text-gray-600 mt-1">{option.description}</p>
+                    <Badge variant="outline" className="mt-2 text-xs">{option.difficulty}</Badge>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+          
+          {selectedEnhancement && (
+            <div className="mt-4 p-3 bg-white rounded-lg border border-blue-200">
+              <p className="text-sm">
+                <span className="font-medium">Next step:</span> Ask the AI to help you implement the selected feature in your application.
+              </p>
+              <div className="mt-2 text-xs text-gray-500">
+                Example: "Can you help me implement {enhancementOptions.find(o => o.id === selectedEnhancement)?.title} in my app?"
+              </div>
+            </div>
           )}
         </div>
       )}
