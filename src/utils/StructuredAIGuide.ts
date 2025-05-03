@@ -1,559 +1,322 @@
-export interface Challenge {
-  id: string;
-  title: string;
-  description: string;
-  featureName: string;
-  difficulty: string;
-  type: string;
-  filesPaths: string[];
-  completed: boolean;
-  hints: string[];
-}
 
 export interface ImplementationStep {
   id: string;
-  title: string;
-  description: string;
-  completed: boolean;
-  challengeId: string;
-  filesPaths: string[];
-  concepts?: string[];
-  expectedDuration?: string;
-  taskInstructions?: string;
-  codeExample?: string;
-}
-
-export interface ProjectData {
   name: string;
   description: string;
-  stack: string;
-  challenges: Challenge[];
-  projectName?: string;
-}
-
-export interface ConversationMessage {
-  type: 'user' | 'guide' | 'codeSnippet' | 'hint';
-  content: string;
-  challengeId: string;
+  type?: string;
+  difficulty?: string;
+  filePaths?: string[];
+  prerequisites?: string[];
+  expectedOutcome?: string;
+  hints?: string[];
 }
 
 export class StructuredAIGuide {
-  private project: ProjectData;
-  private currentChallengeIndex: number;
-  private conversationHistory: ConversationMessage[];
-  private implementationSteps: ImplementationStep[];
-  private currentStepIndex: number;
-  
-  constructor(projectData: ProjectData) {
-    this.project = projectData;
-    this.currentChallengeIndex = 0;
-    this.conversationHistory = [];
+  private projectName: string;
+  private description: string;
+  private steps: ImplementationStep[];
+  private currentStep: ImplementationStep | null;
+  private stepProgress: Record<string, any>;
+
+  constructor(projectData: any) {
+    this.projectName = projectData.projectName || projectData.name || "Project";
+    this.description = projectData.description || "A coding project";
+    this.steps = projectData.challenges?.map((challenge: any) => this._convertChallengeToStep(challenge)) || [];
+    this.currentStep = null;
+    this.stepProgress = {};
     
-    // Generate implementation steps for all challenges
-    this.implementationSteps = this._generateImplementationSteps();
-    this.currentStepIndex = 0;
-  }
-  
-  /**
-   * Generate implementation steps for all challenges
-   */
-  private _generateImplementationSteps(): ImplementationStep[] {
-    const allSteps: ImplementationStep[] = [];
-    
-    this.project.challenges.forEach(challenge => {
-      // Generate 3-5 steps for each challenge based on its type
-      const stepsForChallenge = this._generateStepsForChallenge(challenge);
-      allSteps.push(...stepsForChallenge);
+    // Initialize step progress
+    this.steps.forEach(step => {
+      this.stepProgress[step.id] = {
+        status: 'not_started',
+        completionTime: null
+      };
     });
-    
-    return allSteps;
   }
   
-  /**
-   * Generate steps for a specific challenge
-   */
-  private _generateStepsForChallenge(challenge: Challenge): ImplementationStep[] {
-    const steps: ImplementationStep[] = [];
-    const baseId = challenge.id;
+  private _convertChallengeToStep(challenge: any): ImplementationStep {
+    return {
+      id: challenge.id || `step-${Math.random().toString(36).substr(2, 9)}`,
+      name: challenge.featureName || challenge.title || "Implementation Step",
+      description: challenge.description || "Implement this feature",
+      type: this._mapChallengeType(challenge.type),
+      difficulty: challenge.difficulty || "intermediate",
+      filePaths: challenge.filesPaths || [],
+      prerequisites: challenge.prerequisites || [],
+      expectedOutcome: challenge.expectedOutcome || `A working implementation of ${challenge.featureName || challenge.title}`,
+      hints: challenge.hints || []
+    };
+  }
+  
+  private _mapChallengeType(type: string): string {
+    if (!type) return "implementation";
     
-    // Common step patterns based on challenge type
-    if (challenge.type === 'implementation') {
-      steps.push(
-        {
-          id: `${baseId}-step-1`,
-          title: `Understand the ${challenge.featureName} Requirements`,
-          description: `Analyze what functionality the ${challenge.featureName} feature needs to provide and its user interactions.`,
-          completed: false,
-          challengeId: challenge.id,
-          filesPaths: challenge.filesPaths,
-          concepts: ["Requirements Analysis", "Feature Planning"],
-          expectedDuration: "10-15 minutes",
-          taskInstructions: `Review the code and documentation for the ${challenge.featureName} feature. Identify what functionality is missing and what user interactions need to be implemented.`
-        },
-        {
-          id: `${baseId}-step-2`,
-          title: `Build the ${challenge.featureName} UI Components`,
-          description: `Create the necessary React components for the ${challenge.featureName} feature.`,
-          completed: false,
-          challengeId: challenge.id,
-          filesPaths: challenge.filesPaths.filter(path => path.includes('components') || path.includes('.tsx')),
-          concepts: ["React Components", "JSX", "Tailwind CSS Styling"],
-          expectedDuration: "20-30 minutes",
-          taskInstructions: `Implement the UI components needed for the ${challenge.featureName} feature. Make sure to create any necessary inputs, buttons, and layout elements.`
-        },
-        {
-          id: `${baseId}-step-3`,
-          title: `Implement ${challenge.featureName} Logic`,
-          description: `Add the necessary state management and business logic for the ${challenge.featureName} feature.`,
-          completed: false,
-          challengeId: challenge.id,
-          filesPaths: challenge.filesPaths,
-          concepts: ["React Hooks", "State Management", "Event Handling"],
-          expectedDuration: "25-35 minutes",
-          taskInstructions: `Implement the business logic for the ${challenge.featureName} feature. This includes state management, event handlers, and any necessary data processing.`
-        },
-        {
-          id: `${baseId}-step-4`,
-          title: `Test and Refine ${challenge.featureName}`,
-          description: `Test the ${challenge.featureName} feature, fix any bugs, and refine the implementation.`,
-          completed: false,
-          challengeId: challenge.id,
-          filesPaths: challenge.filesPaths,
-          concepts: ["Debugging", "Testing", "Code Refinement"],
-          expectedDuration: "15-20 minutes",
-          taskInstructions: `Test the ${challenge.featureName} feature thoroughly. Identify and fix any bugs or issues. Refine the implementation to improve performance, user experience, and code quality.`
-        }
-      );
-    } else if (challenge.type === 'bugfix') {
-      steps.push(
-        {
-          id: `${baseId}-step-1`,
-          title: `Identify the Bug in ${challenge.featureName}`,
-          description: `Locate and understand the bug in the ${challenge.featureName} feature.`,
-          completed: false,
-          challengeId: challenge.id,
-          filesPaths: challenge.filesPaths,
-          concepts: ["Debugging", "Error Identification"],
-          expectedDuration: "10-15 minutes",
-          taskInstructions: `Review the code for the ${challenge.featureName} feature. Look for any error messages, unexpected behavior, or logical issues. Use console.log statements or the browser developer tools to help identify the problem.`
-        },
-        {
-          id: `${baseId}-step-2`,
-          title: `Fix the Bug in ${challenge.featureName}`,
-          description: `Implement a solution to fix the bug in the ${challenge.featureName} feature.`,
-          completed: false,
-          challengeId: challenge.id,
-          filesPaths: challenge.filesPaths,
-          concepts: ["Debugging", "Error Resolution", "Code Correction"],
-          expectedDuration: "15-25 minutes",
-          taskInstructions: `Implement a solution to fix the identified bug. Make sure to test your solution thoroughly to ensure it resolves the issue without creating new problems.`
-        },
-        {
-          id: `${baseId}-step-3`,
-          title: `Test and Verify ${challenge.featureName} Fix`,
-          description: `Test the ${challenge.featureName} feature to ensure the bug is fixed.`,
-          completed: false,
-          challengeId: challenge.id,
-          filesPaths: challenge.filesPaths,
-          concepts: ["Testing", "Verification", "Quality Assurance"],
-          expectedDuration: "10-15 minutes",
-          taskInstructions: `Test the ${challenge.featureName} feature thoroughly to verify that the bug is fixed. Check for any regressions or new issues that may have been introduced by your fix.`
-        }
-      );
-    } else if (challenge.type === 'feature') {
-      steps.push(
-        {
-          id: `${baseId}-step-1`,
-          title: `Plan ${challenge.featureName} Feature`,
-          description: `Plan the implementation of the ${challenge.featureName} feature.`,
-          completed: false,
-          challengeId: challenge.id,
-          filesPaths: challenge.filesPaths,
-          concepts: ["Feature Planning", "Design", "Architecture"],
-          expectedDuration: "15-20 minutes",
-          taskInstructions: `Plan how you will implement the ${challenge.featureName} feature. Consider what components you'll need, what state management will be required, and how the feature will integrate with the rest of the application.`
-        },
-        {
-          id: `${baseId}-step-2`,
-          title: `Implement ${challenge.featureName} UI`,
-          description: `Create the user interface for the ${challenge.featureName} feature.`,
-          completed: false,
-          challengeId: challenge.id,
-          filesPaths: challenge.filesPaths.filter(path => path.includes('components') || path.includes('.tsx')),
-          concepts: ["React Components", "JSX", "Tailwind CSS Styling"],
-          expectedDuration: "20-30 minutes",
-          taskInstructions: `Implement the UI components for the ${challenge.featureName} feature. Focus on creating a clean, intuitive interface that aligns with the rest of the application's design.`
-        },
-        {
-          id: `${baseId}-step-3`,
-          title: `Add ${challenge.featureName} Functionality`,
-          description: `Implement the core functionality for the ${challenge.featureName} feature.`,
-          completed: false,
-          challengeId: challenge.id,
-          filesPaths: challenge.filesPaths,
-          concepts: ["React Hooks", "State Management", "API Integration"],
-          expectedDuration: "25-35 minutes",
-          taskInstructions: `Implement the core functionality for the ${challenge.featureName} feature. This includes state management, event handlers, API calls, and any necessary data processing.`
-        },
-        {
-          id: `${baseId}-step-4`,
-          title: `Test and Optimize ${challenge.featureName}`,
-          description: `Test the ${challenge.featureName} feature and optimize its performance.`,
-          completed: false,
-          challengeId: challenge.id,
-          filesPaths: challenge.filesPaths,
-          concepts: ["Testing", "Performance Optimization", "Refinement"],
-          expectedDuration: "15-25 minutes",
-          taskInstructions: `Test the ${challenge.featureName} feature thoroughly. Optimize its performance and make any necessary refinements to improve the user experience.`
-        },
-        {
-          id: `${baseId}-step-5`,
-          title: `Document ${challenge.featureName} Feature`,
-          description: `Document how the ${challenge.featureName} feature works.`,
-          completed: false,
-          challengeId: challenge.id,
-          filesPaths: challenge.filesPaths,
-          concepts: ["Documentation", "Code Comments"],
-          expectedDuration: "10-15 minutes",
-          taskInstructions: `Add comments to your code explaining how the ${challenge.featureName} feature works. Consider adding a brief documentation section in the README or a separate documentation file.`
-        }
-      );
+    switch (type.toLowerCase()) {
+      case "frontend":
+      case "ui":
+        return "frontend";
+      case "backend":
+      case "api":
+        return "backend";
+      case "integration":
+        return "integration";
+      case "testing":
+        return "testing";
+      default:
+        return type;
     }
-    
-    // Default steps if none were added based on type
-    if (steps.length === 0) {
-      steps.push(
-        {
-          id: `${baseId}-step-1`,
-          title: `Understand the ${challenge.featureName} Challenge`,
-          description: `Analyze what needs to be done for the ${challenge.featureName} challenge.`,
-          completed: false,
-          challengeId: challenge.id,
-          filesPaths: challenge.filesPaths,
-          concepts: ["Analysis", "Planning"],
-          expectedDuration: "10-15 minutes",
-          taskInstructions: `Review the code and understand what needs to be done for the ${challenge.featureName} challenge.`
-        },
-        {
-          id: `${baseId}-step-2`,
-          title: `Implement ${challenge.featureName} Solution`,
-          description: `Implement a solution for the ${challenge.featureName} challenge.`,
-          completed: false,
-          challengeId: challenge.id,
-          filesPaths: challenge.filesPaths,
-          concepts: ["Implementation", "Coding", "Problem Solving"],
-          expectedDuration: "20-30 minutes",
-          taskInstructions: `Implement your solution for the ${challenge.featureName} challenge. Be sure to test it thoroughly.`
-        },
-        {
-          id: `${baseId}-step-3`,
-          title: `Review and Refine ${challenge.featureName}`,
-          description: `Review your solution for the ${challenge.featureName} challenge and refine it.`,
-          completed: false,
-          challengeId: challenge.id,
-          filesPaths: challenge.filesPaths,
-          concepts: ["Code Review", "Refinement"],
-          expectedDuration: "15-20 minutes",
-          taskInstructions: `Review your solution for the ${challenge.featureName} challenge. Look for ways to improve it, such as optimizing performance, enhancing readability, or adding additional features.`
-        }
-      );
-    }
-    
-    return steps;
   }
   
-  /**
-   * Get all implementation steps
-   */
-  getImplementationSteps(): ImplementationStep[] {
-    return this.implementationSteps;
+  // Get all steps for the project
+  getSteps(): ImplementationStep[] {
+    return this.steps;
   }
   
-  /**
-   * Get steps for a specific challenge
-   */
-  getStepsForChallenge(challengeId: string): ImplementationStep[] {
-    return this.implementationSteps.filter(step => step.challengeId === challengeId);
-  }
-  
-  /**
-   * Get all challenges
-   */
+  // Add the missing getChallengeSteps method that's being called in AppGeneratorDisplay.tsx
   getChallengeSteps(): ImplementationStep[] {
-    return this.implementationSteps;
+    return this.steps;
   }
   
-  /**
-   * Get current step
-   */
-  getCurrentStep(): ImplementationStep {
-    return this.implementationSteps[this.currentStepIndex];
-  }
-  
-  /**
-   * Mark a step as completed and move to the next step
-   */
-  completeStep(stepId: string): ImplementationStep | null {
-    // Find the step with the given ID
-    const stepIndex = this.implementationSteps.findIndex(step => step.id === stepId);
+  // Select a step to work on
+  selectStep(stepId: string): ImplementationStep | null {
+    const step = this.steps.find(s => s.id === stepId);
     
-    if (stepIndex !== -1) {
-      // Mark the step as completed
-      this.implementationSteps[stepIndex].completed = true;
+    if (step) {
+      this.currentStep = step;
       
-      // Find the next uncompleted step
-      for (let i = 0; i < this.implementationSteps.length; i++) {
-        if (!this.implementationSteps[i].completed) {
-          this.currentStepIndex = i;
-          return this.implementationSteps[i];
-        }
+      if (this.stepProgress[stepId].status === 'not_started') {
+        this.stepProgress[stepId].status = 'in_progress';
       }
       
-      // All steps are completed
-      return null;
+      return step;
     }
     
     return null;
   }
   
-  /**
-   * Generate the first task message for the user
-   */
-  generateFirstTaskMessage(): string {
-    const firstStep = this.implementationSteps[0];
+  // Select next logical step for the user automatically
+  autoSelectNextStep(): ImplementationStep | null {
+    // First try to find a step that's already in progress
+    const inProgressStep = this.steps.find(
+      step => this.stepProgress[step.id].status === 'in_progress'
+    );
     
-    if (firstStep) {
-      return `
-## Let's start with your first task: ${firstStep.title}
-
-${firstStep.description}
-
-**What you need to do:**
-${firstStep.taskInstructions}
-
-**Key concepts to understand:**
-${firstStep.concepts?.join(', ') || 'N/A'}
-
-**Relevant files:** 
-${firstStep.filesPaths.join('\n')}
-
-**Estimated time:** ${firstStep.expectedDuration}
-
-When you've completed this task, let me know and we'll move on to the next step.
-      `;
+    if (inProgressStep) {
+      this.currentStep = inProgressStep;
+      return inProgressStep;
     }
     
-    return "Let's get started with implementing this project! Please review the code and let me know if you have any questions.";
-  }
-  
-  getCurrentChallenge(): Challenge {
-    return this.project.challenges[this.currentChallengeIndex];
-  }
-  
-  getNextGuidanceMessage(): string {
-    const currentChallenge = this.getCurrentChallenge();
-    
-    // If this is the first message about this challenge
-    if (!this.conversationHistory.some(msg => msg.challengeId === currentChallenge.description)) {
-      const message = this._generateIntroMessage(currentChallenge);
-      this.conversationHistory.push({
-        type: 'guide',
-        content: message,
-        challengeId: currentChallenge.description
-      });
-      return message;
-    }
-    
-    // If we've already started discussing this challenge, provide a hint
-    const hintsGiven = this.conversationHistory
-      .filter(msg => msg.challengeId === currentChallenge.description && msg.type === 'hint')
-      .length;
-    
-    if (hintsGiven < currentChallenge.hints.length) {
-      const hint = currentChallenge.hints[hintsGiven];
-      const message = `Here's a hint: ${hint}`;
+    // Next try to find a step that's not started and has no prerequisites
+    // or all prerequisites are completed
+    const availableStep = this.steps.find(step => {
+      const stepInfo = this.stepProgress[step.id];
       
-      this.conversationHistory.push({
-        type: 'hint',
-        content: message,
-        challengeId: currentChallenge.description
-      });
+      if (stepInfo.status === 'not_started') {
+        // Check prerequisites
+        if (!step.prerequisites || step.prerequisites.length === 0) {
+          return true;
+        }
+        
+        // Check if all prerequisites are completed
+        const allPrerequisitesMet = step.prerequisites.every(prereqId => {
+          const prereqStep = this.steps.find(s => s.id === prereqId);
+          return prereqStep && this.stepProgress[prereqId].status === 'completed';
+        });
+        
+        return allPrerequisitesMet;
+      }
       
-      return message;
-    }
-    
-    // If we've given all the hints, provide encouragement
-    return "You're on the right track! Try implementing this solution and let me know if you encounter any specific issues.";
-  }
-  
-  private _generateIntroMessage(challenge: Challenge): string {
-    const messages = [
-      `Now let's work on implementing the ${challenge.description} feature for ${challenge.featureName}. This is an important part of the application that needs to be completed.`,
-      `I've noticed that the ${challenge.description} functionality is missing from the ${challenge.featureName} feature. Let's implement this together.`,
-      `Your next challenge is to add ${challenge.description} to the ${challenge.featureName} part of the application. This is a ${challenge.difficulty} level task.`,
-      `Let's make our application better by implementing ${challenge.description} for the ${challenge.featureName} feature. I'll guide you through this process.`
-    ];
-    
-    // Randomly select one of the introduction messages
-    const intro = messages[Math.floor(Math.random() * messages.length)];
-    
-    // Add specific context based on the challenge
-    let context = '';
-    
-    if (challenge.description.includes('profile image upload')) {
-      context = `\n\nI've created a button in the Profile component, but it currently just shows an alert when clicked. You'll need to implement both the frontend and backend components of this feature. The frontend should allow users to select an image file, while the backend needs to handle file uploads, storage, and updating the user's profile.`;
-    } else if (challenge.description.includes('Follow API')) {
-      context = `\n\nThe Follow button in the user profile currently doesn't do anything. You'll need to implement the API endpoints for following/unfollowing users and update the UI accordingly. This involves creating a Follow model to track relationships between users.`;
-    } else if (challenge.description.includes('password reset')) {
-      context = `\n\nThe authentication system is working for login and registration, but there's no way for users to reset their password if they forget it. You'll need to implement this functionality, including sending a reset token via email and creating a form for entering a new password.`;
-    } else if (challenge.description.includes('search')) {
-      context = `\n\nThe application needs a search feature to find content. You'll need to implement both the frontend UI for entering search queries and the backend API for processing those queries and returning relevant results.`;
-    } else {
-      context = `\n\nTake a look at the existing code to understand how this feature should fit into the application. I've provided some structure, but you'll need to fill in the missing functionality.`;
-    }
-    
-    // Add call to action
-    const callToAction = `\n\nWould you like to start with the frontend or backend implementation? Or do you need more information about this challenge?`;
-    
-    return intro + context + callToAction;
-  }
-  
-  processUserMessage(message: string): string {
-    // Add user message to conversation history
-    this.conversationHistory.push({
-      type: 'user',
-      content: message,
-      challengeId: this.getCurrentChallenge().description
+      return false;
     });
     
-    // Check if the message indicates the challenge is complete
-    if (this._isChallengeSolutionMessage(message)) {
-      // Mark current challenge as complete
-      this.project.challenges[this.currentChallengeIndex].completed = true;
+    if (availableStep) {
+      this.currentStep = availableStep;
+      this.stepProgress[availableStep.id].status = 'in_progress';
+      return availableStep;
+    }
+    
+    return null;
+  }
+  
+  // Mark a step as complete
+  completeStep(stepId: string): boolean {
+    if (this.stepProgress[stepId]) {
+      this.stepProgress[stepId].status = 'completed';
+      this.stepProgress[stepId].completionTime = new Date().toISOString();
+      return true;
+    }
+    
+    return false;
+  }
+  
+  // Get current step
+  getCurrentStep(): ImplementationStep | null {
+    return this.currentStep;
+  }
+  
+  // Get progress information
+  getStepProgress(): Record<string, any> {
+    return this.stepProgress;
+  }
+  
+  // Get project overview
+  getProjectOverview(): string {
+    const completedSteps = Object.values(this.stepProgress).filter(p => p.status === 'completed').length;
+    
+    return `
+# ${this.projectName}
+
+${this.description}
+
+Progress: ${completedSteps}/${this.steps.length} steps completed
+
+## Remaining Steps:
+${this.steps
+  .filter(step => this.stepProgress[step.id].status !== 'completed')
+  .map(step => `- ${step.name}: ${step.description}`)
+  .join('\n')}
+`;
+  }
+  
+  // Generate first task message for AI to send to user
+  generateFirstTaskMessage(): string {
+    const step = this.autoSelectNextStep();
+    
+    if (!step) {
+      return "All tasks have been completed! Great job on finishing the project!";
+    }
+    
+    let message = `# Let's start building: ${this.projectName}\n\n`;
+    message += `I'll be guiding you through implementing this project step by step.\n\n`;
+    message += `## Your first task: ${step.name}\n\n`;
+    message += `${step.description}\n\n`;
+    
+    if (step.difficulty) {
+      message += `**Difficulty:** ${step.difficulty}\n`;
+    }
+    
+    if (step.type) {
+      message += `**Type:** ${step.type}\n`;
+    }
+    
+    if (step.filePaths && step.filePaths.length > 0) {
+      message += `\n**Files to work with:** ${step.filePaths.join(', ')}\n`;
+    }
+    
+    message += `\n**Expected outcome:** ${step.expectedOutcome}\n\n`;
+    
+    if (step.hints && step.hints.length > 0) {
+      message += `**Hints to help you:**\n`;
+      step.hints.forEach((hint, index) => {
+        message += `${index + 1}. ${hint}\n`;
+      });
+      message += '\n';
+    }
+    
+    message += `When you've completed this task, let me know and I'll check your implementation and provide guidance for the next step.`;
+    
+    return message;
+  }
+  
+  // Handle user message and provide guidance
+  processUserMessage(message: string): string {
+    const lowerMessage = message.toLowerCase();
+    
+    // Check for progress inquiry
+    if (lowerMessage.includes('progress') || 
+        lowerMessage.includes('steps left') || 
+        lowerMessage.includes('remaining') || 
+        lowerMessage.includes('overview')) {
+      return this.getProjectOverview();
+    }
+    
+    // Check if user is indicating task completion
+    if (lowerMessage.includes('done') ||
+        lowerMessage.includes('completed') ||
+        lowerMessage.includes('finished') ||
+        (lowerMessage.includes('next') && lowerMessage.includes('task'))) {
       
-      // Move to the next challenge
-      if (this.currentChallengeIndex < this.project.challenges.length - 1) {
-        this.currentChallengeIndex++;
-        return this._generateCompletionMessage();
-      } else {
-        return this._generateAllChallengesCompletedMessage();
+      // Mark current step as complete if there is one
+      if (this.currentStep) {
+        this.completeStep(this.currentStep.id);
+        
+        // Select next task
+        const nextStep = this.autoSelectNextStep();
+        
+        if (nextStep) {
+          return `Great job completing the previous task!\n\n**Next task: ${nextStep.name}**\n\n${this.getStepGuidance(nextStep.id)}`;
+        } else {
+          return "Congratulations! You've completed all the tasks for this project!";
+        }
       }
     }
     
-    // Analyze the message to determine the appropriate response
-    if (this._isAskingForHelp(message)) {
-      return this.getNextGuidanceMessage();
-    } else if (this._isAskingForCode(message)) {
-      return this._provideCodeSnippet();
-    } else {
-      // General encouragement
-      return this._generateEncouragementMessage();
-    }
-  }
-  
-  private _isChallengeSolutionMessage(message: string): boolean {
-    const lowerMessage = message.toLowerCase();
-    const completionPhrases = [
-      "i've completed", "i have completed", "finished implementing", 
-      "done implementing", "implemented the feature", "feature is working",
-      "it's working now", "it works now", "completed the challenge"
-    ];
-    
-    return completionPhrases.some(phrase => lowerMessage.includes(phrase));
-  }
-  
-  private _isAskingForHelp(message: string): boolean {
-    const lowerMessage = message.toLowerCase();
-    const helpPhrases = [
-      "help", "hint", "stuck", "don't understand", "don't know how", 
-      "not sure", "guidance", "assist", "confused", "struggling"
-    ];
-    
-    return helpPhrases.some(phrase => lowerMessage.includes(phrase));
-  }
-  
-  private _isAskingForCode(message: string): boolean {
-    const lowerMessage = message.toLowerCase();
-    const codePhrases = [
-      "code example", "sample code", "example code", "how do i code", 
-      "show me the code", "code snippet", "implementation example"
-    ];
-    
-    return codePhrases.some(phrase => lowerMessage.includes(phrase));
-  }
-  
-  private _generateCompletionMessage(): string {
-    const completedChallenge = this.project.challenges[this.currentChallengeIndex - 1];
-    const nextChallenge = this.getCurrentChallenge();
-    
-    const messages = [
-      `Great job implementing the ${completedChallenge.description} feature! You've successfully completed this challenge.`,
-      `Excellent work on the ${completedChallenge.description} functionality! That's one challenge down.`,
-      `You've successfully implemented ${completedChallenge.description}! The application is getting better with each feature you add.`
-    ];
-    
-    const completion = messages[Math.floor(Math.random() * messages.length)];
-    
-    return `${completion}\n\nNow, let's move on to the next challenge: ${nextChallenge.description} for the ${nextChallenge.featureName} feature. This is a ${nextChallenge.difficulty} level task.\n\nWould you like to get started with this new challenge?`;
-  }
-  
-  private _generateAllChallengesCompletedMessage(): string {
-    return `Congratulations! You've completed all the challenges for this project. You've successfully built a functioning application with all the required features.\n\nYou've demonstrated your skills in implementing various aspects of a full-stack application, from user authentication to complex features like ${this.project.challenges[0].description} and ${this.project.challenges[this.project.challenges.length - 1].description}.\n\nWhat would you like to do next? You could:\n\n1. Add additional features to this project\n2. Optimize the existing code\n3. Start a new project with different challenges\n\nLet me know how you'd like to proceed!`;
-  }
-  
-  private _provideCodeSnippet(): string {
-    const challenge = this.getCurrentChallenge();
-    
-    // Add this interaction to conversation history
-    this.conversationHistory.push({
-      type: 'codeSnippet',
-      content: 'Code snippet provided',
-      challengeId: challenge.description
-    });
-    
-    // Based on the challenge type, provide appropriate code snippet
-    // This would be expanded with more code examples for different challenge types
-    if (challenge.description.includes('profile image upload')) {
-      return "Here's a code snippet for implementing profile image upload...";
-    } else if (challenge.description.includes('Follow API')) {
-      return "Here's a code snippet to help you implement the Follow API...";
+    // If we have a current step, provide guidance for that step
+    if (this.currentStep) {
+      return this.getStepGuidance(this.currentStep.id);
     }
     
-    return "Here's some sample code to help you with this challenge...";
+    // Default response if no specific context
+    return `I'm ready to help you implement features for ${this.projectName}. Let me select a task for you to work on, and I'll provide specific guidance.`;
   }
   
-  private _generateEncouragementMessage(): string {
-    const messages = [
-      "How's your implementation coming along? Remember to break down the problem into smaller steps.",
-      "That's a good approach! Keep going, and let me know if you run into any specific issues.",
-      "You're on the right track. Don't hesitate to ask if you need any hints or guidance.",
-      "Take your time with this challenge. It's important to understand each part of the implementation.",
-      "Looking forward to seeing your solution! Remember that there are often multiple valid ways to implement a feature."
-    ];
+  // Get detailed guidance for a specific step
+  getStepGuidance(stepId: string): string {
+    const step = this.steps.find(s => s.id === stepId);
     
-    return messages[Math.floor(Math.random() * messages.length)];
-  }
-  
-  getProjectOverview(): string {
-    const completedChallenges = this.project.challenges.filter(c => c.completed).length;
-    const totalChallenges = this.project.challenges.length;
+    if (!step) {
+      return "I couldn't find that step. Let me select another task for you to work on.";
+    }
     
-    const projectName = this.project.name || this.project.projectName || "Code Challenge";
-    const description = this.project.description || "A coding challenge project";
-    const stack = this.project.stack || "Full Stack";
+    let guidance = `## Let's implement: ${step.name}
     
-    const overview = `
-Project: ${projectName}
-Description: ${description}
-Stack: ${stack}
-Progress: ${completedChallenges}/${totalChallenges} challenges completed
+${step.description}
 
-Current Challenges:
-${this.project.challenges.map((challenge, index) => 
-  `${index + 1}. ${challenge.description} (${challenge.featureName}) - ${challenge.completed ? '✅ Completed' : '⏳ In Progress'}`
-).join('\n')}
-    `;
+**Difficulty:** ${step.difficulty}
+**Type:** ${step.type}
+`;
+
+    if (step.filePaths && step.filePaths.length > 0) {
+      guidance += `\n**Files to work with:** ${step.filePaths.join(', ')}\n`;
+    }
+
+    if (step.hints && step.hints.length > 0) {
+      guidance += `\n**Hints:**\n${step.hints.map((hint, i) => `${i+1}. ${hint}`).join('\n')}\n`;
+    }
     
-    return overview;
+    // Add specific implementation guidance based on step type
+    switch (step.type) {
+      case 'frontend':
+        guidance += `
+### Implementation Steps:
+1. Create the UI components needed
+2. Add styling using Tailwind CSS
+3. Implement any required event handlers
+4. Connect the component to any data sources if needed
+`;
+        break;
+      case 'backend':
+        guidance += `
+### Implementation Steps:
+1. Design the API endpoints needed
+2. Implement the server-side logic
+3. Set up proper error handling
+4. Test the endpoints with sample requests
+`;
+        break;
+      case 'integration':
+        guidance += `
+### Implementation Steps:
+1. Make sure both frontend and backend pieces are working individually
+2. Connect the frontend to the backend API
+3. Handle loading states and errors properly
+4. Test the full flow end-to-end
+`;
+        break;
+    }
+    
+    guidance += `\nI'm here to help if you have any questions. Just let me know when you're done with this task, and I'll check your implementation and provide guidance for the next step.`;
+    
+    return guidance;
   }
 }

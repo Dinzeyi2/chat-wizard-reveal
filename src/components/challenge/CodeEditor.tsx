@@ -59,6 +59,27 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     }
   };
 
+  // File validation function - integrated from the code snippet
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+    
+    // Continue with file processing...
+    console.log("File validated for CodeEditor:", file.name);
+    
+    // You could add more processing here in a real implementation
+    toast({
+      title: "File Validated",
+      description: "The selected image file is valid and ready for upload."
+    });
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex justify-between items-center p-4 border-b">
@@ -99,6 +120,15 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
           </div>
         )}
       </div>
+
+      {/* Hidden file input for demonstration purposes */}
+      <input 
+        type="file"
+        id="code-file-upload"
+        className="hidden"
+        accept="image/*"
+        onChange={handleFileChange}
+      />
     </div>
   );
 };

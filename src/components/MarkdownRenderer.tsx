@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Message } from "@/types/chat";
 import AppGeneratorDisplay from "./AppGeneratorDisplay";
@@ -121,7 +122,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
     console.log("Rendering AppGeneratorDisplay for message:", message.id);
     return (
       <ArtifactProvider>
-        <AppGeneratorDisplay message={message} projectId={projectId} onSendMessage={undefined} />
+        <AppGeneratorDisplay message={message} projectId={projectId} />
       </ArtifactProvider>
     );
   }

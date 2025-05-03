@@ -1,4 +1,3 @@
-
 /**
  * GeminiCodeGenerator - Handles the generation of intentionally incomplete code challenges
  * This module integrates with the Gemini API to create incomplete applications
@@ -7,7 +6,8 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { Challenge, GeneratedProject } from "./projectTemplates";
-import { ChallengeGenerator, AIGuide } from "./ChallengeGenerator";
+import { ChallengeGenerator } from "./ChallengeGenerator";
+import { StructuredAIGuide } from "./StructuredAIGuide";
 
 interface GeminiCodeRequest {
   prompt: string;
@@ -41,7 +41,7 @@ export interface ChallengeResult {
   }[];
   explanation: string;
   error?: string;
-  guide?: AIGuide;
+  guide?: StructuredAIGuide;
 }
 
 export class GeminiCodeGenerator {
@@ -114,7 +114,7 @@ export class GeminiCodeGenerator {
       const generatedProject = this.challengeGenerator.generateProject(projectType, completionLevel);
       
       // Create an AI guide for the project
-      const guide = this.challengeGenerator.createGuideForProject(generatedProject);
+      const guide = new StructuredAIGuide(generatedProject);
       
       // Convert challenges to required format
       const challenges = generatedProject.challenges.map(challenge => ({
