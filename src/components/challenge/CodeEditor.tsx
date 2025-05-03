@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 
@@ -9,6 +9,7 @@ interface CodeEditorProps {
   filename: string | null;
   onSave?: () => void;
   readOnly?: boolean;
+  projectId?: string;
 }
 
 const CodeEditor: React.FC<CodeEditorProps> = ({
@@ -16,9 +17,24 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   onChange,
   filename,
   onSave,
-  readOnly = false
+  readOnly = false,
+  projectId
 }) => {
   const [analyzing, setAnalyzing] = useState(false);
+  const [sentGuidanceMessage, setSentGuidanceMessage] = useState(false);
+
+  useEffect(() => {
+    // When the component mounts and has a project ID but hasn't sent guidance yet
+    if (projectId && !sentGuidanceMessage && filename) {
+      // Send guidance message to console for the AI to pick up
+      console.log("AI_GUIDANCE_NEEDED:", JSON.stringify({
+        projectId,
+        filename,
+        action: "send_first_step"
+      }));
+      setSentGuidanceMessage(true);
+    }
+  }, [projectId, filename, sentGuidanceMessage]);
 
   // Function to analyze code
   const analyzeCode = async () => {
@@ -55,6 +71,15 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
         title: "File Saved",
         description: `${filename} has been saved successfully.`
       });
+    }
+
+    // Trigger guidance check after save
+    if (projectId) {
+      console.log("AI_CODE_SAVED:", JSON.stringify({
+        projectId,
+        filename,
+        action: "check_progress"
+      }));
     }
   };
 

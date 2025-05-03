@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -174,6 +173,34 @@ async function getDesignWithPerplexity(prompt: string): Promise<any> {
     console.log("Using default app design as fallback");
     return createDefaultAppDesign(prompt);
   }
+}
+
+// Function to prepare first step guidance
+function prepareFirstStepGuidance(appData: any): string {
+  // Get the first challenge from the generated app
+  if (!appData.challenges || appData.challenges.length === 0) {
+    return "Let's start by exploring the generated code to understand the application structure.";
+  }
+  
+  const firstChallenge = appData.challenges[0];
+  
+  let guidance = `
+## Let's Start Building! Your First Task
+
+I've created this application with some challenges for you to solve. Let's tackle them one by one!
+
+### First Task: ${firstChallenge.title}
+
+**What you need to do:**
+${firstChallenge.description}
+
+**Files to examine:** ${firstChallenge.filesPaths.join(', ')}
+
+Take a look at the code, find the issues marked with TODO comments, and make the necessary fixes.
+When you've completed this task, let me know and I'll guide you to the next challenge.
+  `;
+  
+  return guidance;
 }
 
 serve(async (req) => {
@@ -446,6 +473,9 @@ serve(async (req) => {
       });
     }
     
+    // Prepare first step guidance
+    const firstStepGuidance = prepareFirstStepGuidance(appData);
+    
     // Store the app data in the database
     try {
       const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -518,7 +548,7 @@ serve(async (req) => {
       console.error("Database error when storing app data:", dbError);
     }
 
-    // Return the generated app data to the client
+    // Return the generated app data to the client with first step guidance
     return new Response(JSON.stringify({
       projectId,
       projectName: appData.projectName,
@@ -528,7 +558,8 @@ serve(async (req) => {
       explanation: appData.explanation || "Learn by fixing the issues in this application",
       designInfo: {
         perplexityDesign: appDesign
-      }
+      },
+      firstStepGuidance: firstStepGuidance
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" }

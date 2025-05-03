@@ -5,7 +5,7 @@ import { CheckSquare, ArrowRight } from "lucide-react";
 import { ImplementationStep } from '@/utils/StructuredAIGuide';
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface StepProgressDisplayProps {
   steps: ImplementationStep[];

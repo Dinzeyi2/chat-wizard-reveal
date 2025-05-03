@@ -30,6 +30,7 @@ const Index = () => {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [firstStepGuidanceSent, setFirstStepGuidanceSent] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const location = useLocation();
@@ -314,6 +315,7 @@ const Index = () => {
   };
 
   useEffect(() => {
+    // Scroll to bottom when messages change
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
@@ -425,6 +427,25 @@ You can explore the file structure and content in the panel above. This is a sta
         // Save this conversation to chat history
         if (data && data.response) {
           saveToHistory(content, formattedResponse);
+        }
+
+        // If we have first step guidance, send it automatically after a small delay
+        if (appData.firstStepGuidance && !firstStepGuidanceSent) {
+          setTimeout(() => {
+            const guidanceMessage: Message = {
+              id: (Date.now() + 3).toString(),
+              role: "assistant",
+              content: appData.firstStepGuidance,
+              metadata: {
+                projectId: appData.projectId,
+                isGuidance: true
+              },
+              timestamp: new Date()
+            };
+            
+            setMessages(prev => [...prev, guidanceMessage]);
+            setFirstStepGuidanceSent(true);
+          }, 1500);
         }
       } catch (error) {
         console.error('Error calling function:', error);
@@ -584,9 +605,17 @@ If you were trying to generate an app, this might be due to limits with our AI m
     }
   };
 
+  // Automatic guidance system
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    // Check if we need to send a step completion message
+    const hasStepCompletionMessage = messages.some(msg => 
+      msg.content && msg.content.includes("I've completed this") && 
+      msg.role === "user"
+    );
+    
+    // If the user has completed a step, make sure firstStepGuidanceSent is true
+    if (hasStepCompletionMessage) {
+      setFirstStepGuidanceSent(true);
     }
   }, [messages]);
 

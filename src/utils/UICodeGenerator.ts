@@ -1,3 +1,4 @@
+
 /**
  * UI Code Generator - Main Integration
  * This module integrates the Perplexity AI Design Scraper with the Claude Code Customizer
@@ -54,6 +55,7 @@ export class UICodeGenerator {
   private customizer: ClaudeCodeCustomizer | null = null;
   private generationHistory: GenerationHistoryItem[];
   private structuredGuide: StructuredAIGuide | null = null;
+  private shouldSendFirstStepGuidance: boolean = true;
   
   constructor(config: UICodeGeneratorConfig = {}) {
     // Extract configuration
@@ -94,6 +96,7 @@ export class UICodeGenerator {
    */
   initializeStructuredGuide(projectData: any): StructuredAIGuide {
     this.structuredGuide = new StructuredAIGuide(projectData);
+    this.shouldSendFirstStepGuidance = true;
     return this.structuredGuide;
   }
   
@@ -113,6 +116,53 @@ export class UICodeGenerator {
     }
     
     return this.structuredGuide.processUserMessage(message);
+  }
+
+  /**
+   * Check if first step guidance should be sent
+   */
+  shouldSendFirstStepGuidance(): boolean {
+    return this.shouldSendFirstStepGuidance && this.structuredGuide !== null;
+  }
+
+  /**
+   * Mark first step guidance as sent
+   */
+  markFirstStepGuidanceSent(): void {
+    this.shouldSendFirstStepGuidance = false;
+  }
+
+  /**
+   * Get first step guidance message
+   */
+  getFirstStepGuidanceMessage(): string | null {
+    if (!this.structuredGuide) {
+      return null;
+    }
+    
+    const firstStep = this.structuredGuide.getFirstStep();
+    if (!firstStep) {
+      return null;
+    }
+    
+    this.structuredGuide.setCurrentStep(firstStep.id);
+    
+    return `
+## Let's Start Building! Your First Task
+
+I've created an application with some challenges for you to solve. Let's tackle them one by one!
+
+### First Task: ${firstStep.name}
+
+**What you need to do:**
+${firstStep.description}
+
+${firstStep.helpText || ''}
+
+**File(s) to modify:** ${firstStep.files?.join(', ') || 'Check the code to identify the issues'}
+
+When you've completed this task, click the "I've completed this" button and I'll guide you to the next step.
+    `;
   }
   
   /**
