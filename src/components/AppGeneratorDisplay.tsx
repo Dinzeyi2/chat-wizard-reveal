@@ -1,366 +1,941 @@
-
-import React, { useState, useEffect } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import CodeEditor from '@/components/challenge/CodeEditor';
-import { ChevronDownIcon, ChevronUpIcon, Code2Icon, PlayIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { StructuredAIGuide, ImplementationStep } from '@/utils/StructuredAIGuide';
-import { UICodeGenerator } from '@/utils/UICodeGenerator';
+import React, { useState, useEffect } from "react";
+import { Message } from "@/types/chat";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Download, FileCode, ChevronRight, ChevronDown, ShoppingBag, Code, SquareDashed, History } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { 
+  Accordion, 
+  AccordionContent, 
+  AccordionItem, 
+  AccordionTrigger 
+} from "@/components/ui/accordion";
+import { useArtifact } from "./artifact/ArtifactSystem";
+import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { UICodeGenerator } from "@/utils/UICodeGenerator";
+import { ImplementationStep } from "@/utils/StructuredAIGuide";
+import StepProgressDisplay from "./StepProgressDisplay";
 import { Card } from "@/components/ui/card";
 
-// Function to create a basic project structure from files array
-const createProjectStructure = (files: any[]) => {
-  const structure: any = {
-    files: {},
-    directories: {}
-  };
+// Implementation enhancement options
+const enhancementOptions = [
+  {
+    id: "authentication",
+    title: "Authentication System",
+    description: "Add user registration, login, and profile management",
+    difficulty: "Intermediate",
+    icon: "🔐"
+  },
+  {
+    id: "profile-settings",
+    title: "Profile Settings",
+    description: "Implement profile customization and user preferences",
+    difficulty: "Beginner",
+    icon: "👤"
+  },
+  {
+    id: "ui-improvements",
+    title: "UI Enhancements",
+    description: "Improve the visual design and user experience",
+    difficulty: "Intermediate",
+    icon: "✨"
+  }
+];
 
-  files.forEach(file => {
-    const pathParts = file.path.split('/');
-    const fileName = pathParts.pop();
-    let current = structure;
+interface GeneratedFile {
+  path: string;
+  content: string;
+}
 
-    pathParts.forEach(part => {
-      if (!current.directories[part]) {
-        current.directories[part] = {
-          files: {},
-          directories: {}
-        };
-      }
-      current = current.directories[part];
-    });
+interface GeneratedApp {
+  projectName: string;
+  description: string;
+  files: GeneratedFile[];
+  explanation?: string;
+  technologies?: string[];
+  projectId?: string;
+  version?: number;
+  challenges?: any[];
+}
 
-    current.files[fileName] = file.content;
-  });
+interface AppGeneratorDisplayProps {
+  message: Message;
+  projectId?: string | null;
+}
 
-  return structure;
-};
-
-const AppGeneratorDisplay = ({ appData, projectId }) => {
-  const [activeFile, setActiveFile] = useState('');
-  const [fileContent, setFileContent] = useState('');
-  const [projectStructure, setProjectStructure] = useState<any>(null);
-  const [isFileExplorerOpen, setIsFileExplorerOpen] = useState(true);
-  const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
-  const [activeTab, setActiveTab] = useState('files');
-  const [structuredGuide, setStructuredGuide] = useState<StructuredAIGuide | null>(null);
-  const [currentStep, setCurrentStep] = useState<ImplementationStep | null>(null);
-  const [stepProgress, setStepProgress] = useState<Record<string, any>>({});
-  const [uiCodeGenerator, setUICodeGenerator] = useState<UICodeGenerator | null>(null);
+const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, projectId: propProjectId }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const { openArtifact } = useArtifact();
+  const [appData, setAppData] = useState<GeneratedApp | null>(null);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [versionHistory, setVersionHistory] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const { toast } = useToast();
+  const [showEnhancementOptions, setShowEnhancementOptions] = useState(false);
+  const [selectedEnhancement, setSelectedEnhancement] = useState<string | null>(null);
+  const [guidanceState, setGuidanceState] = useState<{
+    currentStep: ImplementationStep | null;
+    steps: ImplementationStep[];
+    stepProgress: Record<string, any>;
+  }>({
+    currentStep: null,
+    steps: [],
+    stepProgress: {}
+  });
+  const [uiCodeGenerator, setUiCodeGenerator] = useState<UICodeGenerator | null>(null);
   
-  // Initialize structured guide
   useEffect(() => {
-    if (appData && !structuredGuide) {
+    // Initialize the UICodeGenerator for guidance
+    if (!uiCodeGenerator) {
+      setUiCodeGenerator(new UICodeGenerator({
+        debug: true
+      }));
+    }
+  }, []);
+  
+  useEffect(() => {
+    const extractAppData = (): GeneratedApp | null => {
       try {
-        const guide = new StructuredAIGuide(appData);
-        setStructuredGuide(guide);
+        // Primary extraction method: Try to find JSON data
+        const jsonRegex = /```json([\s\S]*?)```/;
+        const appDataMatch = message.content.match(jsonRegex);
         
-        // Initialize UI code generator
-        const generator = new UICodeGenerator();
-        generator.initializeStructuredGuide(appData);
-        setUICodeGenerator(generator);
-        
-        // Auto-select the first step
-        const firstStep = guide.autoSelectNextStep();
-        if (firstStep) {
-          setCurrentStep(firstStep);
+        if (appDataMatch && appDataMatch[1]) {
+          const jsonText = appDataMatch[1].trim();
+          const jsonData = JSON.parse(jsonText);
+          
+          if (jsonData && 
+              typeof jsonData.projectName === 'string' && 
+              typeof jsonData.description === 'string' && 
+              Array.isArray(jsonData.files)) {
+            
+            // Include the project ID if provided from props or found in JSON
+            const extractedData = {
+              ...jsonData,
+              projectId: propProjectId || jsonData.projectId || null
+            };
+            
+            // Initialize structured guidance if challenges are available
+            if (extractedData.challenges && extractedData.challenges.length > 0 && uiCodeGenerator) {
+              const guide = uiCodeGenerator.initializeStructuredGuide({
+                name: extractedData.projectName,
+                description: extractedData.description,
+                stack: extractedData.technologies?.join(", ") || "React",
+                challenges: extractedData.challenges
+              });
+              
+              if (guide) {
+                // Let the AI automatically select the first step
+                const selectedStep = guide.autoSelectNextStep();
+                
+                // Generate the initial guidance message
+                const firstTaskMessage = guide.generateFirstTaskMessage();
+                
+                // Log this message to console for the AI to use
+                console.log("AI FIRST TASK:", firstTaskMessage);
+                
+                // Get available steps for the current challenge
+                const steps = guide.getChallengeSteps();
+                
+                // Update guidance state
+                setGuidanceState({
+                  currentStep: selectedStep,
+                  steps,
+                  stepProgress: guide.getStepProgress()
+                });
+                
+                // Send automatic first task message
+                setTimeout(() => {
+                  // Simulate sending a message to the chat
+                  console.log("AUTO SENDING FIRST TASK:", firstTaskMessage);
+                }, 1000);
+              }
+            }
+            
+            return extractedData;
+          }
         }
         
-        // Initialize step progress
-        const initialProgress = {};
-        guide.getSteps().forEach(step => {
-          initialProgress[step.id] = guide.getStepProgress()[step.id];
-        });
-        setStepProgress(initialProgress);
-      } catch (error) {
-        console.error("Error initializing structured guide:", error);
-      }
-    }
-  }, [appData, structuredGuide]);
-
-  // Parse project structure from files
-  useEffect(() => {
-    if (appData && appData.files) {
-      const structure = createProjectStructure(appData.files);
-      setProjectStructure(structure);
-      
-      // Set first file as active by default
-      if (appData.files.length > 0) {
-        const firstFilePath = appData.files[0].path;
-        setActiveFile(firstFilePath);
-        setFileContent(appData.files[0].content);
-      }
-    }
-  }, [appData]);
-
-  // Handle file selection
-  const handleFileSelect = (filePath, content) => {
-    setActiveFile(filePath);
-    setFileContent(content);
-  };
-
-  // Handle completing a step
-  const handleCompleteStep = (stepId) => {
-    if (structuredGuide) {
-      structuredGuide.completeStep(stepId);
-      
-      // Update step progress
-      setStepProgress({...structuredGuide.getStepProgress()});
-      
-      // Select next step
-      const nextStep = structuredGuide.autoSelectNextStep();
-      if (nextStep) {
-        setCurrentStep(nextStep);
-      } else {
-        setCurrentStep(null);
-      }
-    }
-  };
-  
-  // Check if we should display the file browser
-  const shouldShowFileBrowser = projectStructure && (
-    Object.keys(projectStructure.files).length > 0 || 
-    Object.keys(projectStructure.directories).length > 0
-  );
-  
-  // Helper to render directory structure recursively
-  const renderDirectory = (directory, path = '', level = 0) => {
-    const fileEntries = Object.entries(directory.files || {});
-    const dirEntries = Object.entries(directory.directories || {});
-    
-    return (
-      <div className={`pl-${level * 4}`}>
-        {fileEntries.map(([fileName, content]) => {
-          const filePath = path ? `${path}/${fileName}` : fileName;
-          return (
-            <div 
-              key={filePath}
-              className={`cursor-pointer py-1 hover:bg-gray-100 px-2 rounded ${activeFile === filePath ? 'bg-blue-100' : ''}`}
-              onClick={() => handleFileSelect(filePath, content)}
-            >
-              <span className="text-xs font-mono flex items-center">
-                <Code2Icon size={12} className="mr-1 inline" />
-                {fileName}
-              </span>
-            </div>
-          );
-        })}
+        // Fallback method: try to find any JSON in the content
+        const anyJsonRegex = /{[\s\S]*?"files"[\s\S]*?}/;
+        const anyJsonMatch = message.content.match(anyJsonRegex);
         
-        {dirEntries.map(([dirName, subDir]) => {
-          const dirPath = path ? `${path}/${dirName}` : dirName;
-          return (
-            <div key={dirPath}>
-              <div className="flex items-center py-1 px-1">
-                <span className="text-xs font-medium">{dirName}</span>
+        if (anyJsonMatch) {
+          try {
+            const jsonData = JSON.parse(anyJsonMatch[0]);
+            if (jsonData && Array.isArray(jsonData.files)) {
+              return {
+                projectName: jsonData.projectName || "Generated Application",
+                description: jsonData.description || "Generated application files",
+                files: jsonData.files,
+                technologies: jsonData.technologies || [],
+                projectId: propProjectId || jsonData.projectId || null,
+                version: jsonData.version || 1,
+                challenges: jsonData.challenges || []
+              };
+            }
+          } catch (e) {
+            console.log("Failed to parse JSON in fallback method:", e);
+          }
+        }
+        
+        return null;
+      } catch (error) {
+        console.error("Failed to parse app data:", error);
+        return null;
+      }
+    };
+    
+    setAppData(extractAppData());
+  }, [message, propProjectId, uiCodeGenerator]);
+  
+  useEffect(() => {
+    // Load version history when project ID is available and when showVersionHistory becomes true
+    if (showVersionHistory && (appData?.projectId || propProjectId)) {
+      fetchVersionHistory();
+    }
+  }, [showVersionHistory, appData?.projectId, propProjectId]);
+
+  // Function to fetch version history from Supabase
+  const fetchVersionHistory = async () => {
+    try {
+      setIsLoadingHistory(true);
+      const projectId = appData?.projectId || propProjectId;
+      
+      if (!projectId) {
+        console.error("No project ID available to fetch history");
+        return;
+      }
+      
+      console.log("Fetching version history for project:", projectId);
+      
+      // Fetch all versions of this project
+      const { data: versions, error } = await supabase
+        .from('app_projects')
+        .select('*')
+        .eq('id', projectId)
+        .order('version', { ascending: false });
+      
+      if (error) {
+        console.error("Error fetching project versions:", error);
+        throw error;
+      }
+      
+      // Also fetch versions where this project is a parent
+      const { data: childVersions, error: childError } = await supabase
+        .from('app_projects')
+        .select('*')
+        .eq('parent_id', projectId)
+        .order('version', { ascending: false });
+      
+      if (childError) {
+        console.error("Error fetching child versions:", childError);
+        throw childError;
+      }
+      
+      console.log("Fetched versions:", versions?.length || 0, "child versions:", childVersions?.length || 0);
+      
+      // Combine and sort all versions
+      const allVersions = [...(versions || []), ...(childVersions || [])];
+      allVersions.sort((a, b) => b.version - a.version);
+      
+      setVersionHistory(allVersions);
+    } catch (error) {
+      console.error("Error fetching version history:", error);
+      toast({
+        title: "Error fetching version history",
+        description: "Could not load project versions",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  // Function to handle restoring a specific version
+  const handleRestoreVersion = async (versionData: any) => {
+    try {
+      toast({
+        title: "Restoring version...",
+        description: `Restoring to version ${versionData.version}`,
+      });
+      
+      console.log("Restoring version:", versionData.version, "with ID:", versionData.id);
+      
+      const { data, error } = await supabase.functions.invoke('restore-version', {
+        body: { 
+          projectId: versionData.id,
+        }
+      });
+      
+      if (error) {
+        console.error("Error from restore-version function:", error);
+        throw error;
+      }
+      
+      console.log("Restore version response:", data);
+      
+      toast({
+        title: "Version restored",
+        description: `Successfully restored to version ${versionData.version}`,
+      });
+      
+      // Ask the user to submit a new message to see the restored version
+      toast({
+        title: "Ask the assistant",
+        description: "Send a message to see your restored application",
+      });
+      
+    } catch (error) {
+      console.error("Error restoring version:", error);
+      toast({
+        title: "Error restoring version",
+        description: "Could not restore to selected version",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Improved and simplified function to extract code blocks from message content
+  const extractCodeBlocks = () => {
+    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)\n```/g;
+    const codeFiles = [];
+    let match;
+    let index = 0;
+    
+    while ((match = codeBlockRegex.exec(message.content)) !== null) {
+      const language = match[1] || 'plaintext';
+      const content = match[2].trim();
+      
+      // Skip if it's JSON we already tried to parse
+      if (language.toLowerCase() === 'json' && content.includes('"files"') && content.includes('"projectName"')) {
+        continue;
+      }
+      
+      codeFiles.push({
+        id: `file-${index++}`,
+        name: `file-${index}.${getExtensionFromLanguage(language)}`,
+        path: `file-${index}.${getExtensionFromLanguage(language)}`,
+        language: language,
+        content: content
+      });
+    }
+    
+    console.log("Extracted code blocks:", codeFiles.length);
+    return codeFiles;
+  };
+  
+  const getExtensionFromLanguage = (lang: string) => {
+    const langMap: Record<string, string> = {
+      'javascript': 'js',
+      'typescript': 'ts',
+      'jsx': 'jsx',
+      'tsx': 'tsx',
+      'html': 'html',
+      'css': 'css',
+      'json': 'json',
+      'markdown': 'md',
+      'plaintext': 'txt'
+    };
+    
+    return langMap[lang.toLowerCase()] || 'txt';
+  };
+
+  // Enhanced version of formatExplanationText to completely remove all markdown symbols
+  const formatExplanationText = (text: string) => {
+    if (!text) return null;
+
+    // Split the explanation into paragraphs
+    const paragraphs = text.split('\n\n');
+    
+    return (
+      <div className="space-y-4">
+        {paragraphs.map((paragraph, idx) => {
+          // Check if paragraph is a heading (starts with # or ##)
+          if (paragraph.trim().startsWith('# ')) {
+            return <h3 key={idx} className="text-lg font-bold mt-4">{paragraph.replace(/^# /, '')}</h3>;
+          } 
+          if (paragraph.trim().startsWith('## ')) {
+            return <h4 key={idx} className="text-md font-semibold mt-3">{paragraph.replace(/^## /, '')}</h4>;
+          }
+          if (paragraph.trim().startsWith('### ')) {
+            return <h5 key={idx} className="text-base font-semibold mt-2">{paragraph.replace(/^### /, '')}</h5>;
+          }
+          
+          // Check if paragraph is a list
+          if (paragraph.includes('\n- ') || paragraph.includes('\n* ')) {
+            const listItems = paragraph.split(/\n[-*] /).filter(Boolean);
+            return (
+              <div key={idx}>
+                {listItems[0].trim() && <p className="mb-2">{listItems[0].trim()}</p>}
+                <ul className="list-disc pl-5 space-y-1">
+                  {listItems.slice(listItems[0].trim() ? 1 : 0).map((item, i) => {
+                    // Process nested formatting within list items (bold, italic)
+                    let formattedItem = item;
+                    
+                    // Handle bold in list items
+                    formattedItem = formattedItem.replace(/\*\*(.*?)\*\*|__(.*?)__/g, (_, p1, p2) => {
+                      return `<strong>${p1 || p2}</strong>`;
+                    });
+                    
+                    // Handle italic in list items
+                    formattedItem = formattedItem.replace(/\*(.*?)\*|_(.*?)_/g, (_, p1, p2) => {
+                      // Skip if this is part of a bold pattern we already replaced
+                      if (!p1 && !p2) return _;
+                      const content = p1 || p2;
+                      return `<em>${content}</em>`;
+                    });
+                    
+                    return <li key={i} dangerouslySetInnerHTML={{ __html: formattedItem }} />;
+                  })}
+                </ul>
               </div>
-              {renderDirectory(subDir, dirPath, level + 1)}
-            </div>
-          );
+            );
+          }
+          
+          // Format text with common markdown patterns
+          let formattedText = paragraph;
+          
+          // Replace bold markdown (**text** or __text__)
+          formattedText = formattedText.replace(/\*\*(.*?)\*\*|__(.*?)__/g, (_, p1, p2) => {
+            const content = p1 || p2;
+            return `<strong>${content}</strong>`;
+          });
+          
+          // Replace italic markdown (*text* or _text_)
+          formattedText = formattedText.replace(/\*(.*?)\*|_(.*?)_/g, (_, p1, p2) => {
+            // Skip if this is part of a bold pattern we already replaced
+            if (!p1 && !p2) return _;
+            const content = p1 || p2;
+            return `<em>${content}</em>`;
+          });
+          
+          // Replace code/inline code markdown (`text`)
+          formattedText = formattedText.replace(/`(.*?)`/g, (_, p1) => {
+            return `<code class="px-1 py-0.5 bg-gray-100 rounded text-sm font-mono">${p1}</code>`;
+          });
+          
+          // Replace links [text](url)
+          formattedText = formattedText.replace(/\[(.*?)\]\((.*?)\)/g, (_, text, url) => {
+            return `<a href="${url}" class="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">${text}</a>`;
+          });
+          
+          // Use dangerouslySetInnerHTML to render the HTML tags
+          return <p key={idx} dangerouslySetInnerHTML={{ __html: formattedText }} />;
         })}
       </div>
     );
   };
-  
-  // Define tab content for challenges
-  const renderChallengesTab = () => {
-    if (!appData || !appData.challenges || appData.challenges.length === 0) {
-      return (
-        <div className="p-4 text-center text-gray-500">
-          No challenges defined for this project.
-        </div>
-      );
+
+  // Modified function to handle viewing the full project
+  const handleViewFullProject = () => {
+    try {
+      console.log("Opening artifact viewer with message content:", message.content.substring(0, 100) + "...");
+      
+      // Create a guaranteed artifact ID
+      const artifactId = `artifact-${Date.now()}`;
+      // Default title that will always work
+      const projectTitle = appData?.projectName || "Generated Application";
+      
+      // Try extracting code blocks first as the primary method
+      const extractedFiles = extractCodeBlocks();
+      console.log("Extracted files count:", extractedFiles.length);
+      
+      // Create final files array with proper structure
+      let files = [];
+      
+      if (extractedFiles && extractedFiles.length > 0) {
+        console.log("Using extracted code blocks, count:", extractedFiles.length);
+        files = extractedFiles;
+      } 
+      // If no extracted files, but we have appData, use those files
+      else if (appData?.files && appData.files.length > 0) {
+        console.log("Using appData files, count:", appData.files.length);
+        files = appData.files.map((file, index) => ({
+          id: `file-${index}`,
+          name: file.path.split('/').pop() || `file-${index}`,
+          path: file.path,
+          language: getLanguageFromPath(file.path),
+          content: file.content
+        }));
+      }
+      // Ultimate fallback - create at least one file with the message content
+      else {
+        console.log("Using ultimate fallback - creating content file");
+        files = [{
+          id: "content-file",
+          name: "generated-content.md",
+          path: "generated-content.md",
+          language: "markdown",
+          content: message.content
+        }];
+      }
+      
+      // Ensure we have at least one file
+      if (files.length === 0) {
+        files = [{
+          id: "fallback-file",
+          name: "content.md",
+          path: "content.md",
+          language: "markdown",
+          content: "No code content could be extracted. Please check the message content."
+        }];
+      }
+      
+      // Log what we're actually opening
+      console.log(`Opening artifact with ${files.length} files:`, 
+        files.map(f => f.path).join(', '));
+      
+      // Ensure we have a valid artifact to open
+      const artifact = {
+        id: artifactId,
+        title: projectTitle,
+        description: appData?.description || "Generated application",
+        files: files
+      };
+      
+      // Call the openArtifact function
+      console.log("Calling openArtifact with artifact:", artifact.id);
+      openArtifact(artifact);
+      
+      // If we get here, we should show a message to the user
+      toast({
+        title: "Code viewer opened",
+        description: `Displaying ${files.length} code files`
+      });
+    } catch (error) {
+      console.error("Error opening artifact:", error);
+      toast({
+        variant: "destructive",
+        title: "Error opening code viewer",
+        description: "There was a problem displaying the code. Please try again."
+      });
     }
-    
-    return (
-      <div className="space-y-3">
-        {appData.challenges.map((challenge, index) => (
-          <Card key={challenge.id || index} className="p-3">
-            <h4 className="font-medium mb-1">{index + 1}. {challenge.title}</h4>
-            <p className="text-sm text-gray-600">{challenge.description}</p>
-            {challenge.filesPaths && challenge.filesPaths.length > 0 && (
-              <div className="mt-2">
-                <span className="text-xs text-gray-500">Files: </span>
-                {challenge.filesPaths.map((path, i) => (
-                  <span 
-                    key={i}
-                    className="text-xs bg-gray-100 px-1 py-0.5 rounded mr-1 cursor-pointer hover:bg-gray-200"
-                    onClick={() => {
-                      const file = appData.files.find(f => f.path === path);
-                      if (file) {
-                        handleFileSelect(path, file.content);
-                        setActiveTab('files');
-                      }
-                    }}
-                  >
-                    {path}
-                  </span>
-                ))}
-              </div>
-            )}
-          </Card>
-        ))}
-      </div>
-    );
   };
-  
-  // Determine what to display in the main area
-  const renderMainContent = () => {
-    if (!activeFile) {
-      return (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center p-6">
-            <h3 className="text-lg font-medium mb-2">No File Selected</h3>
-            <p className="text-gray-500 text-sm">Select a file from the explorer to view its content.</p>
+
+  const handleDownload = () => {
+    alert("Download functionality would be implemented here");
+  };
+
+  const getLanguageFromPath = (path: string): string => {
+    const extension = path.split('.').pop()?.toLowerCase() || '';
+    const languageMap: Record<string, string> = {
+      'js': 'javascript',
+      'jsx': 'javascript',
+      'ts': 'typescript',
+      'tsx': 'typescript',
+      'css': 'css',
+      'scss': 'scss',
+      'html': 'html',
+      'json': 'json',
+      'md': 'markdown',
+    };
+    return languageMap[extension] || 'plaintext';
+  };
+
+  const generateSummary = () => {
+    if (!appData) return null;
+    
+    const fileTypes = appData.files
+      .map(file => file.path.split('.').pop()?.toLowerCase())
+      .filter((value, index, self) => value && self.indexOf(value) === index);
+    
+    const frontendFiles = appData.files.filter(file => 
+      file.path.includes('pages') || 
+      file.path.includes('components') || 
+      file.path.includes('.jsx') || 
+      file.path.includes('.tsx'));
+    
+    const backendFiles = appData.files.filter(file => 
+      file.path.includes('api') || 
+      file.path.includes('server') || 
+      file.path.includes('routes'));
+
+    return (
+      <div className="text-sm space-y-3">
+        <p className="text-base font-medium">{appData.description}</p>
+        
+        <div className="flex flex-wrap gap-2 my-2">
+          {appData.technologies?.map(tech => (
+            <Badge key={tech} variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100">{tech}</Badge>
+          ))}
+          {!appData.technologies && fileTypes.map(type => (
+            <Badge key={type} variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100">{type}</Badge>
+          ))}
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4 mt-3">
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <p className="font-medium text-gray-700">Frontend</p>
+            <p className="text-gray-600">{frontendFiles.length} files</p>
+          </div>
+          
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <p className="font-medium text-gray-700">Backend</p>
+            <p className="text-gray-600">{backendFiles.length > 0 ? `${backendFiles.length} files` : 'Frontend only'}</p>
           </div>
         </div>
-      );
-    }
-    
-    // Extract file extension
-    const fileExt = activeFile.split('.').pop()?.toLowerCase();
-    
-    // Determine language for the code editor
-    let language = 'javascript';
-    if (fileExt === 'ts' || fileExt === 'tsx') language = 'typescript';
-    else if (fileExt === 'json') language = 'json';
-    else if (fileExt === 'css') language = 'css';
-    else if (fileExt === 'html') language = 'html';
-    
-    return (
-      <div className="h-full">
-        <div className="bg-gray-100 px-3 py-1 text-xs font-mono border-b">{activeFile}</div>
-        <CodeEditor
-          content={fileContent}
-          onChange={() => {}} // Dummy onChange handler since it's readOnly
-          filename={activeFile}
-          readOnly={true}
-          projectId={projectId}
-        />
       </div>
     );
   };
   
-  // If no app data is available yet
+  const getMainFeatures = () => {
+    if (!appData) return [];
+    
+    const isEcommerce = 
+      appData.description.toLowerCase().includes('ecommerce') || 
+      appData.description.toLowerCase().includes('e-commerce') ||
+      appData.projectName.toLowerCase().includes('shop') ||
+      appData.projectName.toLowerCase().includes('store');
+      
+    if (isEcommerce) {
+      return [
+        "Product catalog with search and filtering",
+        "Shopping cart and checkout process",
+        "User authentication and profiles",
+        "Order management and payment processing"
+      ];
+    }
+    
+    return [
+      "User authentication",
+      "Interactive UI components",
+      "Data management",
+      "Responsive design"
+    ];
+  };
+  
+  // Handle selection of enhancement option
+  const handleSelectEnhancement = (enhancementId: string) => {
+    setSelectedEnhancement(enhancementId);
+    setShowEnhancementOptions(false);
+    
+    // Notify the user about their selection
+    toast({
+      title: "Enhancement selected",
+      description: "Ask the AI to help you implement this feature",
+    });
+  };
+  
+  // Handle step selection
+  const handleSelectStep = (step: ImplementationStep) => {
+    if (uiCodeGenerator) {
+      const guide = uiCodeGenerator.getStructuredGuide();
+      if (guide) {
+        // Update step progress
+        const message = `I want to work on the ${step.name} step`;
+        const response = guide.processUserMessage(message);
+        
+        // Update local guidance state
+        setGuidanceState(prev => ({
+          ...prev,
+          currentStep: step,
+          waitingForStepSelection: false,
+          stepProgress: {
+            ...prev.stepProgress,
+            [step.id]: {
+              status: 'in_progress',
+              startedAt: new Date()
+            }
+          }
+        }));
+        
+        // Notify the user
+        toast({
+          title: `Working on: ${step.name}`,
+          description: "Ask the AI for guidance on implementing this step",
+        });
+      }
+    }
+  };
+  
+  // Handle marking a step as complete
+  const handleCompleteStep = (stepId: string) => {
+    if (uiCodeGenerator) {
+      const guide = uiCodeGenerator.getStructuredGuide();
+      if (guide) {
+        // Update step progress
+        const completeResult = guide.completeStep(stepId);
+        
+        if (completeResult) {
+          // Auto-select next step
+          const nextStep = guide.autoSelectNextStep();
+          
+          // Update local guidance state
+          setGuidanceState(prev => ({
+            ...prev,
+            currentStep: nextStep,
+            stepProgress: guide.getStepProgress()
+          }));
+          
+          // Show toast based on whether there's another task
+          if (nextStep) {
+            // Generate next step guidance
+            const nextStepGuidance = guide.getStepGuidance(nextStep.id);
+            
+            // Log this for AI to use
+            console.log("AI NEXT TASK:", JSON.stringify({
+              stepId: nextStep.id,
+              guidance: nextStepGuidance
+            }));
+            
+            toast({
+              title: `Moving to next task: ${nextStep.name}`,
+              description: "The AI will guide you through the implementation",
+            });
+            
+            // Simulate sending a message to the chat with next task
+            setTimeout(() => {
+              console.log("AUTO SENDING NEXT TASK:", nextStepGuidance);
+            }, 500);
+          } else {
+            // All steps completed
+            toast({
+              title: `All tasks completed!`,
+              description: "Congratulations on completing all project tasks!",
+            });
+            
+            // Simulate sending a completion message
+            setTimeout(() => {
+              console.log("AUTO SENDING COMPLETION MESSAGE: Congratulations! You've completed all the tasks for this project!");
+            }, 500);
+          }
+        }
+      }
+    }
+  };
+  
+  // If no app data could be extracted, show a simple message
   if (!appData) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center p-6">
-          <h3 className="text-lg font-medium mb-2">No Application Data</h3>
-          <p className="text-gray-500">Generate an application first to see details here.</p>
-        </div>
+      <div className="my-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+        <p className="text-gray-600">Unable to extract application data. Click the button below to view any code that might be available.</p>
+        <Button 
+          variant="outline" 
+          className="mt-3" 
+          onClick={handleViewFullProject}
+        >
+          <Code className="mr-2 h-4 w-4" /> View Available Code
+        </Button>
       </div>
     );
   }
 
+  // Detect if this is a modified app or an original generation
+  const isModification = message.content.toLowerCase().includes('modified') || 
+                        message.content.toLowerCase().includes('updated') || 
+                        message.content.toLowerCase().includes('changed') ||
+                        message.content.toLowerCase().includes("i've updated your app");
+
   return (
-    <div className="h-full flex flex-col">
-      <div className="p-4 border-b">
-        <h2 className="text-xl font-semibold">{appData.projectName || "Generated Application"}</h2>
-        <p className="text-sm text-gray-600">{appData.description || "No description provided"}</p>
-      </div>
-      
-      <div className={`flex flex-1 overflow-hidden ${isPreviewExpanded ? 'flex-col' : ''}`}>
-        {/* Side panel with file explorer */}
-        <div className={`border-r ${isPreviewExpanded ? 'h-1/3' : 'w-1/3'}`}>
-          <div className="h-full flex flex-col">
-            <div className="p-2 border-b bg-gray-50">
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="w-full">
-                  <TabsTrigger value="files" className="flex-1">Files</TabsTrigger>
-                  <TabsTrigger value="challenges" className="flex-1">Challenges</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto">
-              <Tabs value={activeTab} className="h-full">
-                <TabsContent value="files" className="m-0 h-full">
-                  <ScrollArea className="h-full">
-                    <Collapsible
-                      open={isFileExplorerOpen}
-                      onOpenChange={setIsFileExplorerOpen}
-                      className="w-full"
-                    >
-                      <div className="flex items-center justify-between px-3 py-2">
-                        <h3 className="text-sm font-medium">Project Files</h3>
-                        <CollapsibleTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                            {isFileExplorerOpen ? <ChevronUpIcon size={16} /> : <ChevronDownIcon size={16} />}
-                          </Button>
-                        </CollapsibleTrigger>
-                      </div>
-                      <Separator />
-                      <CollapsibleContent className="p-2">
-                        {shouldShowFileBrowser ? (
-                          renderDirectory(projectStructure)
-                        ) : (
-                          <div className="p-4 text-center text-gray-500">
-                            No files available.
-                          </div>
-                        )}
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </ScrollArea>
-                </TabsContent>
-                
-                <TabsContent value="challenges" className="m-0 p-3 overflow-y-auto h-full">
-                  <ScrollArea className="h-full">
-                    {renderChallengesTab()}
-                  </ScrollArea>
-                </TabsContent>
-              </Tabs>
-            </div>
-          </div>
-        </div>
+    <div className="my-6 space-y-6">
+      <div>
+        <h3 className="text-xl font-semibold mb-2">
+          {isModification 
+            ? `Your app has been updated with the requested changes` 
+            : `I've generated a full-stack application: ${appData.projectName}`}
+        </h3>
+        <p className="text-gray-600">{isModification 
+          ? "The changes you requested have been applied to your existing application."
+          : appData.description}
+        </p>
         
-        {/* Main content area */}
-        <div className={`${isPreviewExpanded ? 'h-2/3' : 'flex-1'}`}>
-          <div className="h-full flex flex-col">
-            <div className="p-2 border-b bg-gray-50 flex justify-between">
-              <h3 className="text-sm font-medium">File Viewer</h3>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-7"
-                onClick={() => setIsPreviewExpanded(!isPreviewExpanded)}
-              >
-                {isPreviewExpanded ? "Horizontal Split" : "Vertical Split"}
-              </Button>
-            </div>
-            
-            <div className="flex-1 overflow-hidden">
-              {renderMainContent()}
-            </div>
+        {appData.version && (
+          <div className="flex items-center gap-2 mt-2">
+            <Badge variant="outline" className="text-xs font-normal">
+              Version {appData.version}
+            </Badge>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 px-2 text-xs bg-gray-50 hover:bg-gray-100"
+              onClick={() => setShowVersionHistory(!showVersionHistory)}
+            >
+              <History className="h-3 w-3 mr-1" />
+              {showVersionHistory ? "Hide History" : "Version History"}
+            </Button>
           </div>
-        </div>
+        )}
       </div>
       
-      {appData.explanation && (
-        <div className="p-4 border-t bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-lg m-4">
-          <h3 className="text-lg font-medium mb-2">About This Application</h3>
-          <p className="text-sm text-gray-700">{appData.explanation}</p>
-          
-          {appData.challenges && appData.challenges.length > 0 && (
-            <div className="mt-4">
-              <p className="text-sm font-medium">This app includes {appData.challenges.length} learning challenges:</p>
-              <ul className="list-disc pl-5 mt-1 text-sm">
-                {appData.challenges.slice(0, 3).map((challenge, i) => (
-                  <li key={i}>{challenge.title}</li>
+      {showVersionHistory && (
+        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+          <h4 className="font-medium mb-3">Version History</h4>
+          {isLoadingHistory ? (
+            <div className="flex items-center justify-center p-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+              <span className="ml-2 text-sm text-gray-500">Loading version history...</span>
+            </div>
+          ) : versionHistory.length === 0 ? (
+            <p className="text-sm text-gray-500 p-2">No version history available</p>
+          ) : (
+            <ScrollArea className="h-[250px]">
+              <div className="space-y-3">
+                {versionHistory.map((version, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-white rounded-md border border-gray-100">
+                    <div>
+                      <p className="text-sm font-medium">Version {version.version}</p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(version.created_at).toLocaleDateString()} {new Date(version.created_at).toLocaleTimeString()}
+                      </p>
+                      {version.modification_prompt && (
+                        <p className="text-xs text-gray-600 mt-1 italic max-w-[300px] truncate">"{version.modification_prompt}"</p>
+                      )}
+                    </div>
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      className="h-8 ml-2"
+                      onClick={() => handleRestoreVersion(version)}
+                    >
+                      Restore
+                    </Button>
+                  </div>
                 ))}
-                {appData.challenges.length > 3 && (
-                  <li>And {appData.challenges.length - 3} more...</li>
-                )}
-              </ul>
-              <p className="text-xs text-gray-500 mt-2">View the Challenges tab for details on each challenge.</p>
+              </div>
+            </ScrollArea>
+          )}
+        </div>
+      )}
+      
+      {/* Application Enhancements Section - Only show for new generations */}
+      {!isModification && appData.challenges && appData.challenges.length > 0 && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-lg p-5">
+          <h4 className="text-lg font-semibold mb-3 text-blue-800">AI-Guided Implementation</h4>
+          <p className="text-sm text-blue-700 mb-4">
+            The AI will guide you through implementing this application step by step.
+          </p>
+
+          {guidanceState.steps.length > 0 && (
+            <StepProgressDisplay 
+              steps={guidanceState.steps}
+              currentStep={guidanceState.currentStep}
+              stepProgress={guidanceState.stepProgress}
+              onCompleteStep={handleCompleteStep}
+            />
+          )}
+          
+          <div className="mt-4 text-sm text-blue-700">
+            <p>Follow the AI's guidance in the chat. Complete each task and click "I've completed this" when done.</p>
+          </div>
+        </div>
+      )}
+      
+      {/* Show enhancement options if there are no challenges or for modified apps */}
+      {(!appData.challenges || appData.challenges.length === 0 || isModification) && (
+        <div className="border border-blue-200 rounded-lg p-5 bg-blue-50">
+          <h4 className="text-lg font-semibold mb-2 text-blue-800">Enhance Your Application</h4>
+          <p className="text-sm text-blue-700 mb-4">What would you like to add to your application next?</p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {enhancementOptions.map((option) => (
+              <Card 
+                key={option.id}
+                className={`p-4 border hover:border-blue-300 cursor-pointer transition-all ${
+                  selectedEnhancement === option.id ? 'border-blue-400 bg-blue-100' : ''
+                }`}
+                onClick={() => handleSelectEnhancement(option.id)}
+              >
+                <div className="flex items-start">
+                  <div className="text-2xl mr-3">{option.icon}</div>
+                  <div>
+                    <h5 className="font-medium">{option.title}</h5>
+                    <p className="text-xs text-gray-600 mt-1">{option.description}</p>
+                    <Badge variant="outline" className="mt-2 text-xs">{option.difficulty}</Badge>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+          
+          {selectedEnhancement && (
+            <div className="mt-4 p-3 bg-white rounded-lg border border-blue-200">
+              <p className="text-sm">
+                <span className="font-medium">Next step:</span> Ask the AI to help you implement the selected feature in your application.
+              </p>
+              <div className="mt-2 text-xs text-gray-500">
+                Example: "Can you help me implement {enhancementOptions.find(o => o.id === selectedEnhancement)?.title} in my app?"
+              </div>
             </div>
           )}
         </div>
       )}
+      
+      <div className="bg-white border border-gray-200 rounded-full shadow-sm p-4 flex items-center justify-between">
+        <div className="flex items-center">
+          <SquareDashed className="mr-3 h-5 w-5 text-gray-500" />
+          <span className="font-medium text-lg">{isModification ? "View updated code" : "View code"}</span>
+        </div>
+        <Button 
+          variant="default" 
+          size="sm" 
+          className="bg-blue-600 hover:bg-blue-700" 
+          onClick={() => {
+            console.log("View Code button clicked");
+            handleViewFullProject();
+          }}
+        >
+          View Code <ChevronRight className="h-4 w-4 ml-1" />
+        </Button>
+      </div>
+      
+      {!isModification && (
+        <div className="space-y-4">
+          <h4 className="font-semibold">This application includes:</h4>
+          <ol className="list-decimal pl-6 space-y-2">
+            {appData.files.length > 0 && (
+              <li>
+                <span className="font-medium">{appData.files.length} files</span> organized in a structured project
+              </li>
+            )}
+            {appData.technologies && appData.technologies.length > 0 && (
+              <li>
+                <span className="font-medium">Technologies used:</span> {appData.technologies.join(', ')}
+              </li>
+            )}
+            <li>
+              <span className="font-medium">Main features:</span>
+              <ul className="list-disc pl-6 pt-1">
+                {getMainFeatures().map((feature, index) => (
+                  <li key={index}>{feature}</li>
+                ))}
+              </ul>
+            </li>
+          </ol>
+        </div>
+      )}
+      
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="explanation">
+          <AccordionTrigger className="px-5 py-3 hover:bg-gray-50">Application Details</AccordionTrigger>
+          <AccordionContent className="px-5 pb-4">
+            <div className="text-sm space-y-2">
+              {appData?.explanation ? (
+                formatExplanationText(appData.explanation)
+              ) : (
+                <div className="space-y-4">
+                  <p><strong>Architecture Overview:</strong> This {appData?.projectName || "generated"} application follows a modern web architecture with a clean separation of concerns.</p>
+                  
+                  <p><strong>Frontend:</strong> The UI is built with React components organized in a logical hierarchy, with pages for different views and reusable components for common elements.</p>
+                  
+                  <p><strong>Data Management:</strong> The application handles data through state management and API calls to backend services.</p>
+                  
+                  <h4 className="text-md font-semibold mt-4">Key Technical Features:</h4>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>React components for UI building blocks</li>
+                    <li>State management for application data</li>
+                    <li>API integration for data fetching</li>
+                    <li>Responsive design for all device sizes</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 };

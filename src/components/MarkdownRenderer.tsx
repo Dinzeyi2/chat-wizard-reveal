@@ -35,25 +35,6 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
     
     return null;
   }, [content, message]);
-
-  // Extract appData from content
-  const appData = React.useMemo(() => {
-    if (!content) return null;
-    
-    // Try to find app data in JSON blocks
-    const jsonRegex = /```json\n([\s\S]*?)```/;
-    const jsonMatch = content.match(jsonRegex);
-    
-    if (jsonMatch && jsonMatch[1]) {
-      try {
-        return JSON.parse(jsonMatch[1]);
-      } catch (e) {
-        console.error("Error parsing JSON for appData:", e);
-      }
-    }
-    
-    return null;
-  }, [content]);
   
   // Very lenient detection for app generation content
   const isAppGeneration = React.useMemo(() => {
@@ -141,7 +122,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
     console.log("Rendering AppGeneratorDisplay for message:", message.id);
     return (
       <ArtifactProvider>
-        <AppGeneratorDisplay appData={appData} projectId={projectId} />
+        <AppGeneratorDisplay message={message} projectId={projectId} />
       </ArtifactProvider>
     );
   }
