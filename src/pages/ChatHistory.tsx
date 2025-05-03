@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -133,7 +134,11 @@ const ChatHistory = () => {
   );
 
   const handleChatSelection = (chatId: string) => {
-    // Here we navigate to the main chat page with the specific chat ID
+    // Debug the chat selection
+    console.log(`Navigating to chat with ID: ${chatId}`);
+    
+    // Navigate to the main chat page with the specific chat ID
+    // Ensure we're using the correct path (/app) and the chat parameter
     navigate(`/app?chat=${chatId}`);
   };
 

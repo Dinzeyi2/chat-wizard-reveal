@@ -69,10 +69,13 @@ const Index = () => {
     checkAuth();
   }, []);
 
+  // This effect handles loading a specific chat from the URL
   useEffect(() => {
     // Parse chat ID from URL if present
     const searchParams = new URLSearchParams(location.search);
     const chatId = searchParams.get('chat');
+    
+    console.log("Chat ID from URL:", chatId);
     
     if (chatId) {
       setCurrentChatId(chatId);
@@ -111,6 +114,7 @@ const Index = () => {
               timestamp: new Date(msg.timestamp)
             }));
             
+            console.log("Setting messages from Supabase:", formattedMessages);
             setMessages(formattedMessages);
             
             // If this chat had a project ID, restore it
@@ -128,7 +132,9 @@ const Index = () => {
       const storedHistory = localStorage.getItem('chatHistory');
       let localChatHistory = storedHistory ? JSON.parse(storedHistory) : [];
       
+      console.log("Looking for chat in localStorage, history contains", localChatHistory.length, "chats");
       const selectedChat = localChatHistory.find((chat: ChatHistoryItem) => chat.id === chatId);
+      console.log("Found chat in localStorage:", selectedChat ? "yes" : "no");
       
       if (selectedChat) {
         if (selectedChat.messages && selectedChat.messages.length > 0) {
