@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -133,13 +132,9 @@ const ChatHistory = () => {
     chat.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleChatSelection = (chat: ChatHistoryItem) => {
-    // Debug the chat selection
-    console.log(`Navigating to chat with ID: ${chat.id}`);
-    
-    // Navigate to the main chat page with the specific chat ID
-    // Ensure we're using the correct path (/app) and the chat parameter
-    navigate(`/app?chat=${chat.id}`);
+  const handleChatSelection = (chatId: string) => {
+    // Here we navigate to the main chat page with the specific chat ID
+    navigate(`/app?chat=${chatId}`);
   };
 
   // Function to handle creating a new chat
@@ -324,7 +319,7 @@ const ChatHistory = () => {
             <Card 
               key={chat.id}
               className="cursor-pointer hover:bg-gray-50 p-4 transition-colors relative"
-              onClick={() => handleChatSelection(chat)}
+              onClick={() => handleChatSelection(chat.id)}
             >
               <div className="flex justify-between items-start">
                 <div>
@@ -332,7 +327,7 @@ const ChatHistory = () => {
                   <p className="text-sm text-gray-500">{chat.last_message || "No messages"}</p>
                   {chat.messages && (
                     <p className="text-xs text-gray-400 mt-1">
-                      {typeof chat.messages === 'string' ? JSON.parse(chat.messages).length : chat.messages.length} messages
+                      {chat.messages.length} messages
                     </p>
                   )}
                 </div>
