@@ -1,4 +1,3 @@
-
 /**
  * UI Code Generator - Main Integration
  * This module integrates the Perplexity AI Design Scraper with the Claude Code Customizer
@@ -55,7 +54,7 @@ export class UICodeGenerator {
   private customizer: ClaudeCodeCustomizer | null = null;
   private generationHistory: GenerationHistoryItem[];
   private structuredGuide: StructuredAIGuide | null = null;
-  private shouldSendFirstStepGuidance: boolean = true;
+  private _shouldSendFirstStepGuidance: boolean = true;
   
   constructor(config: UICodeGeneratorConfig = {}) {
     // Extract configuration
@@ -96,7 +95,7 @@ export class UICodeGenerator {
    */
   initializeStructuredGuide(projectData: any): StructuredAIGuide {
     this.structuredGuide = new StructuredAIGuide(projectData);
-    this.shouldSendFirstStepGuidance = true;
+    this._shouldSendFirstStepGuidance = true;
     return this.structuredGuide;
   }
   
@@ -122,14 +121,14 @@ export class UICodeGenerator {
    * Check if first step guidance should be sent
    */
   shouldSendFirstStepGuidance(): boolean {
-    return this.shouldSendFirstStepGuidance && this.structuredGuide !== null;
+    return this._shouldSendFirstStepGuidance && this.structuredGuide !== null;
   }
 
   /**
    * Mark first step guidance as sent
    */
   markFirstStepGuidanceSent(): void {
-    this.shouldSendFirstStepGuidance = false;
+    this._shouldSendFirstStepGuidance = false;
   }
 
   /**
