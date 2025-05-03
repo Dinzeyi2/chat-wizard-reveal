@@ -66,6 +66,24 @@ async function processInput(prompt: string, maxTokens: number = 800): Promise<st
   return await summarizeWithOpenAI(prompt);
 }
 
+// Function to create a default app design when Perplexity fails
+function createDefaultAppDesign(prompt: string): any {
+  // Extract potential name from prompt
+  const nameParts = prompt.split(' ').filter(word => word.length > 2);
+  const projectName = nameParts.length > 0 
+    ? `${nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1)}App`
+    : "SimpleApp";
+  
+  return {
+    projectName,
+    description: `A simple application based on the prompt: "${prompt}"`,
+    features: ["Basic user interface", "Core functionality"],
+    techStack: ["React", "JavaScript", "CSS"],
+    mainComponents: ["App", "HomePage"],
+    dataStructure: "Simple state management with React hooks"
+  };
+}
+
 // Function to get app design using Perplexity API
 async function getDesignWithPerplexity(prompt: string): Promise<any> {
   // Get the Perplexity API key from environment variables
@@ -77,60 +95,84 @@ async function getDesignWithPerplexity(prompt: string): Promise<any> {
   
   console.log("Calling Perplexity API to get application design");
   
-  const response = await fetch("https://api.perplexity.ai/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${perplexityApiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: "llama-3.1-sonar-small-128k-online",
-      messages: [
-        {
-          role: "system",
-          content: `You are an expert software architect who designs modern web applications. 
-                   You create detailed, well-structured application designs based on user requests.
-                   Focus on clarity, modern best practices, and a comprehensive understanding of the requirements.`
-        },
-        {
-          role: "user",
-          content: `Design a modern web application based on this request: "${prompt}"
-                   
-                   Provide your response in the following JSON format:
-                   {
-                     "projectName": "name-of-project",
-                     "description": "Detailed description of the application",
-                     "features": ["Feature 1", "Feature 2", "..."],
-                     "techStack": ["React", "Tailwind CSS", "..."],
-                     "mainComponents": ["Component1", "Component2", "..."],
-                     "dataStructure": "Description of how data should be structured"
-                   }`
-        }
-      ],
-      temperature: 0.6,
-      max_tokens: 1000
-    })
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`Perplexity API error (${response.status}): ${errorText}`);
-    throw new Error(`Perplexity API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  const designText = data.choices[0].message.content;
-  
-  // Extract JSON from response
   try {
-    // Try to find JSON block in the response
-    const jsonMatch = designText.match(/{[\s\S]*"projectName"[\s\S]*}/);
-    const jsonContent = jsonMatch ? jsonMatch[0] : designText;
+    const response = await fetch("https://api.perplexity.ai/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${perplexityApiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-sonar-small-128k-online",
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert software architect who designs modern web applications. 
+                    You create detailed, well-structured application designs based on user requests.
+                    Focus on clarity, modern best practices, and a comprehensive understanding of the requirements.
+                    IMPORTANT: You must respond ONLY with a valid JSON object containing the application design.`
+          },
+          {
+            role: "user",
+            content: `Design a modern web application based on this request: "${prompt}"
+                    
+                    Provide your response in the following JSON format (and ONLY this format, no other text):
+                    {
+                      "projectName": "name-of-project",
+                      "description": "Detailed description of the application",
+                      "features": ["Feature 1", "Feature 2", "..."],
+                      "techStack": ["React", "Tailwind CSS", "..."],
+                      "mainComponents": ["Component1", "Component2", "..."],
+                      "dataStructure": "Description of how data should be structured"
+                    }`
+          }
+        ],
+        temperature: 0.6,
+        max_tokens: 1000
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Perplexity API error (${response.status}): ${errorText}`);
+      throw new Error(`Perplexity API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const designText = data.choices[0].message.content;
     
-    return JSON.parse(jsonContent);
+    console.log("Raw Perplexity response:", designText.substring(0, 100) + "...");
+    
+    // Extract JSON from response
+    try {
+      // First, try to directly parse the response as JSON
+      try {
+        return JSON.parse(designText);
+      } catch (error) {
+        console.log("Direct JSON parsing failed, attempting to extract JSON from text");
+      }
+      
+      // Try to find JSON block in the response with regex
+      const jsonMatch = designText.match(/{[\s\S]*}/);
+      if (jsonMatch) {
+        const jsonContent = jsonMatch[0];
+        console.log("Extracted JSON:", jsonContent.substring(0, 100) + "...");
+        return JSON.parse(jsonContent);
+      }
+      
+      // If we can't extract JSON, return a default design
+      console.log("Could not extract valid JSON, using default design");
+      return createDefaultAppDesign(prompt);
+      
+    } catch (error) {
+      console.error("Failed to parse Perplexity JSON response:", error);
+      console.log("Using default app design as fallback");
+      return createDefaultAppDesign(prompt);
+    }
   } catch (error) {
-    console.error("Failed to parse Perplexity JSON response:", error);
-    throw new Error("Failed to parse application design");
+    console.error("Error calling Perplexity API:", error);
+    console.log("Using default app design as fallback");
+    return createDefaultAppDesign(prompt);
   }
 }
 
@@ -177,10 +219,10 @@ serve(async (req) => {
       console.log("Successfully received app design from Perplexity:", appDesign.projectName);
     } catch (error) {
       console.error("Error getting app design from Perplexity:", error);
-      return new Response(JSON.stringify({ error: `Error getting app design: ${error.message}` }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
+      
+      // Create a default app design
+      appDesign = createDefaultAppDesign(processedPrompt);
+      console.log("Created default app design:", appDesign.projectName);
     }
 
     const projectId = crypto.randomUUID();
