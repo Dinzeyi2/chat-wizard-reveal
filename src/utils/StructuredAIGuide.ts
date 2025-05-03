@@ -1,559 +1,474 @@
-import { Challenge } from "./AIGuide";
-
 export interface ImplementationStep {
   id: string;
   name: string;
   description: string;
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
-  type: 'frontend' | 'backend' | 'integration' | 'testing' | 'design';
-  filePaths?: string[];
-  hints: string[];
-}
-
-export interface StepProgress {
-  status: 'not_started' | 'in_progress' | 'completed';
-  startedAt?: Date;
-  completedAt?: Date;
+  difficulty?: string;
+  type?: string;
+  status?: 'not_started' | 'in_progress' | 'completed';
 }
 
 export class StructuredAIGuide {
   private project: any;
   private currentChallengeIndex: number;
   private conversationHistory: any[];
-  private stepProgress: Record<string, StepProgress>;
-  
   public currentStep: ImplementationStep | null;
   public waitingForStepSelection: boolean;
+  public stepProgress: Record<string, any>;
   
   constructor(projectData: any) {
     this.project = projectData;
     this.currentChallengeIndex = 0;
     this.conversationHistory = [];
     this.currentStep = null;
+    this.waitingForStepSelection = false;
     this.stepProgress = {};
-    this.waitingForStepSelection = true;
   }
   
   // Get the current challenge
-  getCurrentChallenge(): Challenge {
+  getCurrentChallenge() {
     return this.project.challenges[this.currentChallengeIndex];
   }
   
-  // Get steps for current challenge
-  getChallengeSteps(): ImplementationStep[] {
+  // Get specific implementation steps for the current challenge
+  getChallengeSteps() {
     const challenge = this.getCurrentChallenge();
     
-    // Define steps based on challenge type
-    if (challenge.type.includes('profile') || challenge.description.includes('profile image')) {
+    // Define steps based on the challenge type
+    if (challenge.description.includes('profile image upload')) {
       return [
         {
           id: 'frontend-ui',
           name: 'Frontend UI Components',
           description: 'Implement the file input and preview UI elements',
-          difficulty: 'beginner',
-          type: 'frontend',
-          hints: [
-            'Create a hidden file input triggered by a button',
-            'Add image preview functionality using FileReader',
-            'Style the upload button and preview container'
-          ]
+          status: 'not_started'
         },
         {
           id: 'frontend-logic',
-          name: 'Frontend Upload Logic', 
-          description: 'Handle file selection, validation and upload process',
-          difficulty: 'intermediate',
-          type: 'frontend',
-          hints: [
-            'Validate file type and size before uploading',
-            'Create a FormData object to send the file',
-            'Show loading state during upload'
-          ]
+          name: 'Frontend Upload Logic',
+          description: 'Implement the JavaScript logic for handling file selection and upload',
+          status: 'not_started'
         },
         {
           id: 'backend-middleware',
           name: 'Backend File Upload Middleware',
-          description: 'Set up server middleware for handling file uploads',
-          difficulty: 'intermediate',
-          type: 'backend',
-          hints: [
-            'Use a library like Multer or Formidable',
-            'Configure storage location and filename generation',
-            'Add file size and type validation'
-          ]
+          description: 'Set up the file upload middleware (e.g., Multer) on the server',
+          status: 'not_started'
         },
         {
           id: 'backend-storage',
           name: 'Backend Storage Implementation',
           description: 'Implement file storage and database updating',
-          difficulty: 'intermediate',
-          type: 'backend',
-          hints: [
-            'Store uploaded files in a designated directory',
-            'Update user profile with new image path',
-            'Handle existing files (delete old ones)'
-          ]
+          status: 'not_started'
         },
         {
-          id: 'security',
+          id: 'security-validation',
           name: 'Security and Validation',
-          description: 'Add proper security measures and validation',
-          difficulty: 'advanced',
-          type: 'integration',
-          hints: [
-            'Sanitize filenames to prevent path traversal',
-            'Implement server-side file type validation',
-            'Add authentication checks'
-          ]
+          description: 'Add file validation and security measures',
+          status: 'not_started'
         }
       ];
-    } else if (challenge.type.includes('auth') || challenge.description.includes('password reset')) {
-      return [
-        {
-          id: 'frontend-form',
-          name: 'Password Reset Form',
-          description: 'Create the password reset request form',
-          difficulty: 'beginner',
-          type: 'frontend',
-          hints: [
-            'Create a form with email input field',
-            'Add form validation',
-            'Display appropriate success/error messages'
-          ]
-        },
-        {
-          id: 'backend-email',
-          name: 'Email Notification System',
-          description: 'Set up system for sending password reset emails',
-          difficulty: 'intermediate',
-          type: 'backend',
-          hints: [
-            'Choose an email sending library (e.g., Nodemailer)',
-            'Create an email template for password reset',
-            'Set up environment variables for email credentials'
-          ]
-        },
-        {
-          id: 'backend-token',
-          name: 'Reset Token Generation',
-          description: 'Implement secure token generation and storage',
-          difficulty: 'advanced',
-          type: 'backend',
-          hints: [
-            'Generate a secure random token',
-            'Store token with expiration time in database',
-            'Create an API endpoint for token verification'
-          ]
-        },
-        {
-          id: 'frontend-reset',
-          name: 'Reset Page Implementation',
-          description: 'Create the page for entering a new password',
-          difficulty: 'intermediate',
-          type: 'frontend',
-          hints: [
-            'Create a form with password and confirm password fields',
-            'Validate token from URL parameters',
-            'Implement client-side password validation'
-          ]
-        }
-      ];
-    } else if (challenge.type.includes('search') || challenge.description.includes('search')) {
-      return [
-        {
-          id: 'frontend-search-ui',
-          name: 'Search UI Components',
-          description: 'Create the search input and results display',
-          difficulty: 'beginner',
-          type: 'frontend',
-          hints: [
-            'Create a search input with appropriate styling',
-            'Implement a results container with loading states',
-            'Add clear and submit buttons'
-          ]
-        },
-        {
-          id: 'frontend-search-logic',
-          name: 'Search Logic and State',
-          description: 'Implement search query handling and state management',
-          difficulty: 'intermediate',
-          type: 'frontend',
-          hints: [
-            'Manage search query state',
-            'Implement debouncing for input',
-            'Handle loading, error, and empty states'
-          ]
-        },
-        {
-          id: 'backend-search-api',
-          name: 'Search API Implementation',
-          description: 'Create backend endpoint for processing search queries',
-          difficulty: 'advanced',
-          type: 'backend',
-          hints: [
-            'Define query parameters and validation',
-            'Implement efficient database querying',
-            'Add pagination for results'
-          ]
-        },
-        {
-          id: 'backend-search-indexing',
-          name: 'Search Optimization',
-          description: 'Optimize search with indexes and advanced techniques',
-          difficulty: 'advanced',
-          type: 'backend',
-          hints: [
-            'Create appropriate database indexes',
-            'Implement full text search if needed',
-            'Consider caching for frequent searches'
-          ]
-        }
-      ];
-    } else if (challenge.type.includes('follow') || challenge.description.includes('follow')) {
+    } else if (challenge.description.includes('Follow API')) {
       return [
         {
           id: 'data-model',
           name: 'Follow Data Model',
-          description: 'Create the data model for user relationships',
-          difficulty: 'intermediate',
-          type: 'backend',
-          hints: [
-            'Design a schema with follower and following references',
-            'Add unique constraints to prevent duplicate follows',
-            'Include timestamps for when relationships were created'
-          ]
+          description: 'Create the database model for follower relationships',
+          status: 'not_started'
         },
         {
-          id: 'follow-api',
-          name: 'Follow/Unfollow API',
-          description: 'Implement endpoints for following and unfollowing users',
-          difficulty: 'intermediate',
-          type: 'backend',
-          hints: [
-            'Create POST endpoint for following a user',
-            'Create DELETE endpoint for unfollowing',
-            'Add proper error handling for duplicates'
-          ]
+          id: 'follow-endpoints',
+          name: 'Follow/Unfollow Endpoints',
+          description: 'Implement the API endpoints for following and unfollowing users',
+          status: 'not_started'
         },
         {
-          id: 'followers-ui',
-          name: 'Follow Button UI',
-          description: 'Create a follow/unfollow button component',
-          difficulty: 'beginner',
-          type: 'frontend',
-          hints: [
-            'Design a toggle button with appropriate states',
-            'Handle loading and error states',
-            'Update UI optimistically'
-          ]
+          id: 'frontend-buttons',
+          name: 'Frontend Follow Buttons',
+          description: 'Implement the UI components for follow/unfollow actions',
+          status: 'not_started'
         },
         {
-          id: 'followers-list',
+          id: 'follow-state',
+          name: 'Follow State Management',
+          description: 'Implement the logic to track and display follow status',
+          status: 'not_started'
+        },
+        {
+          id: 'follower-lists',
           name: 'Followers/Following Lists',
-          description: 'Implement views to display user relationships',
-          difficulty: 'intermediate',
-          type: 'frontend',
-          hints: [
-            'Create a reusable list component for users',
-            'Implement pagination or infinite scrolling',
-            'Add filters or search functionality'
-          ]
+          description: 'Create views to display followers and following lists',
+          status: 'not_started'
+        }
+      ];
+    } else if (challenge.description.includes('search')) {
+      return [
+        {
+          id: 'search-ui',
+          name: 'Search UI Components',
+          description: 'Create the search input and results display components',
+          status: 'not_started'
+        },
+        {
+          id: 'search-endpoint',
+          name: 'Search API Endpoint',
+          description: 'Implement the backend API endpoint for search queries',
+          status: 'not_started'
+        },
+        {
+          id: 'search-algorithm',
+          name: 'Search Algorithm',
+          description: 'Implement the search algorithm (text matching, relevance sorting, etc.)',
+          status: 'not_started'
+        },
+        {
+          id: 'result-display',
+          name: 'Results Display',
+          description: 'Implement the display of search results with proper formatting',
+          status: 'not_started'
+        },
+        {
+          id: 'search-optimization',
+          name: 'Search Optimization',
+          description: 'Optimize the search for performance (indexing, caching, etc.)',
+          status: 'not_started'
         }
       ];
     } else {
-      // Generic steps for other challenge types
+      // Generic steps for other challenges
       return [
         {
-          id: 'requirements',
-          name: 'Requirements Analysis',
-          description: 'Analyze and understand the feature requirements',
-          difficulty: 'beginner',
-          type: 'design',
-          hints: [
-            'Break down the feature into clear requirements',
-            'Identify which components and files need changes',
-            'Plan the data flow through your application'
-          ]
+          id: 'frontend-components',
+          name: 'Frontend Components',
+          description: 'Implement the UI components needed for this feature',
+          status: 'not_started'
         },
         {
-          id: 'frontend',
-          name: 'Frontend Implementation',
-          description: 'Implement the UI and client-side logic',
-          difficulty: 'intermediate',
-          type: 'frontend',
-          hints: [
-            'Create reusable UI components',
-            'Implement state management',
-            'Add form validation if needed'
-          ]
+          id: 'frontend-logic',
+          name: 'Frontend Logic',
+          description: 'Implement the JavaScript logic for the feature',
+          status: 'not_started'
         },
         {
-          id: 'backend',
-          name: 'Backend Implementation',
-          description: 'Create necessary API endpoints and services',
-          difficulty: 'intermediate',
-          type: 'backend',
-          hints: [
-            'Design API endpoints following RESTful principles',
-            'Implement proper error handling',
-            'Add authentication and authorization checks'
-          ]
+          id: 'backend-models',
+          name: 'Backend Data Models',
+          description: 'Create or update the database models',
+          status: 'not_started'
         },
         {
-          id: 'testing',
-          name: 'Testing',
-          description: 'Test the functionality thoroughly',
-          difficulty: 'intermediate',
-          type: 'testing',
-          hints: [
-            'Test happy path scenarios',
-            'Test error handling and edge cases',
-            'Verify UI updates correctly based on state changes'
-          ]
+          id: 'backend-endpoints',
+          name: 'Backend API Endpoints',
+          description: 'Implement the API endpoints for the feature',
+          status: 'not_started'
+        },
+        {
+          id: 'testing-validation',
+          name: 'Testing and Validation',
+          description: 'Add validation, error handling, and testing',
+          status: 'not_started'
         }
       ];
     }
   }
   
-  // Process incoming message from user
-  processUserMessage(message: string): string {
+  // Get the next message to guide the user
+  getNextGuidanceMessage() {
+    const currentChallenge = this.getCurrentChallenge();
+    
+    // If this is the first message about this challenge
+    if (!this.conversationHistory.some(msg => msg.challengeId === currentChallenge.description)) {
+      // Generate introduction message
+      const message = this._generateIntroMessage(currentChallenge);
+      this.conversationHistory.push({
+        type: 'guide',
+        content: message,
+        challengeId: currentChallenge.description
+      });
+      
+      // Set waiting for step selection flag
+      this.waitingForStepSelection = true;
+      
+      return message;
+    }
+    
+    // If waiting for user to select a step, remind them
+    if (this.waitingForStepSelection) {
+      return "Please select one of the listed steps to work on first. Which step would you like to tackle?";
+    }
+    
+    // If a step is selected, provide guidance for that specific step
+    if (this.currentStep) {
+      return this._getStepGuidance(this.currentStep);
+    }
+    
+    // Default guidance
+    return "Let me know which part of the implementation you'd like to work on, or if you have any questions about the challenge.";
+  }
+  
+  // Generate an introduction message for a challenge with steps
+  _generateIntroMessage(challenge: any) {
+    const steps = this.getChallengeSteps();
+    
+    // Basic intro
+    let intro = `Now let's work on implementing the ${challenge.description} feature for ${challenge.featureName}. This feature is currently incomplete in the project.`;
+    
+    // Add challenge context based on the challenge type
+    let context = '';
+    
+    if (challenge.description.includes('profile image upload')) {
+      context = `\n\nThe profile image upload functionality is an important part of the user profile system. Currently, there is a "Change Profile Image" button in the Profile component, but it only shows an alert when clicked. The backend has a placeholder endpoint that returns "Not implemented".`;
+    } else if (challenge.description.includes('Follow API')) {
+      context = `\n\nThe follow functionality allows users to follow other users and see their content in their feed. Currently, there is a Follow button in the profile page, but it doesn't do anything when clicked. The backend doesn't have a data model or endpoints for this feature yet.`;
+    } else if (challenge.description.includes('search')) {
+      context = `\n\nThe search functionality is essential for users to find content within the application. Currently, there is no search feature implemented. We need to add both frontend and backend components for this feature.`;
+    } else {
+      context = `\n\nThis feature is currently missing from the application and needs to be implemented from scratch.`;
+    }
+    
+    // Add step details
+    let stepsText = `\n\nTo implement this feature, we'll need to complete the following steps:\n\n`;
+    
+    steps.forEach((step: any, index: number) => {
+      stepsText += `${index + 1}. ${step.name}: ${step.description}\n`;
+    });
+    
+    // Add call to action
+    const callToAction = `\n\nWhich step would you like to work on first? Please choose one of the numbered steps, and we'll focus on implementing that specific part before moving on to the others.`;
+    
+    return intro + context + stepsText + callToAction;
+  }
+  
+  // Process user message and determine next steps
+  processUserMessage(message: string) {
     // Add user message to conversation history
     this.conversationHistory.push({
       type: 'user',
       content: message,
-      timestamp: new Date()
+      challengeId: this.getCurrentChallenge().description
     });
     
-    // Check if we're waiting for step selection
+    // If waiting for step selection, check if the message selects a step
     if (this.waitingForStepSelection) {
-      // Try to determine which step the user wants to work on
-      const stepSelection = this._tryParseStepSelection(message);
+      const selectedStep = this._parseStepSelection(message);
       
-      if (stepSelection) {
-        this.currentStep = stepSelection;
+      if (selectedStep) {
+        // User has selected a step
+        this.currentStep = selectedStep;
         this.waitingForStepSelection = false;
-        this.stepProgress[stepSelection.id] = {
+        this.stepProgress[selectedStep.id] = {
           status: 'in_progress',
           startedAt: new Date()
         };
         
-        // Generate step-specific guidance
-        const guidance = this._getInitialStepGuidance(stepSelection);
+        // Return step-specific guidance
+        const stepGuidance = this._getInitialStepGuidance(selectedStep);
         
         this.conversationHistory.push({
           type: 'guide',
-          content: guidance,
-          stepId: stepSelection.id,
-          timestamp: new Date()
+          content: stepGuidance,
+          challengeId: this.getCurrentChallenge().description,
+          stepId: selectedStep.id
         });
         
-        return guidance;
+        return stepGuidance;
       } else {
-        // If we're waiting for step selection but the message doesn't contain a selection,
-        // show the list of steps again
-        return this._generateStepSelectionPrompt();
+        // Remind user to select a step
+        return "I don't see a clear step selection in your message. Please choose one of the numbered steps listed above to get started. For example, you can say 'I'll work on step 1' or 'Let's start with the Frontend UI Components'.";
       }
     }
     
-    // Check if message indicates step completion
-    if (this.currentStep && this._isStepCompletionMessage(message)) {
-      // Mark current step as complete
-      this.stepProgress[this.currentStep.id] = {
-        ...this.stepProgress[this.currentStep.id],
-        status: 'completed',
-        completedAt: new Date()
-      };
-      
-      // Check if all steps are complete for this challenge
-      const allStepsComplete = this._areAllStepsComplete();
-      
-      if (allStepsComplete) {
-        // Mark current challenge as complete
-        this.project.challenges[this.currentChallengeIndex].completed = true;
-        
-        // Move to next challenge if available
-        if (this.currentChallengeIndex < this.project.challenges.length - 1) {
-          this.currentChallengeIndex++;
-          
-          // Generate completion message
-          const completionMessage = this._generateCompletionMessage();
-          
-          this.waitingForStepSelection = true;
-          this.currentStep = null;
-          
-          // Add completion message to history
-          this.conversationHistory.push({
-            type: 'guide',
-            content: completionMessage,
-            timestamp: new Date()
-          });
-          
-          return completionMessage;
-        } else {
-          // All challenges completed
-          const allDoneMessage = this._generateAllChallengesCompletedMessage();
-          
-          this.conversationHistory.push({
-            type: 'guide',
-            content: allDoneMessage,
-            timestamp: new Date()
-          });
-          
-          return allDoneMessage;
-        }
-      } else {
-        // Not all steps complete, prompt for next step
-        this.waitingForStepSelection = true;
-        this.currentStep = null;
-        
-        const stepPrompt = this._generateStepSelectionPrompt();
-        
-        this.conversationHistory.push({
-          type: 'guide',
-          content: stepPrompt,
-          timestamp: new Date()
-        });
-        
-        return stepPrompt;
-      }
-    }
-    
-    // If we have a current step, provide guidance for it
+    // If user has already selected a step
     if (this.currentStep) {
-      // Check if asking for code example
-      if (this._isAskingForCode(message)) {
-        const codeSnippet = this._provideCodeSnippet();
-        
-        this.conversationHistory.push({
-          type: 'codeSnippet',
-          content: codeSnippet,
-          stepId: this.currentStep.id,
-          timestamp: new Date()
-        });
-        
-        return codeSnippet;
+      // Check if the message indicates the step is complete
+      if (this._isStepCompletionMessage(message)) {
+        return this._handleStepCompletion();
       }
       
-      // Check if asking for help with specific step
-      if (this._isAskingForHelp(message)) {
-        const guidance = this._getStepGuidance(this.currentStep);
+      // Check if user wants to switch to a different step
+      const newStepSelection = this._parseStepSelection(message);
+      if (newStepSelection && newStepSelection.id !== this.currentStep.id) {
+        // User wants to switch steps
+        this.currentStep = newStepSelection;
+        this.stepProgress[newStepSelection.id] = {
+          status: 'in_progress',
+          startedAt: new Date()
+        };
         
-        this.conversationHistory.push({
-          type: 'guide',
-          content: guidance,
-          stepId: this.currentStep.id,
-          timestamp: new Date()
-        });
-        
-        return guidance;
-      }
-      
-      // Handle specific questions about current step
-      if (message.trim().endsWith('?')) {
-        const answer = this._answerStepQuestion(message);
+        const stepGuidance = this._getInitialStepGuidance(newStepSelection);
         
         this.conversationHistory.push({
           type: 'guide',
-          content: answer,
-          stepId: this.currentStep.id,
-          timestamp: new Date()
+          content: stepGuidance,
+          challengeId: this.getCurrentChallenge().description,
+          stepId: newStepSelection.id
         });
         
-        return answer;
+        return stepGuidance;
       }
       
-      // General encouragement and guidance
-      const encouragement = this._generateEncouragementMessage();
-      
-      this.conversationHistory.push({
-        type: 'guide',
-        content: encouragement,
-        stepId: this.currentStep.id,
-        timestamp: new Date()
-      });
-      
-      return encouragement;
+      // Otherwise, provide continued guidance for the current step
+      return this._processContinuedStepGuidance(message);
     }
     
-    // Fallback for unexpected state
-    return "I'm here to help you implement your application. Let's break down the current challenge into specific steps and work on them one by one.";
+    // Check if the message indicates the challenge is complete
+    if (this._isChallengeSolutionMessage(message)) {
+      // Mark current challenge as complete
+      this.project.challenges[this.currentChallengeIndex].completed = true;
+      
+      // Move to the next challenge
+      if (this.currentChallengeIndex < this.project.challenges.length - 1) {
+        this.currentChallengeIndex++;
+        this.currentStep = null;
+        this.waitingForStepSelection = false;
+        return this._generateCompletionMessage();
+      } else {
+        return this._generateAllChallengesCompletedMessage();
+      }
+    }
+    
+    // Default response
+    return "I'm here to help you implement the missing features in this project. Let me know which specific part you'd like to work on, or if you have any questions about the implementation.";
   }
-
-  // Try to determine which step the user wants to work on based on their message
-  private _tryParseStepSelection(message: string): ImplementationStep | null {
+  
+  // Parse a user message to determine which step they want to work on
+  _parseStepSelection(message: string) {
     const steps = this.getChallengeSteps();
     const lowerMessage = message.toLowerCase();
     
-    // Check if message contains step number
-    const numberMatch = lowerMessage.match(/step\s*(\d+)|(\d+)(?:st|nd|rd|th)?\s*step/);
-    if (numberMatch) {
-      const stepNumber = parseInt(numberMatch[1] || numberMatch[2]) - 1;
-      if (stepNumber >= 0 && stepNumber < steps.length) {
-        return steps[stepNumber];
+    // Check for step number references (e.g., "step 1", "number 2")
+    for (let i = 0; i < steps.length; i++) {
+      const stepNumber = i + 1;
+      if (
+        lowerMessage.includes(`step ${stepNumber}`) ||
+        lowerMessage.includes(`step#${stepNumber}`) ||
+        lowerMessage.includes(`step # ${stepNumber}`) ||
+        lowerMessage.includes(`number ${stepNumber}`) ||
+        lowerMessage.includes(`#${stepNumber}`) ||
+        lowerMessage === `${stepNumber}` ||
+        lowerMessage.startsWith(`${stepNumber}.`) ||
+        lowerMessage.startsWith(`${stepNumber})`)
+      ) {
+        return steps[i];
       }
     }
     
-    // Check if message contains step name or description
+    // Check for step name references
     for (const step of steps) {
-      if (lowerMessage.includes(step.id.toLowerCase()) || 
-          lowerMessage.includes(step.name.toLowerCase()) ||
-          lowerMessage.includes(step.description.toLowerCase())) {
+      if (lowerMessage.includes(step.name.toLowerCase())) {
         return step;
       }
     }
     
-    // Check for common keywords
-    if (lowerMessage.includes('front') && !lowerMessage.includes('back')) {
-      return steps.find(step => step.type === 'frontend') || null;
+    // Check for partial step name references
+    for (const step of steps) {
+      // Create keywords from the step name
+      const keywords = step.name.toLowerCase().split(' ');
+      
+      // Check if multiple keywords are present in the message
+      const matchingKeywords = keywords.filter((keyword: string) => 
+        keyword.length > 3 && lowerMessage.includes(keyword)
+      );
+      
+      if (matchingKeywords.length >= 2) {
+        return step;
+      }
     }
     
-    if (lowerMessage.includes('back') && !lowerMessage.includes('front')) {
-      return steps.find(step => step.type === 'backend') || null;
-    }
-    
-    if (lowerMessage.includes('ui') || lowerMessage.includes('interface')) {
-      return steps.find(step => step.type === 'frontend') || null;
-    }
-    
-    if (lowerMessage.includes('api') || lowerMessage.includes('server')) {
-      return steps.find(step => step.type === 'backend') || null;
-    }
-    
+    // No clear step selection found
     return null;
   }
   
-  // Generate a prompt asking the user to select a step to work on
-  private _generateStepSelectionPrompt(): string {
-    const steps = this.getChallengeSteps();
-    const challenge = this.getCurrentChallenge();
+  // Check if the message indicates a step has been completed
+  _isStepCompletionMessage(message: string) {
+    const lowerMessage = message.toLowerCase();
+    const completionPhrases = [
+      "i've completed", "i have completed", "finished implementing", 
+      "done implementing", "implemented the", "feature is working",
+      "it's working now", "it works now", "completed the step",
+      "step is complete", "step is done", "finished the step",
+      "i'm done with this step", "i am done with this step",
+      "this part is complete", "this part is done"
+    ];
     
-    // Get incomplete steps
-    const incompleteSteps = steps.filter(step => 
-      !this.stepProgress[step.id] || 
-      this.stepProgress[step.id].status !== 'completed'
-    );
-    
-    if (incompleteSteps.length === 0) {
-      // Should never get here, but just in case
-      return "It looks like you've completed all the steps for this challenge!";
-    }
-    
-    let response = `For the "${challenge.description}" feature, here are the implementation steps we need to work on:\n\n`;
-    
-    steps.forEach((step, index) => {
-      const status = this.stepProgress[step.id]?.status === 'completed' ? '✅ Completed' : '⏳ Pending';
-      response += `${index + 1}. ${step.name} - ${step.description} (${status})\n`;
-    });
-    
-    response += `\nWhich step would you like to work on next? Please choose one of the numbered steps that's not yet completed.`;
-    
-    return response;
+    return completionPhrases.some(phrase => lowerMessage.includes(phrase));
   }
   
-  // Generate initial guidance for a specific step
-  private _getInitialStepGuidance(step: ImplementationStep): string {
+  // Check if the message indicates the challenge solution is complete
+  _isChallengeSolutionMessage(message: string) {
+    const lowerMessage = message.toLowerCase();
+    const challengeName = this.getCurrentChallenge().description.toLowerCase();
+    
+    const completionPhrases = [
+      "completed all steps", "finished all steps", 
+      "implemented the entire feature", "all steps are complete",
+      "feature is fully implemented", "challenge is complete",
+      "finished the challenge", "all parts are working"
+    ];
+    
+    return completionPhrases.some(phrase => lowerMessage.includes(phrase)) ||
+           (lowerMessage.includes("completed") && lowerMessage.includes(challengeName));
+  }
+  
+  // Handle the completion of a step
+  _handleStepCompletion() {
+    const completedStep = this.currentStep;
+    
+    if (!completedStep) return "I'm not sure which step you've completed. Please let me know which specific implementation step you're working on.";
+    
+    // Mark the step as completed
+    this.stepProgress[completedStep.id] = {
+      ...this.stepProgress[completedStep.id],
+      status: 'completed',
+      completedAt: new Date()
+    };
+    
+    // Check if there are remaining steps
+    const steps = this.getChallengeSteps();
+    const remainingSteps = steps.filter(step => 
+      !this.stepProgress[step.id] || this.stepProgress[step.id].status !== 'completed'
+    );
+    
+    if (remainingSteps.length > 0) {
+      // There are remaining steps
+      this.currentStep = null;
+      this.waitingForStepSelection = true;
+      
+      let message = `Great job completing the ${completedStep.name} step!\n\n`;
+      message += `You still have the following steps to complete:`;
+      
+      remainingSteps.forEach((step, index) => {
+        message += `\n${index + 1}. ${step.name}: ${step.description}`;
+      });
+      
+      message += `\n\nWhich step would you like to work on next?`;
+      
+      this.conversationHistory.push({
+        type: 'guide',
+        content: message,
+        challengeId: this.getCurrentChallenge().description
+      });
+      
+      return message;
+    } else {
+      // All steps are completed, mark the challenge as complete
+      this.project.challenges[this.currentChallengeIndex].completed = true;
+      
+      // Move to the next challenge
+      if (this.currentChallengeIndex < this.project.challenges.length - 1) {
+        this.currentChallengeIndex++;
+        this.currentStep = null;
+        this.waitingForStepSelection = false;
+        return this._generateCompletionMessage();
+      } else {
+        return this._generateAllChallengesCompletedMessage();
+      }
+    }
+  }
+  
+  // Get initial guidance for a specific step
+  _getInitialStepGuidance(step: ImplementationStep) {
     let guidance = `Great! Let's work on the **${step.name}** step: ${step.description}.\n\n`;
     
+    // Add step-specific guidance
     if (step.id === 'frontend-ui') {
       guidance += `For the frontend UI components, you'll need to implement:
 
@@ -566,130 +481,335 @@ Let's start by adding a file input element and connecting it to the button. Here
 - Use a file input with type="file" and accept="image/*" attributes
 - Hide it visually using CSS or by setting display: none
 - Use a ref to reference the hidden input from your button click handler
-- Add an onChange handler to the file input to handle file selection`;
-    } else if (step.id === 'frontend-logic') {
-      guidance += `For the frontend upload logic, you'll need to implement:
+- Add an onChange handler to the file input to handle file selection
 
-1. Validation to ensure only valid image files are selected
-2. Creation of a FormData object to send the file to the server
-3. State management to show loading status during upload
-4. Error handling for various failure scenarios
-
-Let's start with validation and the file upload function. Here's some guidance:
-
-- Check the file type using file.type.startsWith('image/')
-- Set size limits for the file (e.g., max 5MB)
-- Create a FormData object and append the file with a field name
-- Add loading state and error handling in your upload function`;
+Would you like me to show you some code for this implementation, or do you want to try implementing it yourself first?`;
     } else if (step.id === 'backend-middleware') {
-      guidance += `For the backend file upload middleware, you'll need to implement:
+      guidance += `For the backend file upload middleware, you'll need to:
 
-1. A file upload middleware (like Multer for Node.js)
-2. Configuration for file storage destination
-3. Filename generation strategy to avoid conflicts
-4. File type and size validation at the server level
+1. Install a file upload package (Multer is recommended for Express)
+2. Configure the storage options (destination folder, filename generation)
+3. Set up file filters to only allow image files
+4. Add size limits to prevent large file uploads
+5. Create the middleware function to use in your route
 
-Let's start by setting up the middleware. Here's some guidance:
+Let's start by setting up Multer. First, you'll need to install it:
 
-- Install a file upload middleware package if needed
-- Configure the storage options (destination, filename generation)
-- Set file size limits
-- Add file type validation using mimetype checks`;
+\`\`\`
+npm install multer
+\`\`\`
+
+Then you'll need to configure it in your server file or route file. Would you like a code example for the basic setup, or do you want to try implementing it yourself first?`;
+    } else if (step.id === 'search-ui') {
+      guidance += `For the search UI components, you'll need to implement:
+
+1. A search input field with appropriate styling
+2. Handling user input and search submission
+3. A results display area
+4. Loading states during search
+5. Empty state when no results are found
+
+Let's start with creating the search input component. You'll want to consider:
+
+- Debouncing input to prevent too many requests
+- Adding a search icon and possibly a clear button
+- Styling the input appropriately for your application
+- Handling form submission for both button click and Enter key press
+
+Would you like a code example to get started, or do you want to try implementing it yourself first?`;
     } else {
-      guidance += `For this step, you'll need to break it down into smaller tasks and implement them one by one. Here are some key considerations for the ${step.name}:
+      // Generic guidance for other steps
+      guidance += `To implement this step, you'll need to:
 
-1. Understand the requirements and expected outcome
-2. Identify the specific files and components that need to be modified
-3. Make incremental changes and test as you go
-4. Consider edge cases and error scenarios
+1. Understand the current code structure related to this feature
+2. Identify the specific files that need to be modified
+3. Implement the necessary changes
+4. Test your implementation
 
-Let me know if you need specific help with any part of this step, or if you'd like to see code examples.`;
+Let's start by examining the relevant code. What questions do you have about this step, or would you like some code examples to get started?`;
     }
-    
-    guidance += `\n\nWould you like me to show you some code examples for this step, or do you want to try implementing it on your own first?`;
     
     return guidance;
   }
   
-  // Check if a message indicates that a step is completed
-  private _isStepCompletionMessage(message: string): boolean {
+  // Get continued guidance for the current step based on user message
+  _processContinuedStepGuidance(message: string) {
+    // Analyze the message to determine the appropriate response
     const lowerMessage = message.toLowerCase();
-    const completionPhrases = [
-      "i've completed", "i have completed", "finished implementing", 
-      "done implementing", "implemented the", "feature is working",
-      "it's working now", "it works now", "completed the step",
-      "i'm done", "i am done", "step is complete"
-    ];
     
-    return completionPhrases.some(phrase => lowerMessage.includes(phrase));
+    if (this._isAskingForCode(lowerMessage)) {
+      return this._provideCodeSnippet();
+    } else if (this._isAskingForHelp(lowerMessage)) {
+      return this._provideStepHelp();
+    } else if (this._isAskingQuestion(lowerMessage)) {
+      return this._answerQuestion(message);
+    } else {
+      // Generic encouragement and continued guidance
+      return this._generateEncouragementMessage();
+    }
   }
   
-  // Check if all steps for current challenge are complete
-  private _areAllStepsComplete(): boolean {
-    const steps = this.getChallengeSteps();
-    
-    return steps.every(step => 
-      this.stepProgress[step.id] && 
-      this.stepProgress[step.id].status === 'completed'
-    );
-  }
-  
-  // Check if user is asking for help
-  private _isAskingForHelp(message: string): boolean {
-    const lowerMessage = message.toLowerCase();
-    const helpPhrases = [
-      "help", "hint", "stuck", "don't understand", "don't know how", 
-      "not sure", "guidance", "assist", "confused", "struggling",
-      "how do i", "how to", "explain"
-    ];
-    
-    return helpPhrases.some(phrase => lowerMessage.includes(phrase));
-  }
-  
-  // Check if user is asking for code
-  private _isAskingForCode(message: string): boolean {
-    const lowerMessage = message.toLowerCase();
+  // Check if user is asking for code examples
+  _isAskingForCode(message: string) {
     const codePhrases = [
       "code example", "sample code", "example code", "how do i code", 
       "show me the code", "code snippet", "implementation example",
-      "show code", "provide code", "code sample"
+      "show me how", "can you provide code", "give me code",
+      "what's the code", "what is the code"
     ];
     
-    return codePhrases.some(phrase => lowerMessage.includes(phrase));
+    return codePhrases.some(phrase => message.includes(phrase));
   }
   
-  // Answer specific questions about the current step
-  private _answerStepQuestion(question: string): string {
+  // Check if user is asking for help
+  _isAskingForHelp(message: string) {
+    const helpPhrases = [
+      "help", "hint", "stuck", "don't understand", "don't know how", 
+      "not sure", "guidance", "assist", "confused", "struggling",
+      "having trouble", "difficult", "can't figure out"
+    ];
+    
+    return helpPhrases.some(phrase => message.includes(phrase));
+  }
+  
+  // Check if user is asking a question
+  _isAskingQuestion(message: string) {
+    return message.includes("?") || 
+           message.startsWith("what") || 
+           message.startsWith("how") || 
+           message.startsWith("why") || 
+           message.startsWith("when") || 
+           message.startsWith("where") || 
+           message.startsWith("which") || 
+           message.startsWith("can") || 
+           message.startsWith("do") || 
+           message.startsWith("is") ||
+           message.startsWith("are");
+  }
+  
+  // Provide specific help for the current step
+  _provideStepHelp() {
     const step = this.currentStep;
-    if (!step) return "I'm not sure what you're asking about. Please select a step to work on first.";
+    
+    if (!step) return "I'm not sure which step you need help with. Please let me know which specific implementation step you're working on.";
+    
+    // Step-specific help
+    if (step.id === 'frontend-ui') {
+      return `Here are some tips to help you implement the frontend UI components:
+
+1. Start with the basic HTML structure:
+   - Add a hidden file input element
+   - Create a visible button that will trigger the file input
+   - Add a container for the image preview
+
+2. Common challenges with file inputs:
+   - Remember that file inputs can't be styled easily, which is why we hide them
+   - Use JavaScript to programmatically click the hidden input when the visible button is clicked
+   - Make sure to check if a file was actually selected before proceeding
+
+3. For the image preview:
+   - Use the FileReader API to read the selected image file as a data URL
+   - Set the src attribute of an img element to display the preview
+   - Consider adding a default image or placeholder when no image is selected
+
+4. For the loading state:
+   - Add a state variable to track when the upload is in progress
+   - Disable the button during upload to prevent multiple submissions
+   - Consider adding a loading spinner or other visual indicator
+
+Is there a specific part of this implementation that you're struggling with?`;
+    } else if (step.id === 'backend-middleware') {
+      return `Here are some tips to help you implement the backend file upload middleware:
+
+1. Multer Configuration:
+   - Set up storage options (disk storage is common for file uploads)
+   - Configure filename generation to avoid collisions (using Date.now() or UUID)
+   - Set file size limits (typically 5MB for profile images is reasonable)
+   - Add file filters to ensure only images are uploaded
+
+2. Common challenges with file uploads:
+   - Make sure the upload directory exists before saving files
+   - Validate file types properly (check both mimetype and extension)
+   - Handle errors gracefully, especially for file size limits
+
+3. Security considerations:
+   - Sanitize filenames to prevent directory traversal attacks
+   - Use crypto.randomBytes() to generate random filenames instead of using user-provided names
+   - Set proper permissions on upload directories
+
+4. Integration with Express routes:
+   - Add the middleware to the specific route that handles file uploads
+   - Access the uploaded file via req.file in your route handler
+
+Is there a specific part of this implementation that you're struggling with?`;
+    } else {
+      // Generic help for other steps
+      return `I understand you're looking for help with the ${step.name} step. Here are some general tips:
+
+1. Break down the task into smaller sub-tasks
+2. Start with a simple implementation and then refine it
+3. Look at the existing code for similar patterns
+4. Test your implementation frequently as you develop
+
+Could you tell me more specifically what you're struggling with, and I can provide more targeted guidance?`;
+    }
+  }
+  
+  // Answer a user question based on the current step context
+  _answerQuestion(question: string) {
+    const step = this.currentStep;
+    if (!step) return "I'm not sure which step you're asking about. Please let me know which specific implementation step you're working on.";
     
     const lowerQuestion = question.toLowerCase();
     
-    // Extract some common frontend-related questions
-    if (step.id.startsWith('frontend')) {
-      if (lowerQuestion.includes('file input') || lowerQuestion.includes('file upload')) {
-        return `To implement a file input for image upload:
+    // Step-specific question answers
+    if (step.id === 'frontend-ui') {
+      if (lowerQuestion.includes("file reader")) {
+        return `The FileReader API is used to read files from the user's computer. Here's how you can use it to preview an image:
 
-1. Create a hidden input element: 
-\`\`\`jsx
-<input 
-  type="file" 
-  ref={fileInputRef} 
-  style={{ display: 'none' }} 
-  accept="image/*" 
-  onChange={handleFileChange} 
-/>
+\`\`\`javascript
+const handleFileChange = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    // event.target.result contains the data URL representing the file
+    setImagePreview(event.target.result);
+  };
+  reader.readAsDataURL(file);
+};
 \`\`\`
 
-2. Create a visible button that triggers the file input:
+This code creates a FileReader instance, sets up an onload handler to update your state when the file is read, and then starts reading the file as a data URL, which can be directly used as the src attribute of an img element.`;
+      } else if (lowerQuestion.includes("hidden input") || lowerQuestion.includes("file input")) {
+        return `To create a hidden file input that's triggered by a visible button, you can use this pattern:
+
 \`\`\`jsx
-<button onClick={() => fileInputRef.current.click()}>
-  Upload Image
-</button>
+import React, { useRef } from 'react';
+
+function ImageUploader() {
+  const fileInputRef = useRef(null);
+  
+  const handleButtonClick = () => {
+    // Programmatically click the hidden file input
+    fileInputRef.current.click();
+  };
+  
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Process the selected file
+      console.log('File selected:', file.name);
+    }
+  };
+  
+  return (
+    <div>
+      {/* Hidden file input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        style={{ display: 'none' }}
+        accept="image/*"
+        onChange={handleFileChange}
+      />
+      
+      {/* Visible button */}
+      <button onClick={handleButtonClick}>
+        Select Image
+      </button>
+    </div>
+  );
+}
 \`\`\`
 
-3. Handle the file selection:
-\`\`\`jsx
+This code uses a ref to reference the hidden file input element, then triggers a click on it when the visible button is clicked. The onChange handler processes the selected file.`;
+      }
+    } else if (step.id === 'backend-middleware') {
+      if (lowerQuestion.includes("multer")) {
+        return `Multer is a Node.js middleware for handling multipart/form-data, which is primarily used for file uploads. Here's how to set it up for image uploads:
+
+\`\`\`javascript
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Ensure upload directory exists
+const uploadDir = path.join(__dirname, 'uploads/profile-images');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Configure storage
+const storage = multer.diskStorage({
+  destination: function(req, file, cb) {
+    cb(null, 'uploads/profile-images/');
+  },
+  filename: function(req, file, cb) {
+    // Generate a unique filename
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, 'profile-' + uniqueSuffix + ext);
+  }
+});
+
+// File filter
+const fileFilter = (req, file, cb) => {
+  // Accept only images
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed!'), false);
+  }
+};
+
+// Create the multer instance
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: fileFilter
+});
+
+// Use in a route
+app.post('/api/users/profile-image', auth, upload.single('profileImage'), (req, res) => {
+  // req.file contains info about the uploaded file
+  // req.file.path contains the path to the uploaded file
+  // Process the uploaded file...
+});
+\`\`\`
+
+This code sets up Multer with disk storage, configures a unique filename generation function, adds a file filter to only accept images, and sets a 5MB file size limit.`;
+      } else if (lowerQuestion.includes("file type") || lowerQuestion.includes("mimetype")) {
+        return `To validate file types when uploading images, you can check the MIME type of the uploaded file. Here's how to implement it:
+
+\`\`\`javascript
+// File filter function for Multer
+const fileFilter = (req, file, cb) => {
+  // Check if the file's MIME type starts with 'image/'
+  if (file.mimetype.startsWith('image/')) {
+    // Accept the file
+    cb(null, true);
+  } else {
+    // Reject the file
+    cb(new Error('Only image files are allowed!'), false);
+  }
+};
+
+// You can also be more specific with allowed types
+const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+const strictFileFilter = (req, file, cb) => {
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only JPG, PNG, and GIF files are allowed!'), false);
+  }
+};
+\`\`\`
+
+On the frontend, you can also validate file types before uploading:
+
+\`\`\`javascript
 const handleFileChange = (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -715,7 +835,8 @@ Remember that validating on both frontend and backend is important for security 
   // Provide a code snippet for the current step
   _provideCodeSnippet() {
     const step = this.currentStep;
-    if (!step) return "Please select a step to work on first.";
+    
+    if (!step) return "I'm not sure which step you need code for. Please let me know which specific implementation step you're working on.";
     
     // Step-specific code snippets
     if (step.id === 'frontend-ui') {
@@ -813,165 +934,372 @@ function ProfileImageUpload({ currentImage, onImageUpload }) {
 }
 
 export default ProfileImageUpload;
-\`\`\``;
-    } else if (step.id === 'frontend-logic') {
-      return `Here's a code example for implementing the frontend upload logic:
-
-\`\`\`jsx
-import React, { useState, useRef } from 'react';
-import axios from 'axios';
-
-function ImageUploader({ onUploadComplete }) {
-  const [file, setFile] = useState(null);
-  const [preview, setPreview] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState(null);
-  const fileInputRef = useRef(null);
-
-  const handleFileSelect = (e) => {
-    setError(null);
-    const selectedFile = e.target.files[0];
-    
-    // Validate file exists
-    if (!selectedFile) return;
-    
-    // Validate file type
-    if (!selectedFile.type.startsWith('image/')) {
-      setError('Please select a valid image file (JPEG, PNG, etc.)');
-      return;
-    }
-    
-    // Validate file size (max 5MB)
-    if (selectedFile.size > 5 * 1024 * 1024) {
-      setError('File size exceeds 5MB limit');
-      return;
-    }
-    
-    // Create preview
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPreview(reader.result);
-    };
-    reader.readAsDataURL(selectedFile);
-    
-    // Store file
-    setFile(selectedFile);
-  };
-  
-  const handleUpload = async () => {
-    if (!file) {
-      setError('Please select a file to upload');
-      return;
-    }
-    
-    setUploading(true);
-    setError(null);
-    
-    try {
-      // Create form data
-      const formData = new FormData();
-      formData.append('profileImage', file);
-      
-      // Send to server
-      const response = await axios.post('/api/users/profile-image', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-      
-      // Handle success
-      setUploading(false);
-      
-      // Pass result to parent component
-      if (onUploadComplete) {
-        onUploadComplete(response.data);
-      }
-    } catch (err) {
-      setUploading(false);
-      
-      // Handle different error types
-      if (err.response) {
-        // Server responded with error
-        setError(err.response.data.message || 'Upload failed');
-      } else if (err.request) {
-        // No response received
-        setError('No response from server. Please try again.');
-      } else {
-        // Other error
-        setError('Upload failed: ' + err.message);
-      }
-    }
-  };
-  
-  return (
-    <div className="image-uploader">
-      {error && <div className="error-message">{error}</div>}
-      
-      {preview && (
-        <div className="preview-container">
-          <img src={preview} alt="Preview" className="image-preview" />
-        </div>
-      )}
-      
-      <div className="upload-controls">
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileSelect}
-          accept="image/*"
-          style={{ display: 'none' }}
-        />
-        
-        <button 
-          onClick={() => fileInputRef.current.click()}
-          className="select-button"
-          disabled={uploading}
-        >
-          Select Image
-        </button>
-        
-        <button
-          onClick={handleUpload}
-          disabled={!file || uploading}
-          className="upload-button"
-        >
-          {uploading ? 'Uploading...' : 'Upload'}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-export default ImageUploader;
 \`\`\`
 
-This implementation includes:
+And here's some CSS to go with it:
 
-1. File selection with a hidden input
-2. File validation (type and size)
-3. Preview generation with FileReader
-4. FormData creation for upload
-5. Loading state during upload
-6. Error handling for various scenarios
-7. Parent component notification on completion
+\`\`\`css
+.profile-image-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
 
-To use this component:
+.image-container {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.profile-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.upload-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.spinner {
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top: 4px solid white;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.upload-button {
+  padding: 8px 16px;
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.upload-button:hover {
+  background-color: #3a7bc8;
+}
+
+.upload-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+\`\`\`
+
+To use this component in your Profile component:
 
 \`\`\`jsx
-function ProfilePage() {
-  const handleUploadComplete = (result) => {
-    console.log('Upload complete:', result);
-    // Update user profile state, etc.
+import ProfileImageUpload from './ProfileImageUpload';
+
+function Profile({ user }) {
+  const handleImageUpload = (file) => {
+    // In a real implementation, you would create a FormData object
+    // and send it to your server
+    const formData = new FormData();
+    formData.append('profileImage', file);
+    
+    // Call your API to upload the image
+    // api.uploadProfileImage(formData);
   };
   
   return (
     <div className="profile-page">
-      <h1>Your Profile</h1>
-      <ImageUploader onUploadComplete={handleUploadComplete} />
+      <h1>{user.name}</h1>
+      <ProfileImageUpload
+        currentImage={user.profileImage}
+        onImageUpload={handleImageUpload}
+      />
+      {/* Other profile content */}
     </div>
   );
 }
-\`\`\``;
+\`\`\`
+
+This implementation includes:
+1. A hidden file input triggered by a visible button
+2. Image preview functionality using FileReader
+3. Validation of image file types
+4. Loading state during upload
+5. A nice circular image container with overlay during upload
+
+Let me know if you'd like me to explain any part of this code in more detail!`;
+    } else if (step.id === 'backend-middleware') {
+      return `Here's a complete example of implementing the backend file upload middleware with Multer:
+
+\`\`\`javascript
+// Required modules
+const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+
+// Create Express router
+const router = express.Router();
+
+// Ensure upload directory exists
+const uploadDir = path.join(__dirname, '../../uploads/profile-images');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Configure multer storage
+const storage = multer.diskStorage({
+  destination: function(req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function(req, file, cb) {
+    // Generate a secure random filename
+    const randomName = crypto.randomBytes(16).toString('hex');
+    const fileExtension = path.extname(file.originalname).toLowerCase();
+    
+    // Check if extension is valid
+    const validExtensions = ['.jpg', '.jpeg', '.png', '.gif'];
+    if (!validExtensions.includes(fileExtension)) {
+      return cb(new Error('Invalid file extension'), false);
+    }
+    
+    cb(null, randomName + fileExtension);
+  }
+});
+
+// File filter function
+const fileFilter = (req, file, cb) => {
+  // Check MIME type
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed'), false);
+  }
+};
+
+// Create multer upload instance
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
+  fileFilter: fileFilter
+});
+
+// Import authentication middleware and User model
+const auth = require('../../middleware/auth');
+const User = require('../../models/User');
+
+// Profile image upload endpoint
+router.post('/profile-image', auth, upload.single('profileImage'), async (req, res) => {
+  try {
+    // Check if file exists
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+    
+    // Get file path relative to server
+    const filePath = '/uploads/profile-images/' + req.file.filename;
+    
+    // Update user profile with new image URL
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { profileImage: filePath },
+      { new: true }
+    ).select('-password');
+    
+    // Return success response with updated user
+    res.json({
+      success: true,
+      profileImage: filePath,
+      user
+    });
+  } catch (error) {
+    console.error('Error uploading profile image:', error);
+    
+    // If there was a file uploaded, delete it
+    if (req.file) {
+      fs.unlink(req.file.path, (unlinkError) => {
+        if (unlinkError) {
+          console.error('Error deleting file:', unlinkError);
+        }
+      });
+    }
+    
+    // Check for specific error types
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ message: 'File size exceeds 5MB limit' });
+    }
+    
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Error handler for multer errors
+router.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    // A Multer error occurred when uploading
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ message: 'File size exceeds 5MB limit' });
+    }
+    return res.status(400).json({ message: err.message });
+  } else if (err) {
+    // An unknown error occurred
+    return res.status(500).json({ message: err.message });
+  }
+  
+  // If no error, continue
+  next();
+});
+
+module.exports = router;
+\`\`\`
+
+In your main server.js file, you'll need to add:
+
+\`\`\`javascript
+// Set up static file serving
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Use the routes
+app.use('/api/users', require('./routes/api/users'));
+\`\`\`
+
+This implementation includes:
+
+1. Setting up Multer with disk storage
+2. Creating the upload directory if it doesn't exist
+3. Generating secure random filenames using crypto
+4. Validating file types on both extension and MIME type
+5. Setting a 5MB file size limit
+6. Implementing the profile image upload endpoint
+7. Error handling for various upload scenarios
+8. Cleaning up uploaded files on error
+9. Serving static files from the uploads directory
+
+Let me know if you need any clarification on this implementation!`;
+    } else if (step.id === 'data-model') {
+      return `Here's an example of implementing a Follow model for a social media application:
+
+\`\`\`javascript
+// models/Follow.js
+const mongoose = require('mongoose');
+const Schema = mongoose.Schema;
+
+const FollowSchema = new Schema({
+  follower: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  following: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Create a compound index for uniqueness and query optimization
+FollowSchema.index({ follower: 1, following: 1 }, { unique: true });
+
+// Static method to check if a user is following another
+FollowSchema.statics.isFollowing = async function(followerId, followingId) {
+  const follow = await this.findOne({ follower: followerId, following: followingId });
+  return !!follow;
+};
+
+// Static method to get follower count
+FollowSchema.statics.getFollowerCount = async function(userId) {
+  return await this.countDocuments({ following: userId });
+};
+
+// Static method to get following count
+FollowSchema.statics.getFollowingCount = async function(userId) {
+  return await this.countDocuments({ follower: userId });
+};
+
+// Static method to get followers
+FollowSchema.statics.getFollowers = async function(userId, limit = 10, skip = 0) {
+  return await this.find({ following: userId })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .populate('follower', 'name username profileImage')
+    .lean();
+};
+
+// Static method to get following
+FollowSchema.statics.getFollowing = async function(userId, limit = 10, skip = 0) {
+  return await this.find({ follower: userId })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .populate('following', 'name username profileImage')
+    .lean();
+};
+
+module.exports = mongoose.model('Follow', FollowSchema);
+\`\`\`
+
+You would then need to update your User model to reference the Follow model:
+
+\`\`\`javascript
+// Update in models/User.js
+
+// Add methods to get follower and following counts
+UserSchema.methods.getFollowerCount = async function() {
+  const Follow = require('./Follow');
+  return await Follow.getFollowerCount(this._id);
+};
+
+UserSchema.methods.getFollowingCount = async function() {
+  const Follow = require('./Follow');
+  return await Follow.getFollowingCount(this._id);
+};
+
+// Check if the user is following another user
+UserSchema.methods.isFollowing = async function(userId) {
+  const Follow = require('./Follow');
+  return await Follow.isFollowing(this._id, userId);
+};
+\`\`\`
+
+This implementation includes:
+
+1. A Follow schema with follower and following fields (references to User model)
+2. A compound index for uniqueness (a user can't follow another user multiple times)
+3. Static methods for checking follow status and counting followers/following
+4. Static methods for retrieving followers and following lists with pagination
+5. Methods added to the User model for convenience
+
+The model is designed to be efficient for common operations like:
+- Checking if a user follows another user
+- Getting follower/following counts
+- Retrieving follower/following lists with pagination
+- Enforcing uniqueness at the database level
+
+Let me know if you'd like me to explain any part of this implementation in more detail!`;
     } else {
       // Generic code snippet
       return `I'd be happy to provide some code examples for the ${step.name} step. However, I'd like to understand more specifically what part you need help with. 
@@ -991,7 +1319,8 @@ Let me know what specific aspect you're working on, and I can provide a more tar
   // Generate a general encouragement message
   _generateEncouragementMessage() {
     const step = this.currentStep;
-    if (!step) return "Let's get started on implementing your application. What step would you like to work on first?";
+    
+    if (!step) return "I'm here to help you implement this feature. Which specific step would you like to work on?";
     
     const messages = [
       `How's your implementation of the ${step.name} coming along? Remember to break it down into smaller steps if it feels overwhelming.`,
