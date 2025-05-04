@@ -29,8 +29,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
-import { Message, ChatHistoryItem } from "@/types/chat";
+import { Message } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
+
+interface ChatHistoryItem {
+  id: string;
+  title: string;
+  last_message?: string;
+  timestamp: string;
+  messages?: Message[]; // Add messages array to store full conversation
+}
 
 const ChatHistory = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -51,26 +59,17 @@ const ChatHistory = () => {
         const { data: session } = await supabase.auth.getSession();
         
         if (!session.session) {
-          // If no session (user not logged in), get from localStorage as fallback
+          // If no session (user not logged in), try to get from localStorage as fallback
           const storedHistory = localStorage.getItem('chatHistory');
-          console.log("Fetching from localStorage, found:", storedHistory ? "yes" : "no");
           if (storedHistory) {
             try {
-              const parsedHistory = JSON.parse(storedHistory);
-              console.log("Parsed history:", parsedHistory);
-              setChatHistory(parsedHistory);
+              setChatHistory(JSON.parse(storedHistory));
             } catch (error) {
               console.error("Error parsing chat history from localStorage:", error);
-              toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to load chat history from local storage."
-              });
             }
           }
         } else {
           // User is logged in, fetch from Supabase
-          console.log("User is logged in, fetching from Supabase");
           const { data, error } = await supabase
             .from('chat_history')
             .select('*')
@@ -97,77 +96,24 @@ const ChatHistory = () => {
             // Format data from Supabase to match our ChatHistoryItem interface
             const formattedHistory = data.map((item: any) => ({
               id: item.id,
-              title: item.title || "Untitled Conversation",
-              last_message: item.last_message || "No messages",
+              title: item.title,
+              lastMessage: item.last_message || "No messages",
               timestamp: formatTimestamp(item.updated_at || item.created_at),
               messages: item.messages || []
             }));
             
-            console.log("Formatted history from Supabase:", formattedHistory);
             setChatHistory(formattedHistory);
           }
         }
       } catch (error) {
         console.error("Error loading chat history:", error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load chat history."
-        });
       } finally {
         setLoading(false);
       }
     };
     
     fetchChatHistory();
-    
-    // Set up interval to refresh the chat history every 10 seconds
-    const refreshInterval = setInterval(fetchChatHistory, 10000);
-    
-    return () => {
-      clearInterval(refreshInterval);
-    };
   }, []);
-
-  // Universal message formatter that works for ALL message types
-  const formatLastMessage = (message: any): string => {
-    if (!message) return "No messages";
-    
-    try {
-      // Handle any object type message
-      if (typeof message === 'object') {
-        // If it has content, use that (works for all message types)
-        if (message.content) {
-          const content = typeof message.content === 'string' 
-            ? message.content 
-            : JSON.stringify(message.content);
-          
-          // Show 'App creation' prefix if this is an app generation message
-          if (message.metadata?.projectId) {
-            const projectName = message.metadata?.projectName || "New application";
-            return `App creation: ${projectName}`;
-          }
-          
-          // Remove markdown formatting for regular messages
-          const plainText = content.replace(/\*\*/g, '').replace(/`/g, '').replace(/\n/g, ' ');
-          return plainText.length > 60 ? plainText.substring(0, 60) + "..." : plainText;
-        }
-        
-        // Handle other object formats
-        return "Message";
-      }
-      
-      // Handle string messages
-      if (typeof message === 'string') {
-        return message.length > 60 ? message.substring(0, 60) + "..." : message;
-      }
-      
-      return "Message";
-    } catch (error) {
-      console.error("Error formatting message:", error);
-      return "Message";
-    }
-  };
 
   const formatTimestamp = (timestamp: string) => {
     try {
@@ -190,16 +136,14 @@ const ChatHistory = () => {
   );
 
   const handleChatSelection = (chatId: string) => {
-    console.log(`Navigating to chat with ID: ${chatId}`);
-    
-    // Use navigate instead of changing window.location for a smoother transition
-    navigate(`/app?chat=${chatId}`);
+    // Here we navigate to the main chat page with the specific chat ID
+    navigate(`/?chat=${chatId}`);
   };
 
   // Function to handle creating a new chat
   const handleNewChat = () => {
     // Navigate to the home page without any chat ID parameter to start fresh
-    navigate('/app');
+    navigate('/');
   };
   
   const openRenameDialog = (chat: ChatHistoryItem, e: React.MouseEvent) => {
@@ -329,63 +273,11 @@ const ChatHistory = () => {
     }
   };
 
-  // Get message count with unified error handling
-  const getMessageCount = (chat: ChatHistoryItem) => {
-    if (!chat.messages) return 0;
-    
-    try {
-      if (Array.isArray(chat.messages)) {
-        return chat.messages.length;
-      } else if (typeof chat.messages === 'string') {
-        const parsedMessages = JSON.parse(chat.messages);
-        return Array.isArray(parsedMessages) ? parsedMessages.length : 0;
-      } else if (typeof chat.messages === 'object') {
-        return Object.keys(chat.messages).length;
-      }
-    } catch (e) {
-      console.error("Error getting message count:", e);
-    }
-    
-    return 0;
-  };
-
-  // Get last message with robust error handling
-  const getLastMessage = (chat: ChatHistoryItem) => {
-    if (!chat.messages) return chat.last_message || "No messages";
-    
-    try {
-      let messages;
-      
-      // Handle different message formats consistently
-      if (Array.isArray(chat.messages)) {
-        messages = chat.messages;
-      } else if (typeof chat.messages === 'string') {
-        messages = JSON.parse(chat.messages);
-      } else if (typeof chat.messages === 'object') {
-        messages = Object.values(chat.messages);
-      } else {
-        return chat.last_message || "No messages";
-      }
-      
-      if (!Array.isArray(messages) || messages.length === 0) {
-        return chat.last_message || "No messages";
-      }
-      
-      // Get the last message regardless of type and format consistently
-      const lastMessage = messages[messages.length - 1];
-      return formatLastMessage(lastMessage);
-      
-    } catch (e) {
-      console.error("Error parsing last message:", e);
-      return chat.last_message || "No messages";
-    }
-  };
-
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <div className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-3">
-          <Link to="/app">
+          <Link to="/">
             <Button variant="outline" size="icon" className="rounded-full">
               <ArrowLeft className="h-4 w-4" />
             </Button>
@@ -410,7 +302,7 @@ const ChatHistory = () => {
       </div>
       
       <p className="text-gray-600 mb-6">
-        You have {filteredChats.length} previous chats. <span className="text-blue-500 cursor-pointer">Select one to continue</span>
+        You have {filteredChats.length} previous chats with Claude. <span className="text-blue-500 cursor-pointer">Select</span>
       </p>
       
       {loading ? (
@@ -435,10 +327,12 @@ const ChatHistory = () => {
               <div className="flex justify-between items-start">
                 <div>
                   <h2 className="font-medium text-gray-800">{chat.title}</h2>
-                  <p className="text-sm text-gray-500">{getLastMessage(chat)}</p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {getMessageCount(chat)} messages
-                  </p>
+                  <p className="text-sm text-gray-500">{chat.last_message || "No messages"}</p>
+                  {chat.messages && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      {chat.messages.length} messages
+                    </p>
+                  )}
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

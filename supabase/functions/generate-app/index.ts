@@ -1,10 +1,10 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 interface AppGenerationRequest {
   prompt: string;
   completionLevel?: 'beginner' | 'intermediate' | 'advanced';
-  skipGeneration?: boolean; // Add a flag to skip actual generation
 }
 
 // Function to estimate tokens in a string (rough approximation)
@@ -176,6 +176,41 @@ async function getDesignWithPerplexity(prompt: string): Promise<any> {
   }
 }
 
+// Function to prepare first step guidance
+function prepareFirstStepGuidance(appData: any): string {
+  // Get the first challenge from the generated app
+  if (!appData.challenges || appData.challenges.length === 0) {
+    return "Let's start by exploring the generated code to understand the application structure.";
+  }
+  
+  const firstChallenge = appData.challenges[0];
+  
+  let guidance = `
+## Let's Start Building! Your First Task
+
+I've created this application with some challenges for you to solve. Let's tackle them one by one!
+
+### First Task: ${firstChallenge.title}
+
+**What you need to do:**
+${firstChallenge.description}
+
+`;
+
+  // Add file paths information if available
+  if (firstChallenge.filesPaths && Array.isArray(firstChallenge.filesPaths) && firstChallenge.filesPaths.length > 0) {
+    guidance += `**Files to examine:** ${firstChallenge.filesPaths.join(', ')}\n\n`;
+  } else {
+    guidance += `**Examine the project files** to understand the structure.\n\n`;
+  }
+
+  guidance += `Take a look at the code, find the issues marked with TODO comments, and make the necessary fixes.
+When you've completed this task, let me know and I'll guide you to the next challenge.
+  `;
+  
+  return guidance;
+}
+
 serve(async (req) => {
   console.log("Generate app function called");
   
@@ -188,24 +223,12 @@ serve(async (req) => {
     const requestData = await req.json();
     console.log("Request data:", JSON.stringify(requestData));
     
-    const { prompt, completionLevel = 'intermediate', skipGeneration = false } = requestData as AppGenerationRequest;
+    const { prompt, completionLevel = 'intermediate' } = requestData as AppGenerationRequest;
 
     if (!prompt) {
       console.error("Missing prompt in request");
       return new Response(JSON.stringify({ error: "Prompt is required" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-
-    // Check if this is just a guidance message that shouldn't trigger generation
-    if (skipGeneration || prompt.includes("AI-Guided Implementation")) {
-      console.log("Skipping app generation as requested");
-      return new Response(JSON.stringify({ 
-        success: true,
-        message: "Guidance message processed without triggering app generation"
-      }), {
-        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
@@ -458,6 +481,9 @@ serve(async (req) => {
       });
     }
     
+    // Prepare first step guidance
+    const firstStepGuidance = prepareFirstStepGuidance(appData);
+    
     // Store the app data in the database
     try {
       const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -530,7 +556,7 @@ serve(async (req) => {
       console.error("Database error when storing app data:", dbError);
     }
 
-    // Return the generated app data to the client without first step guidance
+    // Return the generated app data to the client with first step guidance
     return new Response(JSON.stringify({
       projectId,
       projectName: appData.projectName,
@@ -540,7 +566,8 @@ serve(async (req) => {
       explanation: appData.explanation || "Learn by fixing the issues in this application",
       designInfo: {
         perplexityDesign: appDesign
-      }
+      },
+      firstStepGuidance: firstStepGuidance
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" }

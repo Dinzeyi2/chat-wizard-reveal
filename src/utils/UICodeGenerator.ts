@@ -145,6 +145,8 @@ export class UICodeGenerator {
       return null;
     }
     
+    // No need to call setCurrentStep as autoSelectNextStep already sets it
+    
     return `
 ## Let's Start Building! Your First Task
 

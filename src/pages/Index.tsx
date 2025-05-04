@@ -9,9 +9,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Loader2 } from "lucide-react";
 import { ArtifactProvider, ArtifactLayout } from "@/components/artifact/ArtifactSystem";
 import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { UserProfileMenu } from "@/components/UserProfileMenu";
-import { v4 as uuidv4 } from 'uuid';
 
 // Interface for chat history items
 interface ChatHistoryItem {
@@ -19,24 +18,22 @@ interface ChatHistoryItem {
   title: string;
   last_message?: string;
   timestamp: string;
-  messages?: Message[] | string; // Add messages array to store full conversation
+  messages?: Message[]; // Add messages array to store full conversation
 }
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
-  const [isGeneratingApp, setIsGeneratingApp] = useState<boolean>(false);
+  const [isGeneratingApp, setIsGeneratingApp] = useState(false);
   const [generationDialog, setGenerationDialog] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [firstStepGuidanceSent, setFirstStepGuidanceSent] = useState<boolean>(false);
-  const [chatLoadingAttempted, setChatLoadingAttempted] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const location = useLocation();
-  const navigate = useNavigate();
 
   // Check for initial prompt from landing page
   useEffect(() => {
@@ -70,160 +67,78 @@ const Index = () => {
     checkAuth();
   }, []);
 
-  // Parse chat ID from URL if present
   useEffect(() => {
     // Parse chat ID from URL if present
     const searchParams = new URLSearchParams(location.search);
     const chatId = searchParams.get('chat');
     
-    console.log("URL search params:", location.search);
-    console.log("Chat ID from URL:", chatId);
-    
     if (chatId) {
       setCurrentChatId(chatId);
       // Load the specific chat history
       loadChatHistory(chatId);
-      setChatLoadingAttempted(true);
     } else {
       // Clear messages if starting a new chat
       setMessages([]);
       setCurrentChatId(null);
     }
-  }, [location.search]);
+  }, [location]);
 
   const loadChatHistory = async (chatId: string) => {
     console.log(`Loading chat history for chat ID: ${chatId}`);
     
     try {
-      // First try to load from Supabase if authenticated
-      const { data: session } = await supabase.auth.getSession();
-      
-      if (session.session) {
-        try {
-          console.log("User is authenticated, fetching from Supabase");
-          const { data, error } = await supabase
-            .from('chat_history')
-            .select('*')
-            .eq('id', chatId)
-            .single();
-          
-          if (error) {
-            console.error("Error fetching chat from Supabase:", error);
-            throw new Error(`Failed to fetch chat: ${error.message}`);
-          }
-          
-          if (data) {
-            console.log("Found chat in Supabase:", data);
+      if (isAuthenticated) {
+        // Try to load from Supabase
+        const { data, error } = await supabase
+          .from('chat_history')
+          .select('*')
+          .eq('id', chatId)
+          .single();
+        
+        if (error) {
+          console.error("Error fetching chat from Supabase:", error);
+          throw error;
+        }
+        
+        if (data) {
+          console.log("Found chat in Supabase:", data);
+          if (data.messages && Array.isArray(data.messages)) {
+            // Format dates in the messages
+            const formattedMessages = data.messages.map((msg: any) => ({
+              ...msg,
+              timestamp: new Date(msg.timestamp)
+            }));
             
-            // Handle messages array based on its type
-            let formattedMessages: Message[] = [];
+            setMessages(formattedMessages);
             
-            if (data.messages) {
-              // Handle different formats of messages from Supabase
-              if (Array.isArray(data.messages)) {
-                formattedMessages = data.messages.map((msg: any) => ({
-                  ...msg,
-                  timestamp: new Date(msg.timestamp)
-                }));
-              } 
-              // Handle JSON string format
-              else if (typeof data.messages === 'string') {
-                try {
-                  const parsedMessages = JSON.parse(data.messages);
-                  formattedMessages = parsedMessages.map((msg: any) => ({
-                    ...msg,
-                    timestamp: new Date(msg.timestamp)
-                  }));
-                } catch (e) {
-                  console.error("Error parsing messages from string:", e);
-                  formattedMessages = [];
-                }
-              } 
-              // Handle JSONB format from Supabase
-              else if (typeof data.messages === 'object') {
-                // Try to extract values if it's a JSONB object
-                if (Object.values(data.messages).length > 0) {
-                  formattedMessages = Object.values(data.messages).map((msg: any) => ({
-                    ...msg,
-                    timestamp: new Date(msg.timestamp)
-                  }));
-                }
-              }
-              
-              console.log("Formatted messages from Supabase:", formattedMessages);
-              
-              if (formattedMessages.length > 0) {
-                setMessages(formattedMessages);
-                
-                // If this chat had a project ID, restore it
-                const projectMsg = formattedMessages.find((msg: Message) => msg.metadata?.projectId);
-                if (projectMsg && projectMsg.metadata?.projectId) {
-                  setCurrentProjectId(projectMsg.metadata.projectId);
-                }
-                
-                return; // Successfully loaded from Supabase
-              } else {
-                // Create placeholder messages if formatting failed
-                createPlaceholderMessages(data.title);
-              }
-            } else {
-              // Create placeholder messages if no messages found
-              createPlaceholderMessages(data.title);
+            // If this chat had a project ID, restore it
+            const projectMsg = formattedMessages.find((msg: Message) => msg.metadata?.projectId);
+            if (projectMsg && projectMsg.metadata?.projectId) {
+              setCurrentProjectId(projectMsg.metadata.projectId);
             }
-          } else {
-            throw new Error("No chat found with that ID in Supabase");
+            
+            return;
           }
-        } catch (supabaseError) {
-          console.error("Error in Supabase chat retrieval:", supabaseError);
-          // Continue to localStorage fallback
         }
       }
       
-      // Fallback to localStorage if not found in Supabase or not authenticated
+      // Fall back to localStorage if not found in Supabase or not authenticated
       const storedHistory = localStorage.getItem('chatHistory');
-      if (!storedHistory) {
-        throw new Error(`No chat history found in localStorage`);
-      }
-      
-      let localChatHistory: ChatHistoryItem[] = [];
-      try {
-        localChatHistory = JSON.parse(storedHistory);
-      } catch (parseError) {
-        console.error("Error parsing chat history from localStorage:", parseError);
-        throw new Error("Could not parse chat history from localStorage");
-      }
+      let localChatHistory = storedHistory ? JSON.parse(storedHistory) : [];
       
       const selectedChat = localChatHistory.find((chat: ChatHistoryItem) => chat.id === chatId);
       
-      if (!selectedChat) {
-        throw new Error(`Chat with ID ${chatId} not found in localStorage`);
-      }
-      
-      console.log("Found chat in localStorage:", selectedChat);
-      
-      // Handle messages based on their format
-      if (selectedChat.messages) {
-        // Process messages based on their type
-        let messagesToUse: Message[] = [];
-        
-        if (Array.isArray(selectedChat.messages)) {
-          messagesToUse = selectedChat.messages;
-        } else if (typeof selectedChat.messages === 'string') {
-          try {
-            messagesToUse = JSON.parse(selectedChat.messages);
-          } catch (e) {
-            console.error("Error parsing messages string:", e);
-            messagesToUse = [];
-          }
-        }
-        
-        // Format dates in the messages
-        const formattedMessages = messagesToUse.map((msg: any) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp)
-        }));
-        
-        if (formattedMessages.length > 0) {
+      if (selectedChat) {
+        if (selectedChat.messages && selectedChat.messages.length > 0) {
+          // Use stored message history if available
+          console.log("Loading saved conversation with", selectedChat.messages.length, "messages from localStorage");
+          
+          // Format dates in the messages
+          const formattedMessages = selectedChat.messages.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp)
+          }));
+          
           setMessages(formattedMessages);
           
           // If this chat had a project ID, restore it
@@ -232,46 +147,37 @@ const Index = () => {
             setCurrentProjectId(projectMsg.metadata.projectId);
           }
         } else {
-          // Create placeholder messages if no valid messages found
-          createPlaceholderMessages(selectedChat.title);
+          // Fallback to creating placeholder messages if no saved messages
+          console.log("No stored messages found, creating placeholder messages");
+          const userMessage: Message = {
+            id: "user-" + Date.now().toString(),
+            role: "user",
+            content: selectedChat.title,
+            timestamp: new Date(Date.now() - 3600000) // 1 hour ago
+          };
+          
+          const assistantMessage: Message = {
+            id: "assistant-" + Date.now().toString(),
+            role: "assistant",
+            content: `This is a previous conversation about "${selectedChat.title}". I'm here to continue helping you with this topic.`,
+            timestamp: new Date(Date.now() - 3500000) // A bit less than 1 hour ago
+          };
+          
+          setMessages([userMessage, assistantMessage]);
         }
-      } else {
-        // Create placeholder messages if no saved messages
-        createPlaceholderMessages(selectedChat.title);
       }
     } catch (error) {
       console.error("Error loading chat history:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Could not find the requested chat. Starting a new conversation.",
+        description: "Failed to load chat history. Please try again.",
       });
-      navigate('/app', { replace: true });
     }
   };
 
-  // Helper function to create placeholder messages for a chat
-  const createPlaceholderMessages = (chatTitle: string) => {
-    console.log("Creating placeholder messages for chat title:", chatTitle);
-    const userMessage: Message = {
-      id: "user-" + Date.now().toString(),
-      role: "user",
-      content: chatTitle,
-      timestamp: new Date(Date.now() - 3600000) // 1 hour ago
-    };
-    
-    const assistantMessage: Message = {
-      id: "assistant-" + Date.now().toString(),
-      role: "assistant",
-      content: `This is a previous conversation about "${chatTitle}". I'm here to continue helping you with this topic.`,
-      timestamp: new Date(Date.now() - 3500000) // A bit less than 1 hour ago
-    };
-    
-    setMessages([userMessage, assistantMessage]);
-  };
-
   // Function to save the current conversation to chat history
-  const saveToHistory = async (content: string, responseContent: string, projectId?: string | null) => {
+  const saveToHistory = async (content: string, responseContent: string) => {
     // Only save if there's actual content
     if (!content.trim()) return;
     
@@ -286,22 +192,18 @@ const Index = () => {
       
       // Add new messages to the history
       const userMessage: Message = {
-        id: uuidv4(),
+        id: Date.now().toString(),
         role: "user",
         content,
         timestamp: now
       };
       
-      // Create assistant message with optional project metadata
       const assistantMessage: Message = {
-        id: uuidv4(),
+        id: (Date.now() + 1).toString(),
         role: "assistant",
         content: responseContent,
         timestamp: now,
-        metadata: projectId ? { 
-          projectId: projectId,
-          projectName: extractProjectName(responseContent) // Helper to extract project name from response
-        } : undefined
+        metadata: currentProjectId ? { projectId: currentProjectId } : undefined
       };
       
       // Update messages state with the new messages
@@ -324,8 +226,8 @@ const Index = () => {
             const { error } = await supabase
               .from('chat_history')
               .update({
-                last_message: responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : ""),
-                messages: serializableMessages,
+                last_message: `Last message ${timeString}`,
+                messages: serializableMessages as unknown as Json,
                 updated_at: now.toISOString()
               })
               .eq('id', currentChatId);
@@ -335,14 +237,14 @@ const Index = () => {
               throw error;
             }
           } else {
-            // Create new chat with consistent format regardless of message type
+            // Create new chat
             const { data, error } = await supabase
               .from('chat_history')
               .insert({
                 user_id: session.session.user.id,
-                title: projectId ? extractProjectName(responseContent) || chatTitle : chatTitle,
-                last_message: responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : ""),
-                messages: serializableMessages
+                title: chatTitle,
+                last_message: `Last message ${timeString}`,
+                messages: serializableMessages as unknown as Json
               })
               .select();
             
@@ -353,17 +255,16 @@ const Index = () => {
             
             if (data && data[0]) {
               setCurrentChatId(data[0].id);
-              console.log("Created new chat with ID:", data[0].id);
             }
           }
         }
       } else {
-        // Save to localStorage if not authenticated - use same format for all message types
-        const newChatId = uuidv4();
+        // Save to localStorage if not authenticated
+        // Create new chat history item
         const newChat: ChatHistoryItem = {
-          id: currentChatId || newChatId,
-          title: projectId ? extractProjectName(responseContent) || chatTitle : chatTitle,
-          last_message: responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : ""),
+          id: currentChatId || Date.now().toString(),
+          title: chatTitle,
+          last_message: `Last message ${timeString}`,
           timestamp: timeString,
           messages: updatedMessages
         };
@@ -384,7 +285,7 @@ const Index = () => {
         if (currentChatId) {
           const existingIndex = chatHistoryArray.findIndex(chat => chat.id === currentChatId);
           if (existingIndex >= 0) {
-            chatHistoryArray[existingIndex].last_message = responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : "");
+            chatHistoryArray[existingIndex].last_message = `Last message ${timeString}`;
             chatHistoryArray[existingIndex].timestamp = timeString;
             chatHistoryArray[existingIndex].messages = updatedMessages;
           } else {
@@ -392,6 +293,7 @@ const Index = () => {
           }
         } else {
           // Set the current chat ID to the new chat's ID
+          const newChatId = Date.now().toString();
           setCurrentChatId(newChatId);
           newChat.id = newChatId;
           
@@ -401,7 +303,6 @@ const Index = () => {
         
         // Save updated history back to localStorage
         localStorage.setItem('chatHistory', JSON.stringify(chatHistoryArray));
-        console.log("Saved chat to localStorage, history now contains", chatHistoryArray.length, "chats");
       }
     } catch (error) {
       console.error("Error saving chat history:", error);
@@ -410,28 +311,6 @@ const Index = () => {
         title: "Error",
         description: "Failed to save chat history."
       });
-    }
-  };
-
-  // Helper function to extract project name from response content
-  const extractProjectName = (content: string): string | null => {
-    try {
-      // Look for project name in JSON format
-      const jsonMatch = content.match(/"projectName"\s*:\s*"([^"]+)"/);
-      if (jsonMatch && jsonMatch[1]) {
-        return jsonMatch[1];
-      }
-      
-      // Look for generated project name in text
-      const textMatch = content.match(/generated a full-stack application[^:]*:\s*([^\n]+)/i);
-      if (textMatch && textMatch[1]) {
-        return textMatch[1].trim();
-      }
-
-      return null;
-    } catch (error) {
-      console.error("Error extracting project name:", error);
-      return null;
     }
   };
 
@@ -455,27 +334,6 @@ const Index = () => {
     };
     
     setMessages(prev => [...prev, userMessage]);
-    
-    // If the message appears to be a guidance message, handle it differently
-    if (content.includes("## AI-Guided Implementation")) {
-      console.log("Processing guidance message without generating new app");
-      
-      // Create assistant message with the guidance
-      const guidanceMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: content,
-        metadata: {
-          isGuidance: true,
-          projectId: currentProjectId
-        },
-        timestamp: new Date()
-      };
-      
-      setMessages(prev => [...prev, guidanceMessage]);
-      setFirstStepGuidanceSent(true);
-      return;
-    }
     
     // Check if this is a standard app generation request
     const isAppGeneration = 
@@ -522,10 +380,7 @@ const Index = () => {
       
       try {
         const { data, error } = await supabase.functions.invoke('generate-app', {
-          body: { 
-            prompt: content,
-            skipGeneration: content.includes("AI-Guided Implementation")
-          }
+          body: { prompt: content }
         });
 
         if (error) {
@@ -571,7 +426,7 @@ You can explore the file structure and content in the panel above. This is a sta
         
         // Save this conversation to chat history
         if (data && data.response) {
-          saveToHistory(content, formattedResponse, appData.projectId);
+          saveToHistory(content, formattedResponse);
         }
 
         // If we have first step guidance, send it automatically after a small delay
@@ -670,7 +525,7 @@ If you were trying to generate an app, this might be due to limits with our AI m
         
         // Save this conversation to chat history
         if (data && data.response) {
-          saveToHistory(content, data.response, data.projectId || currentProjectId);
+          saveToHistory(content, data.response);
         }
       } catch (error) {
         console.error('Error calling function:', error);
@@ -792,7 +647,6 @@ If you were trying to generate an app, this might be due to limits with our AI m
                 <ChatWindow 
                   messages={messages} 
                   isLoading={loading} 
-                  onSendMessage={handleSendMessage} // Pass the onSendMessage prop
                 />
               )}
               <div ref={messagesEndRef} />
@@ -804,14 +658,6 @@ If you were trying to generate an app, this might be due to limits with our AI m
                   </p>
                   <p className="text-xs text-red-600 mt-1">
                     Try refreshing the page and using a simpler prompt.
-                  </p>
-                </div>
-              )}
-              
-              {chatLoadingAttempted && messages.length === 0 && (
-                <div className="px-4 py-3 mx-auto my-4 max-w-3xl bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-sm text-yellow-700">
-                    <strong>Couldn't find the requested chat.</strong> Starting a new conversation.
                   </p>
                 </div>
               )}
