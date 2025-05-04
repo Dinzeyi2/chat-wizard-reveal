@@ -120,6 +120,13 @@ const ChatHistory = () => {
     };
     
     fetchChatHistory();
+    
+    // Set up interval to refresh the chat history every 10 seconds
+    const refreshInterval = setInterval(fetchChatHistory, 10000);
+    
+    return () => {
+      clearInterval(refreshInterval);
+    };
   }, []);
 
   // Universal message formatter that works for ALL message types
