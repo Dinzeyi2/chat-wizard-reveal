@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";
@@ -9,9 +10,10 @@ import { v4 as uuidv4 } from "uuid";
 interface ChatWindowProps {
   messages: Message[];
   isLoading: boolean;
+  onSendMessage?: (message: string) => void; // Add this prop to allow sending messages
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, onSendMessage }) => {
   const [processedMessages, setProcessedMessages] = useState<Message[]>([]);
   
   useEffect(() => {
@@ -24,10 +26,48 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
       if (messages.length > 0) {
         saveConversation(messages);
       }
+      
+      // Check if we need to send a follow-up guidance message
+      if (messages.length > 0) {
+        const lastMessage = messages[messages.length - 1];
+        
+        // Check if the last message is from the assistant and contains project/app generation
+        if (lastMessage.role === "assistant" && 
+            lastMessage.metadata?.projectId && 
+            !lastMessage.metadata.isGuidance) {
+          
+          // Wait a short delay before sending the follow-up message (to make it appear as a separate message)
+          setTimeout(() => {
+            if (onSendMessage) {
+              console.log("Sending automatic follow-up guidance message");
+              
+              // Generate and send a guidance message
+              const guidanceMessage = generateGuidanceMessage(lastMessage.metadata?.projectId);
+              onSendMessage(guidanceMessage);
+            }
+          }, 1000); // 1 second delay
+        }
+      }
     };
     
     processMessages();
-  }, [messages]);
+  }, [messages, onSendMessage]);
+  
+  // Function to generate a guidance message
+  const generateGuidanceMessage = (projectId?: string): string => {
+    return `## AI-Guided Implementation
+
+Now that I've generated your application, let's begin implementing it step by step.
+
+I'll guide you through each part of the implementation, providing clear instructions and explanations along the way.
+
+**First Step: Setup the basic project structure**
+- Review the generated code to understand the project structure
+- Make any necessary adjustments to the file organization
+- Ensure all dependencies are properly installed
+
+Let me know when you're ready to proceed to the next step, or if you have any questions about the generated application!`;
+  };
   
   // Function to save conversation to history
   const saveConversation = async (messages: Message[]) => {
