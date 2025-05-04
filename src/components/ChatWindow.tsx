@@ -7,7 +7,7 @@ import DOMPurify from "dompurify";
 
 interface ChatWindowProps {
   messages: Message[];
-  isLoading: boolean; // Changed from 'loading' to 'isLoading' for consistency
+  isLoading: boolean;
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {

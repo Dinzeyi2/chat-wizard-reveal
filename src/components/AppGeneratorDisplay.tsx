@@ -708,18 +708,23 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
     }
   };
   
-  // If no app data could be extracted, show a simple message
+  // If no app data could be extracted, show guidance directly
   if (!appData) {
     return (
       <div className="my-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
-        <p className="text-gray-600">Interactive App Building Guide - Getting Started</p>
-        <Button 
-          variant="outline" 
-          className="mt-3" 
-          onClick={handleViewFullProject}
-        >
-          <Code className="mr-2 h-4 w-4" /> View Available Code
-        </Button>
+        <h3 className="text-lg font-medium mb-3">Interactive App Building Guide</h3>
+        <div className="prose prose-sm">
+          <p>Welcome to the app building experience! This guide will help you build a complete web application step by step.</p>
+          
+          <h4 className="font-medium mt-4 mb-2">Getting Started</h4>
+          <ul className="list-disc pl-5 space-y-1.5">
+            <li>Describe the type of application you want to build (e.g., "a task manager with authentication")</li>
+            <li>Specify any key features you'd like included</li>
+            <li>Mention your preferred design style or color scheme</li>
+          </ul>
+          
+          <p className="mt-3">Once your application is generated, you can modify or enhance it with additional requests.</p>
+        </div>
       </div>
     );
   }
