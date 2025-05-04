@@ -29,7 +29,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
     if (appGeneratedMessage && !hasGeneratedApp) {
       setHasGeneratedApp(true);
     }
-  }, [messages]);
+  }, [messages, hasGeneratedApp]);
   
   return (
     <div className="px-4 py-5 md:px-8 lg:px-12">

@@ -124,7 +124,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
   const isAIGuidance = React.useMemo(() => {
     if (!message) return false;
     
-    // Explicit metadata flag for guidance
+    // Explicit metadata flag for guidance - highest priority check
     if (message.metadata?.isGuidance === true) return true;
     
     // Check content for guidance patterns
@@ -139,7 +139,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
     return hasGuidancePatterns && message.role === "assistant" && !isAppGeneration;
   }, [content, message, isAppGeneration]);
   
-  if (message && isAppGeneration) {
+  if (message && isAppGeneration && !message.metadata?.isGuidance) {
     console.log("Rendering AppGeneratorDisplay for message:", message.id);
     return (
       <ArtifactProvider>
@@ -148,8 +148,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
     );
   }
   
-  // Special formatting for AI guidance (non-app-generation)
-  if (message && isAIGuidance) {
+  // Special formatting for AI guidance (non-app-generation or explicitly marked as guidance)
+  if (message && (isAIGuidance || message.metadata?.isGuidance)) {
     return (
       <ScrollArea className="max-h-[500px]">
         <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">

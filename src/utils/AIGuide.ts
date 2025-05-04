@@ -87,18 +87,19 @@ export class AIGuide {
       
       const data = await response.json();
       
-      if (!data || !data.guidance) {
+      // Even if there's an error in the response but we got a guidance property, use it
+      if (data && data.guidance) {
+        console.log("AIGuide: Successfully generated guidance:", data.guidance.substring(0, 100) + "...");
+        this.dynamicGuidance = data.guidance;
+      } else {
         console.error("AIGuide: No guidance data returned from function", data);
         throw new Error("No guidance data returned");
       }
       
-      console.log("AIGuide: Successfully generated guidance:", data.guidance.substring(0, 100) + "...");
-      this.dynamicGuidance = data.guidance;
-      
     } catch (error) {
       console.error('AIGuide: Error generating dynamic guidance:', error);
-      // Don't set fallback - leave dynamicGuidance as null so we know generation failed
-      this.dynamicGuidance = null;
+      // Set a fallback message for guidance
+      this.dynamicGuidance = "Let's work on completing your challenge. Look at the files mentioned in the challenge description and see if you can identify where changes need to be made. Feel free to ask me specific questions if you get stuck!";
     }
   }
   
@@ -113,7 +114,7 @@ export class AIGuide {
       this.conversationHistory.push({
         type: 'guide',
         content: this.dynamicGuidance,
-        challengeId: currentChallenge.description
+        challengeId: currentChallenge.id
       });
       
       return this.dynamicGuidance;
@@ -122,19 +123,19 @@ export class AIGuide {
     console.log("AIGuide: No dynamic guidance available, falling back to template");
     
     // If this is the first message about this challenge
-    if (!this.conversationHistory.some(msg => msg.challengeId === currentChallenge.description)) {
+    if (!this.conversationHistory.some(msg => msg.challengeId === currentChallenge.id)) {
       const message = this._generateIntroMessage(currentChallenge);
       this.conversationHistory.push({
         type: 'guide',
         content: message,
-        challengeId: currentChallenge.description
+        challengeId: currentChallenge.id
       });
       return message;
     }
     
     // If we've already started discussing this challenge, provide a hint
     const hintsGiven = this.conversationHistory
-      .filter(msg => msg.challengeId === currentChallenge.description && msg.type === 'hint')
+      .filter(msg => msg.challengeId === currentChallenge.id && msg.type === 'hint')
       .length;
     
     if (hintsGiven < currentChallenge.hints.length) {
@@ -144,7 +145,7 @@ export class AIGuide {
       this.conversationHistory.push({
         type: 'hint',
         content: message,
-        challengeId: currentChallenge.description
+        challengeId: currentChallenge.id
       });
       
       return message;
@@ -189,7 +190,7 @@ export class AIGuide {
     this.conversationHistory.push({
       type: 'user',
       content: message,
-      challengeId: this.getCurrentChallenge().description
+      challengeId: this.getCurrentChallenge().id
     });
     
     // Check if the message indicates the challenge is complete
@@ -281,7 +282,7 @@ export class AIGuide {
     this.conversationHistory.push({
       type: 'codeSnippet',
       content: 'Code snippet provided',
-      challengeId: challenge.description
+      challengeId: challenge.id
     });
     
     // If we have dynamic guidance from Gemini, use it

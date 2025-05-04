@@ -62,7 +62,7 @@ serve(async (req) => {
           }]
         }],
         generationConfig: {
-          temperature: 0.5, // Lowered for more consistent outputs
+          temperature: 0.5,
           topK: 40,
           topP: 0.95,
           maxOutputTokens: 1024
@@ -79,7 +79,6 @@ serve(async (req) => {
     const geminiData = await geminiResponse.json();
     console.log("Gemini API response received");
     
-    // Extract the guidance content with error handling
     if (!geminiData.candidates || geminiData.candidates.length === 0 || !geminiData.candidates[0].content) {
       console.error("Empty or invalid response from Gemini API", geminiData);
       throw new Error("Empty or invalid response from Gemini API");
@@ -104,7 +103,7 @@ serve(async (req) => {
     const fullGuidance = `${guidance.trim()}\n\nWhen you've completed this task, let me know and I'll guide you to the next step.`;
 
     console.log("Returning guidance successfully");
-    return new Response(JSON.stringify({ guidance: fullGuidance }), {
+    return new Response(JSON.stringify({ guidance: fullGuidance, success: true }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
@@ -113,9 +112,11 @@ serve(async (req) => {
     // Return a proper error response so the client knows something went wrong
     return new Response(JSON.stringify({ 
       error: error.message, 
-      success: false
+      success: false,
+      // Include a fallback guidance message so the UI always has something to show
+      guidance: "Let's work on this challenge together! Take a look at the code and see if you can identify where changes need to be made. I'm here to help if you get stuck."
     }), {
-      status: 500,
+      status: 200, // Return 200 even on error so the app can still function with fallback guidance
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
