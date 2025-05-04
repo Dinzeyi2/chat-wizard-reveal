@@ -45,7 +45,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, onSendMess
               const guidanceMessage = generateGuidanceMessage(lastMessage.metadata?.projectId);
               onSendMessage(guidanceMessage);
             }
-          }, 1500); // 1.5 second delay
+          }, 1000); // 1 second delay
         }
       }
     };
