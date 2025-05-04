@@ -712,7 +712,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
   if (!appData) {
     return (
       <div className="my-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
-        <p className="text-gray-600">Unable to extract application data. Click the button below to view any code that might be available.</p>
+        <p className="text-gray-600">Interactive App Building Guide - Getting Started</p>
         <Button 
           variant="outline" 
           className="mt-3" 
