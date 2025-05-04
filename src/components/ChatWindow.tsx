@@ -48,6 +48,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
       // Generate a unique ID for the conversation if needed
       const conversationId = lastMessage.metadata?.chatId || uuidv4();
       
+      // Convert Message objects to JSON-serializable format
+      const serializableMessages = messages.map(msg => ({
+        ...msg,
+        timestamp: msg.timestamp instanceof Date ? msg.timestamp.toISOString() : msg.timestamp
+      }));
+      
       // Try to save to Supabase first
       const { data: session } = await supabase.auth.getSession();
       
@@ -58,7 +64,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
           .upsert({
             id: conversationId,
             title: title,
-            messages: messages,
+            messages: serializableMessages,
             last_message: lastContent.substring(0, 100),
             user_id: session.session.user.id,
             updated_at: new Date().toISOString()
@@ -96,13 +102,19 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
       const existingHistory = localStorage.getItem('chatHistory');
       let history = existingHistory ? JSON.parse(existingHistory) : [];
       
+      // Convert Message objects to JSON-serializable format for localStorage
+      const serializableMessages = messages.map(msg => ({
+        ...msg,
+        timestamp: msg.timestamp instanceof Date ? msg.timestamp.toISOString() : msg.timestamp
+      }));
+      
       // Check if conversation already exists in history
       const existingIndex = history.findIndex((item: any) => item.id === id);
       
       const historyItem = {
         id,
         title,
-        messages,
+        messages: serializableMessages,
         last_message: typeof lastMessage === 'string' ? 
           lastMessage.substring(0, 100) : 
           JSON.stringify(lastMessage).substring(0, 100),
