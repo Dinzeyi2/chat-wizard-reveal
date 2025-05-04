@@ -143,7 +143,7 @@ const ChatHistory = () => {
   // Function to handle creating a new chat
   const handleNewChat = () => {
     // Navigate to the home page without any chat ID parameter to start fresh
-    navigate('/');
+    navigate('/app');
   };
   
   const openRenameDialog = (chat: ChatHistoryItem, e: React.MouseEvent) => {

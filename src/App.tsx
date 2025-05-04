@@ -36,7 +36,7 @@ const App = () => {
             {/* New landing page as the default route */}
             <Route path="/" element={<Landing />} />
             
-            {/* Original Index page now at /app route */}
+            {/* Original Index page now at /app route with chat parameter support */}
             <Route path="/app" element={<Index />} />
             
             {/* All other existing routes preserved */}

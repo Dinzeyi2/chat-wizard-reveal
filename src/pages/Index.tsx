@@ -100,8 +100,10 @@ const Index = () => {
       // Clear messages if starting a new chat
       setMessages([]);
       setCurrentChatId(null);
+      setCurrentProjectId(null);
+      setHasGeneratedApp(false);
     }
-  }, [location]);
+  }, [location.search]); // Changed from [location] to [location.search] to avoid unnecessary rerenders
 
   const loadChatHistory = async (chatId: string) => {
     console.log(`Loading chat history for chat ID: ${chatId}`);
@@ -187,6 +189,16 @@ const Index = () => {
           
           setMessages([userMessage, assistantMessage]);
         }
+      } else {
+        // If no chat was found with this ID, display an error message
+        toast({
+          variant: "destructive",
+          title: "Chat not found",
+          description: "The requested conversation could not be found.",
+        });
+        
+        // Navigate back to home
+        navigate('/app', { replace: true });
       }
     } catch (error) {
       console.error("Error loading chat history:", error);
