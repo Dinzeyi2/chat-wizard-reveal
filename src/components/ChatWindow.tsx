@@ -57,16 +57,21 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, onSendMess
   const generateGuidanceMessage = (projectId?: string): string => {
     return `## AI-Guided Implementation
 
-Now that I've generated your application, let's begin implementing it step by step.
+I've intentionally left parts of this application incomplete as coding challenges for you to solve. I'm here to guide you through completing these missing pieces step by step.
 
-I'll guide you through each part of the implementation, providing clear instructions and explanations along the way.
+**How This Works:**
+1. I've created a foundation with working code but left specific areas incomplete
+2. You'll write the code to implement the missing functionality
+3. I'll provide guidance, hints, and feedback as you go
+4. Each challenge is designed to teach important programming concepts
 
-**First Step: Setup the basic project structure**
-- Review the generated code to understand the project structure
-- Make any necessary adjustments to the file organization
-- Ensure all dependencies are properly installed
+**First Implementation Task:**
+- Review the code I've generated to understand the project structure
+- Look for TODO comments that mark incomplete areas
+- Identify the first challenge you'd like to tackle
+- Let me know which part you want to work on first, and I'll provide specific guidance
 
-Let me know when you're ready to proceed to the next step, or if you have any questions about the generated application!`;
+Let me know when you're ready to start implementing the missing functionality, or if you have any questions about the generated application!`;
   };
   
   // Function to save conversation to history
