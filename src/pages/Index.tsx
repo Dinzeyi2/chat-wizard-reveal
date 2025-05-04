@@ -550,24 +550,8 @@ You can explore the file structure and content in the panel above. This is a sta
           saveToHistory(content, formattedResponse, appData.projectId);
         }
 
-        // If we have first step guidance, send it automatically after a small delay
-        if (appData.firstStepGuidance && !firstStepGuidanceSent) {
-          setTimeout(() => {
-            const guidanceMessage: Message = {
-              id: (Date.now() + 3).toString(),
-              role: "assistant",
-              content: appData.firstStepGuidance,
-              metadata: {
-                projectId: appData.projectId,
-                isGuidance: true
-              },
-              timestamp: new Date()
-            };
-            
-            setMessages(prev => [...prev, guidanceMessage]);
-            setFirstStepGuidanceSent(true);
-          }, 1500);
-        }
+        // The automatic follow-up guidance message will be sent by the ChatWindow component
+        // No need to manually add it here as it's now part of the ChatWindow's logic
       } catch (error) {
         console.error('Error calling function:', error);
         setGenerationDialog(false);
@@ -768,6 +752,7 @@ If you were trying to generate an app, this might be due to limits with our AI m
                 <ChatWindow 
                   messages={messages} 
                   isLoading={loading} 
+                  onSendMessage={handleSendMessage}  // Pass the function to send messages
                 />
               )}
               <div ref={messagesEndRef} />
@@ -796,30 +781,30 @@ If you were trying to generate an app, this might be due to limits with our AI m
               <InputArea onSendMessage={handleSendMessage} loading={loading} />
             </div>
           </div>
-        </ArtifactLayout>
+        </div>
+      </ArtifactLayout>
 
-        <Dialog open={generationDialog} onOpenChange={setGenerationDialog}>
-          <DialogContent className="sm:max-w-md" onInteractOutside={e => {
-            if (isGeneratingApp) {
-              e.preventDefault();
-            }
-          }}>
-            <DialogHeader>
-              <DialogTitle>Generating Your Application</DialogTitle>
-              <DialogDescription>
-                Please wait while we generate your application. This may take a minute or two.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex flex-col items-center justify-center py-6">
-              <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-              <div className="text-center">
-                <p className="font-medium">Building app architecture...</p>
-                <p className="text-sm text-muted-foreground mt-1">This may take up to 2 minutes.</p>
-              </div>
+      <Dialog open={generationDialog} onOpenChange={setGenerationDialog}>
+        <DialogContent className="sm:max-w-md" onInteractOutside={e => {
+          if (isGeneratingApp) {
+            e.preventDefault();
+          }
+        }}>
+          <DialogHeader>
+            <DialogTitle>Generating Your Application</DialogTitle>
+            <DialogDescription>
+              Please wait while we generate your application. This may take a minute or two.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center py-6">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+            <div className="text-center">
+              <p className="font-medium">Building app architecture...</p>
+              <p className="text-sm text-muted-foreground mt-1">This may take up to 2 minutes.</p>
             </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </ArtifactProvider>
   );
 };
