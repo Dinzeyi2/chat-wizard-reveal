@@ -43,7 +43,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
             </div>
           ) : (
             <div>
-              <div className={`ml-0 bg-white border ${message.metadata?.isGuidance ? 'border-blue-200 rounded-lg' : 'border-gray-200 rounded-3xl'} px-6 py-4 max-w-3xl`}>
+              <div className={`ml-0 bg-white border border-gray-200 rounded-3xl px-6 py-4 max-w-3xl`}>
                 {/* Display warning if user asks for another app and one has already been generated */}
                 {hasGeneratedApp && 
                  message.content.includes("I've generated") && 

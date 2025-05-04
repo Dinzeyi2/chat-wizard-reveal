@@ -1,9 +1,10 @@
-
 import React from "react";
 import { Message } from "@/types/chat";
 import AppGeneratorDisplay from "./AppGeneratorDisplay";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useArtifact, ArtifactProvider } from "./artifact/ArtifactSystem";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 
 interface MarkdownRendererProps {
   content: string;
@@ -153,8 +154,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
     return (
       <ScrollArea className="max-h-[500px]">
         <div className="p-4">
-          <div className="prose max-w-none">
-            {processMarkdownContent(content)}
+          <div className="prose max-w-none" 
+               dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked(content)) }}>
           </div>
         </div>
       </ScrollArea>
@@ -164,40 +165,11 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
   // Process normal markdown with better formatting
   return (
     <ScrollArea className="max-h-[500px] pr-2">
-      <div className="whitespace-pre-wrap">{processMarkdownContent(content)}</div>
+      <div className="whitespace-pre-wrap" 
+           dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked(content)) }}>
+      </div>
     </ScrollArea>
   );
 };
-
-// Helper function to process markdown content
-function processMarkdownContent(content: string) {
-  // This is a simple implementation - could be expanded with a full markdown parser
-  return content
-    .split('```')
-    .map((block, index) => {
-      if (index % 2 === 0) {
-        // Text outside code blocks - just wrap paragraphs
-        return block.split('\n\n').map((para, i) => 
-          <p key={i} className="mb-4">{para}</p>
-        );
-      } else {
-        // Code blocks - add syntax highlighting class
-        const firstLine = block.split('\n')[0];
-        const language = firstLine || 'plaintext';
-        const codeContent = firstLine ? block.substring(firstLine.length + 1) : block;
-        
-        return (
-          <div key={index} className="mb-4">
-            <div className="bg-gray-100 text-gray-500 text-xs px-3 py-1 rounded-t-md border border-b-0 border-gray-200">
-              {language.trim() || "Code"}
-            </div>
-            <pre className="bg-gray-100 p-3 rounded-b-md border border-gray-200 overflow-x-auto">
-              <code className={`language-${language.trim()}`}>{codeContent}</code>
-            </pre>
-          </div>
-        );
-      }
-    });
-}
 
 export default MarkdownRenderer;
