@@ -801,29 +801,6 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
         </div>
       )}
       
-      {/* Application Enhancements Section - Only show for new generations */}
-      {!isModification && appData.challenges && appData.challenges.length > 0 && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-lg p-5">
-          <h4 className="text-lg font-semibold mb-3 text-blue-800">AI-Guided Implementation</h4>
-          <p className="text-sm text-blue-700 mb-4">
-            The AI will guide you through implementing this application step by step.
-          </p>
-
-          {guidanceState.steps.length > 0 && (
-            <StepProgressDisplay 
-              steps={guidanceState.steps}
-              currentStep={guidanceState.currentStep}
-              stepProgress={guidanceState.stepProgress}
-              onCompleteStep={handleCompleteStep}
-            />
-          )}
-          
-          <div className="mt-4 text-sm text-blue-700">
-            <p>Follow the AI's guidance in the chat. Complete each task and click "I've completed this" when done.</p>
-          </div>
-        </div>
-      )}
-      
       {/* Show enhancement options if there are no challenges or for modified apps */}
       {(!appData.challenges || appData.challenges.length === 0 || isModification) && (
         <div className="border border-blue-200 rounded-lg p-5 bg-blue-50">
