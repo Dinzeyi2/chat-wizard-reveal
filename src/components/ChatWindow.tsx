@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";
@@ -135,7 +136,6 @@ Let me know when you're ready to proceed to the next step, or if you have any qu
     }
   };
   
-  // Function to save to localStorage
   const saveToLocalStorage = (id: string, title: string, messages: Message[], lastMessage: any) => {
     try {
       // Get existing history or initialize empty array
