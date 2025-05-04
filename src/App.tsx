@@ -1,67 +1,59 @@
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useState } from "react";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import ChatHistory from "./pages/ChatHistory";
-import GitHubCallback from "./pages/GitHubCallback";
-import Auth from "./pages/Auth";
-import Landing from "./pages/Landing";
-import ChallengeGenerator from "./pages/ChallengeGenerator";
-import ChallengeWorkspace from "./pages/ChallengeWorkspace";
-import "./components/artifact/ArtifactSystem.css";
+import { useState, useEffect } from 'react';
+import './App.css';
+import ChatWindow from './components/ChatWindow';
+import InputArea from './components/InputArea';
+import { Message } from './types/chat';
 
-const App = () => {
-  // Create a client
-  const [queryClient] = useState(() => new QueryClient({
-    defaultOptions: {
-      queries: {
-        refetchOnWindowFocus: false,
-        retry: false,
-      },
-    },
-  }));
-
+function App() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const handleSendMessage = (message: string) => {
+    if (!message.trim()) return;
+    
+    // Create a new user message
+    const newUserMessage: Message = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: message,
+      timestamp: new Date()
+    };
+    
+    // Add the message to chat
+    setMessages(prev => [...prev, newUserMessage]);
+    
+    // Set loading state
+    setIsLoading(true);
+    
+    // Simulate AI response (in a real app, this would call your API)
+    setTimeout(() => {
+      const aiResponse: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: `I received your message: "${message}"`,
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, aiResponse]);
+      setIsLoading(false);
+    }, 1000);
+  };
+  
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            {/* New landing page as the default route */}
-            <Route path="/" element={<Landing />} />
-            
-            {/* Original Index page now at /app route */}
-            <Route path="/app" element={<Index />} />
-            
-            {/* All other existing routes preserved */}
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/history" element={<ChatHistory />} />
-            
-            {/* GitHub callback routes with both path styles */}
-            <Route path="/github-callback" element={<GitHubCallback />} />
-            <Route path="github-callback" element={<GitHubCallback />} />
-            <Route path="/callback/github" element={<GitHubCallback />} />
-            <Route path="callback/github" element={<GitHubCallback />} />
-            
-            {/* New CodeCraft Challenge routes */}
-            <Route path="/challenges" element={<ChallengeGenerator />} />
-            <Route path="/challenge/:projectId" element={<ChallengeWorkspace />} />
-            <Route path="/challenge/:projectId/:challengeId" element={<ChallengeWorkspace />} />
-            <Route path="/implementation-steps/:stepId" element={<ChallengeWorkspace />} />
-            
-            {/* Catch-all route for 404s */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <div className="flex flex-col h-screen">
+      <div className="flex-1 overflow-auto bg-gray-50">
+        <ChatWindow 
+          messages={messages} 
+          isLoading={isLoading} 
+          onSendMessage={handleSendMessage}
+        />
+      </div>
+      <div className="p-4 bg-white border-t border-gray-200">
+        <InputArea onSendMessage={handleSendMessage} isLoading={isLoading} />
+      </div>
+    </div>
   );
-};
+}
 
 export default App;
