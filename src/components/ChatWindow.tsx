@@ -52,7 +52,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
                 timestamp: new Date(),
                 metadata: {
                   projectId: message.metadata.projectId,
-                  isGuidance: true
+                  isGuidance: true,
+                  projectName: message.metadata.projectName
                 }
               });
             }

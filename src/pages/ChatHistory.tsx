@@ -98,7 +98,7 @@ const ChatHistory = () => {
             // Format data from Supabase to match our ChatHistoryItem interface
             const formattedHistory = data.map((item: any) => ({
               id: item.id,
-              title: item.title,
+              title: item.title || "Untitled Conversation",
               last_message: item.last_message || "No messages",
               timestamp: formatTimestamp(item.updated_at || item.created_at),
               messages: item.messages || []
@@ -127,26 +127,36 @@ const ChatHistory = () => {
   const formatLastMessage = (message: any): string => {
     if (!message) return "No messages";
     
-    // Check if this is an app generation message
-    if (typeof message === 'object' && message.metadata?.projectId) {
-      return "App creation: " + (message.metadata?.projectName || "New application");
+    try {
+      // Check if this is an app generation message
+      if (typeof message === 'object') {
+        // Handle app generation message
+        if (message.metadata?.projectId) {
+          return "App creation: " + (message.metadata?.projectName || "New application");
+        }
+        
+        // Handle message with content property
+        if (message.content) {
+          const content = typeof message.content === 'string' 
+            ? message.content 
+            : JSON.stringify(message.content);
+          // Remove markdown formatting
+          const plainText = content.replace(/\*\*/g, '').replace(/`/g, '').replace(/\n/g, ' ');
+          return plainText.length > 60 ? plainText.substring(0, 60) + "..." : plainText;
+        }
+      }
+      
+      // Handle string messages
+      if (typeof message === 'string') {
+        // Trim and limit length for display
+        return message.length > 60 ? message.substring(0, 60) + "..." : message;
+      }
+      
+      return "Message";
+    } catch (error) {
+      console.error("Error formatting message:", error);
+      return "Message";
     }
-    
-    // Handle string messages
-    if (typeof message === 'string') {
-      // Trim and limit length for display
-      return message.length > 60 ? message.substring(0, 60) + "..." : message;
-    }
-    
-    // Handle object messages with content property
-    if (typeof message === 'object' && message.content) {
-      const content = message.content;
-      // Remove markdown formatting
-      const plainText = content.replace(/\*\*/g, '').replace(/`/g, '').replace(/\n/g, ' ');
-      return plainText.length > 60 ? plainText.substring(0, 60) + "..." : plainText;
-    }
-    
-    return "No messages";
   };
 
   const formatTimestamp = (timestamp: string) => {
