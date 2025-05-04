@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";
@@ -10,13 +9,10 @@ import { v4 as uuidv4 } from "uuid";
 interface ChatWindowProps {
   messages: Message[];
   isLoading: boolean;
-  onSendMessage?: (message: string) => void;
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, onSendMessage }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
   const [processedMessages, setProcessedMessages] = useState<Message[]>([]);
-  const [lastProjectId, setLastProjectId] = useState<string | null>(null);
-  const [guidanceSent, setGuidanceSent] = useState<Record<string, boolean>>({});
   
   useEffect(() => {
     // Process messages consistently to ensure all are captured for history
@@ -28,67 +24,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, onSendMess
       if (messages.length > 0) {
         saveConversation(messages);
       }
-      
-      // Check for app generation messages to trigger guidance follow-up
-      detectAppGenerationAndSendGuidance(messages);
     };
     
     processMessages();
   }, [messages]);
-  
-  // Function to detect app generation messages and send guidance
-  const detectAppGenerationAndSendGuidance = (messages: Message[]) => {
-    if (!onSendMessage) return;
-    
-    // Check the last message for app generation content
-    const lastMessage = messages[messages.length - 1];
-    if (!lastMessage) return;
-    
-    // Skip if not from assistant
-    if (lastMessage.role !== 'assistant') return;
-    
-    // Extract projectId from metadata or content
-    const projectId = lastMessage.metadata?.projectId || extractProjectIdFromContent(lastMessage.content);
-    
-    // If we found a projectId and haven't sent guidance for it yet
-    if (projectId && !guidanceSent[projectId]) {
-      console.log("Detected app generation with projectId:", projectId);
-      
-      // Wait a moment before sending the follow-up guidance
-      setTimeout(() => {
-        // Mark this projectId as having received guidance
-        setGuidanceSent(prev => ({ ...prev, [projectId]: true }));
-        setLastProjectId(projectId);
-        
-        // Send the guidance message
-        onSendMessage(
-          "I've created your app! Let's start implementing the next step. " +
-          "Click the \"I've completed this\" button when you're done with each step, " +
-          "and I'll guide you through fixing all the issues one by one."
-        );
-      }, 1000);
-    }
-  };
-  
-  // Helper function to extract projectId from message content
-  const extractProjectIdFromContent = (content: any): string | null => {
-    if (typeof content !== 'string') return null;
-    
-    // Try to find project ID in JSON blocks
-    const jsonRegex = /```json\n([\s\S]*?)```/;
-    const jsonMatch = content.match(jsonRegex);
-    
-    if (jsonMatch && jsonMatch[1]) {
-      try {
-        const jsonData = JSON.parse(jsonMatch[1]);
-        return jsonData.projectId || null;
-      } catch (e) {
-        console.error("Error parsing JSON for projectId:", e);
-      }
-    }
-    
-    return null;
-  };
   
   // Function to save conversation to history
   const saveConversation = async (messages: Message[]) => {
