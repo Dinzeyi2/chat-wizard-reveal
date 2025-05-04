@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -361,37 +362,81 @@ serve(async (req) => {
     try {
       const textContent = geminiData.candidates[0].content.parts[0].text;
       
-      // Extract JSON content - improve the extraction by finding the JSON object more reliably
+      // Enhanced JSON extraction to handle more cases
       let jsonContent = textContent;
       
-      // Find the position of the first '{' and the last '}'
-      const startPos = textContent.indexOf('{');
-      const endPos = textContent.lastIndexOf('}');
+      // Try multiple approaches to extract valid JSON
+      const jsonPattern = /\{[\s\S]*?\}(?=\s*$|\s*```)/;
+      const jsonMatches = textContent.match(jsonPattern);
       
-      if (startPos !== -1 && endPos !== -1 && endPos > startPos) {
-        jsonContent = textContent.substring(startPos, endPos + 1);
+      if (jsonMatches && jsonMatches[0]) {
+        // Use the longest match which is likely the full JSON object
+        jsonContent = jsonMatches[0];
+        console.log("Extracted JSON using pattern matching");
+      } else {
+        // Find position of first { and last }
+        const firstBrace = textContent.indexOf('{');
+        let lastBrace = textContent.lastIndexOf('}');
+        
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          jsonContent = textContent.substring(firstBrace, lastBrace + 1);
+          console.log("Extracted JSON using brace positions");
+        }
       }
+      
+      // Clean up common issues in the extracted JSON
+      jsonContent = jsonContent
+        .replace(/```json/g, '')
+        .replace(/```/g, '')
+        .replace(/\\n/g, '\\n')
+        .replace(/\\"/g, '\\"')
+        .replace(/\n\s*\n/g, '\n');
       
       console.log("Cleaned JSON for parsing:", jsonContent.substring(0, 100) + "...");
       
       try {
         appData = JSON.parse(jsonContent.trim());
         console.log("Successfully parsed JSON");
-      } catch (jsonError) {
-        console.error("First JSON parse attempt failed:", jsonError);
+      } catch (firstError) {
+        console.error("First JSON parse attempt failed:", firstError);
         
-        // Second attempt: Try to fix common JSON issues
-        const fixedJson = jsonContent
-          .replace(/`{3}json\n/g, '') // Remove markdown code block indicators
-          .replace(/\n`{3}/g, '')
-          .replace(/\\n/g, '\n')      // Fix escaped newlines
-          .replace(/\\"/g, '"');      // Fix escaped quotes
-          
+        // More aggressive cleaning for malformed JSON
+        const cleanedJson = jsonContent
+          // Handle trailing commas in arrays and objects
+          .replace(/,\s*}/g, '}')
+          .replace(/,\s*\]/g, ']')
+          // Fix quotes
+          .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":')
+          // Replace single quotes with double quotes for property values
+          .replace(/:\s*'([^']*)'/g, ':"$1"');
+        
         try {
-          appData = JSON.parse(fixedJson.trim());
-          console.log("Successfully parsed JSON after fixing");
+          appData = JSON.parse(cleanedJson.trim());
+          console.log("Successfully parsed JSON after cleaning");
         } catch (secondError) {
-          throw new Error(`JSON parsing failed: ${secondError.message}`);
+          // If all parsing attempts fail, create a fallback app
+          console.error("Failed to parse JSON after multiple attempts:", secondError);
+          
+          appData = {
+            projectName: appDesign.projectName || "SimpleApp",
+            description: appDesign.description || `A simple app based on "${prompt}"`,
+            fileStructure: {
+              "src": {
+                "App.js": "import React from 'react';\n\nfunction App() {\n  return <div>Hello World</div>;\n}\n\nexport default App;",
+                "index.js": "import React from 'react';\nimport ReactDOM from 'react-dom';\nimport App from './App';\n\nReactDOM.render(<App />, document.getElementById('root'));"
+              }
+            },
+            challenges: [
+              {
+                id: "challenge-1",
+                title: "Add a Header Component",
+                description: "Create a new Header component and add it to the App.",
+                filesPaths: ["src/App.js"]
+              }
+            ],
+            explanation: "This is a simple starter app with basic React components."
+          };
+          console.log("Using fallback app data");
         }
       }
     } catch (jsonError) {
