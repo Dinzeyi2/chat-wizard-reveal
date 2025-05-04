@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -556,7 +555,7 @@ serve(async (req) => {
       console.error("Database error when storing app data:", dbError);
     }
 
-    // Return the generated app data to the client with first step guidance
+    // When returning the generated app data to the client, include files so they can be used for dynamic guidance
     return new Response(JSON.stringify({
       projectId,
       projectName: appData.projectName,

@@ -17,6 +17,7 @@ export interface ProjectData {
   stack: string;
   challenges: Challenge[];
   projectName?: string;
+  files?: Array<{path: string, content: string}>;
 }
 
 export interface ConversationMessage {
@@ -29,19 +30,78 @@ export class AIGuide {
   private project: ProjectData;
   private currentChallengeIndex: number;
   private conversationHistory: ConversationMessage[];
+  private dynamicGuidance: string | null = null;
   
   constructor(projectData: ProjectData) {
     this.project = projectData;
     this.currentChallengeIndex = 0;
     this.conversationHistory = [];
+    
+    // Generate dynamic guidance if we have files
+    if (this.project.files && this.project.files.length > 0) {
+      this.generateDynamicGuidance();
+    }
   }
   
   getCurrentChallenge(): Challenge {
     return this.project.challenges[this.currentChallengeIndex];
   }
   
+  async generateDynamicGuidance(): Promise<void> {
+    try {
+      // Get first challenge to use as context
+      const currentChallenge = this.getCurrentChallenge();
+      
+      // Prepare code samples from relevant files
+      const relevantFiles = this.project.files?.filter(file => 
+        currentChallenge.filesPaths.includes(file.path)
+      ) || [];
+      
+      const codeSamples = relevantFiles.map(file => 
+        `File: ${file.path}\n\`\`\`\n${file.content.substring(0, 1000)}${file.content.length > 1000 ? '...' : ''}\n\`\`\``
+      ).join('\n\n');
+      
+      // Call Supabase edge function to generate guidance with Gemini
+      const response = await fetch('/api/generate-guidance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          projectName: this.project.projectName || this.project.name,
+          description: this.project.description,
+          challenge: currentChallenge,
+          codeSamples: codeSamples.substring(0, 4000) // Limit size
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate guidance');
+      }
+      
+      const data = await response.json();
+      this.dynamicGuidance = data.guidance;
+      
+    } catch (error) {
+      console.error('Error generating dynamic guidance:', error);
+      // Fallback to static guidance if dynamic generation fails
+    }
+  }
+  
   getNextGuidanceMessage(): string {
     const currentChallenge = this.getCurrentChallenge();
+    
+    // If we have dynamic guidance, use it
+    if (this.dynamicGuidance) {
+      // Mark that we've provided guidance for this challenge
+      this.conversationHistory.push({
+        type: 'guide',
+        content: this.dynamicGuidance,
+        challengeId: currentChallenge.description
+      });
+      
+      return this.dynamicGuidance;
+    }
     
     // If this is the first message about this challenge
     if (!this.conversationHistory.some(msg => msg.challengeId === currentChallenge.description)) {
@@ -124,6 +184,12 @@ export class AIGuide {
       // Move to the next challenge
       if (this.currentChallengeIndex < this.project.challenges.length - 1) {
         this.currentChallengeIndex++;
+        
+        // Generate new dynamic guidance for the next challenge
+        if (this.project.files && this.project.files.length > 0) {
+          this.generateDynamicGuidance();
+        }
+        
         return this._generateCompletionMessage();
       } else {
         return this._generateAllChallengesCompletedMessage();
