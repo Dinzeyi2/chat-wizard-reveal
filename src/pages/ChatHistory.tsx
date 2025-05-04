@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -123,32 +122,36 @@ const ChatHistory = () => {
     fetchChatHistory();
   }, []);
 
-  // Helper function to properly format all message types for display
+  // Universal message formatter that works for ALL message types
   const formatLastMessage = (message: any): string => {
     if (!message) return "No messages";
     
     try {
-      // Check if this is an app generation message
+      // Handle any object type message
       if (typeof message === 'object') {
-        // Handle app generation message
-        if (message.metadata?.projectId) {
-          return "App creation: " + (message.metadata?.projectName || "New application");
-        }
-        
-        // Handle message with content property
+        // If it has content, use that (works for all message types)
         if (message.content) {
           const content = typeof message.content === 'string' 
             ? message.content 
             : JSON.stringify(message.content);
-          // Remove markdown formatting
+          
+          // Show 'App creation' prefix if this is an app generation message
+          if (message.metadata?.projectId) {
+            const projectName = message.metadata?.projectName || "New application";
+            return `App creation: ${projectName}`;
+          }
+          
+          // Remove markdown formatting for regular messages
           const plainText = content.replace(/\*\*/g, '').replace(/`/g, '').replace(/\n/g, ' ');
           return plainText.length > 60 ? plainText.substring(0, 60) + "..." : plainText;
         }
+        
+        // Handle other object formats
+        return "Message";
       }
       
       // Handle string messages
       if (typeof message === 'string') {
-        // Trim and limit length for display
         return message.length > 60 ? message.substring(0, 60) + "..." : message;
       }
       
@@ -319,31 +322,34 @@ const ChatHistory = () => {
     }
   };
 
+  // Get message count with unified error handling
   const getMessageCount = (chat: ChatHistoryItem) => {
     if (!chat.messages) return 0;
     
-    if (Array.isArray(chat.messages)) {
-      return chat.messages.length;
-    } else if (typeof chat.messages === 'string') {
-      try {
+    try {
+      if (Array.isArray(chat.messages)) {
+        return chat.messages.length;
+      } else if (typeof chat.messages === 'string') {
         const parsedMessages = JSON.parse(chat.messages);
         return Array.isArray(parsedMessages) ? parsedMessages.length : 0;
-      } catch (e) {
-        return 0;
+      } else if (typeof chat.messages === 'object') {
+        return Object.keys(chat.messages).length;
       }
-    } else if (typeof chat.messages === 'object') {
-      // Handle case where messages might be a JSONB object from Supabase
-      return Object.keys(chat.messages).length;
+    } catch (e) {
+      console.error("Error getting message count:", e);
     }
+    
     return 0;
   };
 
-  // Get last message from chat for display
+  // Get last message with robust error handling
   const getLastMessage = (chat: ChatHistoryItem) => {
     if (!chat.messages) return chat.last_message || "No messages";
     
     try {
       let messages;
+      
+      // Handle different message formats consistently
       if (Array.isArray(chat.messages)) {
         messages = chat.messages;
       } else if (typeof chat.messages === 'string') {
@@ -358,9 +364,10 @@ const ChatHistory = () => {
         return chat.last_message || "No messages";
       }
       
-      // Get the last message
+      // Get the last message regardless of type and format consistently
       const lastMessage = messages[messages.length - 1];
       return formatLastMessage(lastMessage);
+      
     } catch (e) {
       console.error("Error parsing last message:", e);
       return chat.last_message || "No messages";

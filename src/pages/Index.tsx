@@ -271,7 +271,7 @@ const Index = () => {
   };
 
   // Function to save the current conversation to chat history
-  const saveToHistory = async (content: string, responseContent: string) => {
+  const saveToHistory = async (content: string, responseContent: string, projectId?: string | null) => {
     // Only save if there's actual content
     if (!content.trim()) return;
     
@@ -292,12 +292,16 @@ const Index = () => {
         timestamp: now
       };
       
+      // Create assistant message with optional project metadata
       const assistantMessage: Message = {
         id: uuidv4(),
         role: "assistant",
         content: responseContent,
         timestamp: now,
-        metadata: currentProjectId ? { projectId: currentProjectId } : undefined
+        metadata: projectId ? { 
+          projectId: projectId,
+          projectName: extractProjectName(responseContent) // Helper to extract project name from response
+        } : undefined
       };
       
       // Update messages state with the new messages
@@ -321,7 +325,7 @@ const Index = () => {
               .from('chat_history')
               .update({
                 last_message: responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : ""),
-                messages: serializableMessages as unknown as Json,
+                messages: serializableMessages,
                 updated_at: now.toISOString()
               })
               .eq('id', currentChatId);
@@ -331,14 +335,14 @@ const Index = () => {
               throw error;
             }
           } else {
-            // Create new chat
+            // Create new chat with consistent format regardless of message type
             const { data, error } = await supabase
               .from('chat_history')
               .insert({
                 user_id: session.session.user.id,
-                title: chatTitle,
+                title: projectId ? extractProjectName(responseContent) || chatTitle : chatTitle,
                 last_message: responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : ""),
-                messages: serializableMessages as unknown as Json
+                messages: serializableMessages
               })
               .select();
             
@@ -354,12 +358,11 @@ const Index = () => {
           }
         }
       } else {
-        // Save to localStorage if not authenticated
-        // Create new chat history item
+        // Save to localStorage if not authenticated - use same format for all message types
         const newChatId = uuidv4();
         const newChat: ChatHistoryItem = {
           id: currentChatId || newChatId,
-          title: chatTitle,
+          title: projectId ? extractProjectName(responseContent) || chatTitle : chatTitle,
           last_message: responseContent.substring(0, 100) + (responseContent.length > 100 ? "..." : ""),
           timestamp: timeString,
           messages: updatedMessages
@@ -407,6 +410,28 @@ const Index = () => {
         title: "Error",
         description: "Failed to save chat history."
       });
+    }
+  };
+
+  // Helper function to extract project name from response content
+  const extractProjectName = (content: string): string | null => {
+    try {
+      // Look for project name in JSON format
+      const jsonMatch = content.match(/"projectName"\s*:\s*"([^"]+)"/);
+      if (jsonMatch && jsonMatch[1]) {
+        return jsonMatch[1];
+      }
+      
+      // Look for generated project name in text
+      const textMatch = content.match(/generated a full-stack application[^:]*:\s*([^\n]+)/i);
+      if (textMatch && textMatch[1]) {
+        return textMatch[1].trim();
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Error extracting project name:", error);
+      return null;
     }
   };
 
@@ -522,7 +547,7 @@ You can explore the file structure and content in the panel above. This is a sta
         
         // Save this conversation to chat history
         if (data && data.response) {
-          saveToHistory(content, formattedResponse);
+          saveToHistory(content, formattedResponse, appData.projectId);
         }
 
         // If we have first step guidance, send it automatically after a small delay
@@ -621,7 +646,7 @@ If you were trying to generate an app, this might be due to limits with our AI m
         
         // Save this conversation to chat history
         if (data && data.response) {
-          saveToHistory(content, data.response);
+          saveToHistory(content, data.response, data.projectId || currentProjectId);
         }
       } catch (error) {
         console.error('Error calling function:', error);

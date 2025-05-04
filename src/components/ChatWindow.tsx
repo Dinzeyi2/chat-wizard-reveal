@@ -44,7 +44,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
             console.log = originalConsoleLog;
             
             if (firstTaskMessage) {
-              // Insert a synthetic guidance message
+              // Insert a synthetic guidance message with standard format
               processed.push({
                 id: `guidance-${message.id}`,
                 role: "assistant",
