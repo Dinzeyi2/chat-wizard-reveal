@@ -1,3 +1,4 @@
+
 export interface Challenge {
   id: string;
   title: string;
@@ -136,6 +137,12 @@ export class AIGuide {
   }
   
   private _generateIntroMessage(challenge: Challenge): string {
+    // Try to use dynamic guidance if available
+    if (this.dynamicGuidance) {
+      return this.dynamicGuidance;
+    }
+    
+    // Fall back to template-based messages if no dynamic guidance
     const messages = [
       `Now let's work on implementing the ${challenge.description} feature for ${challenge.featureName}. This is an important part of the application that needs to be completed.`,
       `I've noticed that the ${challenge.description} functionality is missing from the ${challenge.featureName} feature. Let's implement this together.`,
@@ -147,19 +154,7 @@ export class AIGuide {
     const intro = messages[Math.floor(Math.random() * messages.length)];
     
     // Add specific context based on the challenge
-    let context = '';
-    
-    if (challenge.description.includes('profile image upload')) {
-      context = `\n\nI've created a button in the Profile component, but it currently just shows an alert when clicked. You'll need to implement both the frontend and backend components of this feature. The frontend should allow users to select an image file, while the backend needs to handle file uploads, storage, and updating the user's profile.`;
-    } else if (challenge.description.includes('Follow API')) {
-      context = `\n\nThe Follow button in the user profile currently doesn't do anything. You'll need to implement the API endpoints for following/unfollowing users and update the UI accordingly. This involves creating a Follow model to track relationships between users.`;
-    } else if (challenge.description.includes('password reset')) {
-      context = `\n\nThe authentication system is working for login and registration, but there's no way for users to reset their password if they forget it. You'll need to implement this functionality, including sending a reset token via email and creating a form for entering a new password.`;
-    } else if (challenge.description.includes('search')) {
-      context = `\n\nThe application needs a search feature to find content. You'll need to implement both the frontend UI for entering search queries and the backend API for processing those queries and returning relevant results.`;
-    } else {
-      context = `\n\nTake a look at the existing code to understand how this feature should fit into the application. I've provided some structure, but you'll need to fill in the missing functionality.`;
-    }
+    let context = `\n\nTake a look at the existing code to understand how this feature should fit into the application. I've provided some structure, but you'll need to fill in the missing functionality.`;
     
     // Add call to action
     const callToAction = `\n\nWould you like to start with the frontend or backend implementation? Or do you need more information about this challenge?`;
@@ -266,12 +261,9 @@ export class AIGuide {
       challengeId: challenge.description
     });
     
-    // Based on the challenge type, provide appropriate code snippet
-    // This would be expanded with more code examples for different challenge types
-    if (challenge.description.includes('profile image upload')) {
-      return "Here's a code snippet for implementing profile image upload...";
-    } else if (challenge.description.includes('Follow API')) {
-      return "Here's a code snippet to help you implement the Follow API...";
+    // If we have dynamic guidance from Gemini, use it
+    if (this.dynamicGuidance) {
+      return this.dynamicGuidance + "\n\nHere's a code snippet to help you get started.";
     }
     
     return "Here's some sample code to help you with this challenge...";
