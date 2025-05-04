@@ -3,13 +3,17 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-export function HamburgerMenuButton() {
+export function HamburgerMenuButton({ onOpenDashboard }: { onOpenDashboard?: () => void } = {}) {
   const [open, setOpen] = useState<boolean>(false);
   const navigate = useNavigate();
 
   const handleClick = () => {
     setOpen((prevState) => !prevState);
-    navigate('/history');
+    if (onOpenDashboard) {
+      onOpenDashboard();
+    } else {
+      navigate('/history');
+    }
   };
 
   return (
