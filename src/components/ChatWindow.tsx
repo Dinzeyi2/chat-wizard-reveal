@@ -32,6 +32,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, onSendMess
         const lastMessage = messages[messages.length - 1];
         
         // Check if the last message is from the assistant and contains project/app generation
+        // AND doesn't have isGuidance flag already set (to prevent infinite loops)
         if (lastMessage.role === "assistant" && 
             lastMessage.metadata?.projectId && 
             !lastMessage.metadata.isGuidance) {

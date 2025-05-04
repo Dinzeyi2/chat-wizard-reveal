@@ -1,10 +1,10 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 interface AppGenerationRequest {
   prompt: string;
   completionLevel?: 'beginner' | 'intermediate' | 'advanced';
+  skipGeneration?: boolean; // Add a flag to skip actual generation
 }
 
 // Function to estimate tokens in a string (rough approximation)
@@ -188,12 +188,24 @@ serve(async (req) => {
     const requestData = await req.json();
     console.log("Request data:", JSON.stringify(requestData));
     
-    const { prompt, completionLevel = 'intermediate' } = requestData as AppGenerationRequest;
+    const { prompt, completionLevel = 'intermediate', skipGeneration = false } = requestData as AppGenerationRequest;
 
     if (!prompt) {
       console.error("Missing prompt in request");
       return new Response(JSON.stringify({ error: "Prompt is required" }), {
         status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // Check if this is just a guidance message that shouldn't trigger generation
+    if (skipGeneration || prompt.includes("AI-Guided Implementation")) {
+      console.log("Skipping app generation as requested");
+      return new Response(JSON.stringify({ 
+        success: true,
+        message: "Guidance message processed without triggering app generation"
+      }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
@@ -541,4 +553,3 @@ serve(async (req) => {
     });
   }
 });
-

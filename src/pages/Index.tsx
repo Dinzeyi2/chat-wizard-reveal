@@ -456,6 +456,27 @@ const Index = () => {
     
     setMessages(prev => [...prev, userMessage]);
     
+    // If the message appears to be a guidance message, handle it differently
+    if (content.includes("## AI-Guided Implementation")) {
+      console.log("Processing guidance message without generating new app");
+      
+      // Create assistant message with the guidance
+      const guidanceMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: content,
+        metadata: {
+          isGuidance: true,
+          projectId: currentProjectId
+        },
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, guidanceMessage]);
+      setFirstStepGuidanceSent(true);
+      return;
+    }
+    
     // Check if this is a standard app generation request
     const isAppGeneration = 
       (content.toLowerCase().includes("create") || 
@@ -501,7 +522,10 @@ const Index = () => {
       
       try {
         const { data, error } = await supabase.functions.invoke('generate-app', {
-          body: { prompt: content }
+          body: { 
+            prompt: content,
+            skipGeneration: content.includes("AI-Guided Implementation")
+          }
         });
 
         if (error) {
