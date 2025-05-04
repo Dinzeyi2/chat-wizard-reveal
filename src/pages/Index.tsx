@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { UiScraperDemo } from '@/components/UiScraperDemo';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { UICodeGenerator } from '@/utils/UICodeGenerator';
-import { ArtifactSystem } from '@/components/artifact/ArtifactSystem';
+import { ArtifactSystem, ArtifactProvider } from '@/components/artifact/ArtifactSystem';
 import { HamburgerMenuButton } from '@/components/HamburgerMenuButton';
 import Dashboard from '@/components/Dashboard';
 import { UserProfileMenu } from '@/components/UserProfileMenu';
@@ -254,11 +254,11 @@ Would you like to make any adjustments to this design?`,
           
           if (data && data.messages) {
             // Add UUIDs to the messages if they don't have them
-            const processedMessages = data.messages.map((message: any) => ({
+            const processedMessages = Array.isArray(data.messages) ? data.messages.map((message: any) => ({
               ...message,
               id: message.id || uuidv4(),
               timestamp: message.timestamp ? new Date(message.timestamp) : new Date()
-            }));
+            })) : [];
             
             setMessages(processedMessages);
             setShowWelcome(false);
@@ -280,14 +280,14 @@ Would you like to make any adjustments to this design?`,
       {/* Top navigation bar */}
       <header className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <HamburgerMenuButton />
+          <HamburgerMenuButton onOpenDashboard={handleOpenDashboard} />
           <span className="text-xl font-semibold">LovableAI</span>
         </div>
         <UserProfileMenu />
       </header>
 
       {showWelcome ? (
-        <WelcomeScreen onStartChat={handleStartNewChat} onShowDashboard={handleOpenDashboard} />
+        <WelcomeScreen onSendMessage={handleSendMessage} />
       ) : showDashboard ? (
         <Dashboard onClose={handleCloseDashboard} onStartNewProject={handleStartNewProject} />
       ) : (
@@ -311,11 +311,13 @@ Would you like to make any adjustments to this design?`,
             ref={artifactSystemRef} 
             className="w-full md:w-1/2 lg:w-3/5 border-t md:border-t-0 md:border-l border-gray-200 dark:border-gray-800"
           >
-            <ArtifactSystem 
-              messages={messages} 
-              activeProject={currentProjectId} 
-              onSendMessage={handleSendMessage} 
-            />
+            <ArtifactProvider>
+              <ArtifactSystem 
+                messages={messages} 
+                activeProject={currentProjectId} 
+                onSendMessage={handleSendMessage} 
+              />
+            </ArtifactProvider>
           </div>
         </div>
       )}
