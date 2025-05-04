@@ -92,6 +92,7 @@ const Index = () => {
     const chatId = searchParams.get('chat');
     
     if (chatId) {
+      console.log("Loading chat history for chat ID:", chatId);
       setCurrentChatId(chatId);
       // Load the specific chat history
       loadChatHistory(chatId);
@@ -134,6 +135,7 @@ const Index = () => {
             const projectMsg = formattedMessages.find((msg: Message) => msg.metadata?.projectId);
             if (projectMsg && projectMsg.metadata?.projectId) {
               setCurrentProjectId(projectMsg.metadata.projectId);
+              setHasGeneratedApp(true);
             }
             
             return;
@@ -164,6 +166,7 @@ const Index = () => {
           const projectMsg = formattedMessages.find((msg: Message) => msg.metadata?.projectId);
           if (projectMsg && projectMsg.metadata?.projectId) {
             setCurrentProjectId(projectMsg.metadata.projectId);
+            setHasGeneratedApp(true);
           }
         } else {
           // Fallback to creating placeholder messages if no saved messages

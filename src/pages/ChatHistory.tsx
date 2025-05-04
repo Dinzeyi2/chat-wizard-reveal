@@ -136,8 +136,8 @@ const ChatHistory = () => {
   );
 
   const handleChatSelection = (chatId: string) => {
-    // Here we navigate to the main chat page with the specific chat ID
-    navigate(`/?chat=${chatId}`);
+    // Navigate to the main chat page with the specific chat ID
+    navigate(`/app?chat=${chatId}`);
   };
 
   // Function to handle creating a new chat

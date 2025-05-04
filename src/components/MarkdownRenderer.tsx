@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Message } from "@/types/chat";
 import AppGeneratorDisplay from "./AppGeneratorDisplay";
@@ -155,7 +156,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
       <ScrollArea className="max-h-[500px]">
         <div className="p-4">
           <div className="prose max-w-none" 
-               dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked(content)) }}>
+               dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(content)) }}>
           </div>
         </div>
       </ScrollArea>
@@ -166,7 +167,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
   return (
     <ScrollArea className="max-h-[500px] pr-2">
       <div className="whitespace-pre-wrap" 
-           dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked(content)) }}>
+           dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(content)) }}>
       </div>
     </ScrollArea>
   );
