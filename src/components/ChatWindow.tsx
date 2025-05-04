@@ -14,54 +14,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
   const [processedMessages, setProcessedMessages] = useState<Message[]>([]);
   
   useEffect(() => {
-    // Process messages to handle guidance steps
+    // Process messages consistently to ensure all are captured for history
     const processMessages = () => {
-      const processed: Message[] = [];
-      
-      for (let i = 0; i < messages.length; i++) {
-        const message = messages[i];
-        processed.push(message);
-        
-        // Check if this is an AI message with a projectId and there isn't already a guidance message following it
-        if (message.role === "assistant" && 
-            message.metadata?.projectId && 
-            !message.metadata?.isGuidance &&
-            !(i < messages.length - 1 && messages[i + 1].metadata?.isGuidance)) {
-          
-          // Check console logs for ANY FIRST TASK message
-          if (window.console) {
-            const originalConsoleLog = console.log;
-            let firstTaskMessage = "";
-            
-            console.log = function(message) {
-              if (typeof message === "string" && message.includes("AI FIRST TASK:")) {
-                firstTaskMessage = message.replace("AI FIRST TASK:", "").trim();
-              }
-              originalConsoleLog.apply(console, arguments);
-            };
-            
-            // Restore original console.log
-            console.log = originalConsoleLog;
-            
-            if (firstTaskMessage) {
-              // Insert a synthetic guidance message with standard format
-              processed.push({
-                id: `guidance-${message.id}`,
-                role: "assistant",
-                content: firstTaskMessage,
-                timestamp: new Date(),
-                metadata: {
-                  projectId: message.metadata.projectId,
-                  isGuidance: true,
-                  projectName: message.metadata.projectName
-                }
-              });
-            }
-          }
-        }
-      }
-      
-      setProcessedMessages(processed);
+      // Simply copy all messages to processed array, without complex transformations
+      // This ensures all conversations are treated the same way
+      setProcessedMessages([...messages]);
     };
     
     processMessages();
