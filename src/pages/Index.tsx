@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import ChatWindow from '@/components/ChatWindow';
 import InputArea from '@/components/InputArea';
@@ -289,7 +288,8 @@ Would you like to make any adjustments to this design?`,
       {showWelcome ? (
         <WelcomeScreen onSendMessage={handleSendMessage} />
       ) : showDashboard ? (
-        <Dashboard onClose={handleCloseDashboard} onStartNewProject={handleStartNewProject} />
+        // Update Dashboard component usage to match its expected props
+        <Dashboard />
       ) : (
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
           <div className="flex flex-col flex-1">
@@ -313,7 +313,10 @@ Would you like to make any adjustments to this design?`,
           >
             <ArtifactProvider>
               <ArtifactLayout>
-                {/* The ArtifactSystem component is now used as a child of ArtifactLayout in ArtifactSystem.tsx */}
+                {/* Add children to the ArtifactLayout */}
+                <div className="h-full">
+                  {/* The ArtifactSystem component is now used as a child of ArtifactLayout in ArtifactSystem.tsx */}
+                </div>
               </ArtifactLayout>
             </ArtifactProvider>
           </div>
