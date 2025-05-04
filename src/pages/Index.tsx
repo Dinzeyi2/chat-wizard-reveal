@@ -11,7 +11,6 @@ import { ArtifactProvider, ArtifactLayout } from "@/components/artifact/Artifact
 import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
 import { useLocation } from "react-router-dom";
 import { UserProfileMenu } from "@/components/UserProfileMenu";
-import { generateDynamicGuidance } from "@/utils/dynamicGuidanceGenerator";
 
 // Interface for chat history items
 interface ChatHistoryItem {
@@ -470,70 +469,23 @@ You can explore the file structure and content in the panel above. This is a sta
           saveToHistory(content, formattedResponse);
         }
 
-        // Generate dynamic guidance instead of using firstStepGuidance from appData
-        if (!firstStepGuidanceSent) {
-          // Show loading message while generating guidance
-          const loadingGuidanceMessage: Message = {
-            id: (Date.now() + 3).toString(),
-            role: "assistant",
-            content: "Analyzing your application to provide personalized guidance...",
-            metadata: {
-              projectId: appData.projectId,
-              isLoading: true
-            },
-            timestamp: new Date()
-          };
-          
-          setMessages(prev => [...prev, loadingGuidanceMessage]);
-          
-          // Generate dynamic guidance based on the app
-          try {
-            const dynamicGuidance = await generateDynamicGuidance(appData.projectId, appData);
-            
-            // Replace loading message with actual guidance
+        // If we have first step guidance, send it automatically after a small delay
+        if (appData.firstStepGuidance && !firstStepGuidanceSent) {
+          setTimeout(() => {
             const guidanceMessage: Message = {
-              id: (Date.now() + 4).toString(),
+              id: (Date.now() + 3).toString(),
               role: "assistant",
-              content: dynamicGuidance,
+              content: appData.firstStepGuidance,
               metadata: {
                 projectId: appData.projectId,
-                isDynamicGuidance: true
+                isGuidance: true
               },
               timestamp: new Date()
             };
             
-            // Remove loading message and add guidance
-            setMessages(prev => 
-              prev.filter(msg => msg.id !== loadingGuidanceMessage.id)
-                .concat(guidanceMessage)
-            );
+            setMessages(prev => [...prev, guidanceMessage]);
             setFirstStepGuidanceSent(true);
-          } catch (error) {
-            console.error("Error generating dynamic guidance:", error);
-            // Remove the loading message if there's an error
-            setMessages(prev => prev.filter(msg => msg.id !== loadingGuidanceMessage.id));
-            
-            // Send a generic guidance message as fallback
-            setTimeout(() => {
-              const fallbackGuidanceMessage: Message = {
-                id: (Date.now() + 4).toString(),
-                role: "assistant",
-                content: `# Let's get started with your new application
-
-I've created the basic structure for your ${appData.projectName} application. Let's start by exploring the code and understanding the key components.
-
-What would you like to work on first?`,
-                metadata: {
-                  projectId: appData.projectId,
-                  isGuidance: true
-                },
-                timestamp: new Date()
-              };
-              
-              setMessages(prev => [...prev, fallbackGuidanceMessage]);
-              setFirstStepGuidanceSent(true);
-            }, 1500);
-          }
+          }, 1500);
         }
       } catch (error) {
         console.error('Error calling function:', error);
