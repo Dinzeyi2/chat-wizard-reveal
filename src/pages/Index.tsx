@@ -31,6 +31,7 @@ const Index = () => {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [firstStepGuidanceSent, setFirstStepGuidanceSent] = useState<boolean>(false);
+  const [hasGeneratedApp, setHasGeneratedApp] = useState<boolean>(false); // Track if an app has been generated
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const location = useLocation();
@@ -45,6 +46,24 @@ const Index = () => {
       handleSendMessage(initialPrompt);
     }
   }, []);
+  
+  // Check for existing app generation in messages
+  useEffect(() => {
+    // Look for messages that indicate an app was generated
+    const appGeneratedMessage = messages.find(message => 
+      message.role === "assistant" && 
+      message.metadata?.projectId && 
+      (message.content.includes("I've generated") || 
+       message.content.includes("generated a full-stack application") ||
+       message.content.includes("app generation successful"))
+    );
+    
+    // Update state if we found evidence of app generation
+    if (appGeneratedMessage) {
+      setHasGeneratedApp(true);
+      setCurrentProjectId(appGeneratedMessage.metadata?.projectId || null);
+    }
+  }, [messages]);
   
   // Check authentication status
   useEffect(() => {
@@ -363,6 +382,26 @@ const Index = () => {
        content.toLowerCase().includes("fix"));
     
     if (isAppGeneration) {
+      // Check if an app has already been generated in this conversation
+      if (hasGeneratedApp) {
+        console.log("Preventing generation of new app - one already exists in this conversation");
+        
+        // Instead of generating a new app, send a message to the user
+        const appExistsMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `I notice you're asking me to create a new application, but I've already generated an app in this conversation. 
+
+To create a new app, please start a new conversation by clicking the "New Chat" button in the sidebar, or by visiting the homepage.
+
+Would you like me to help you modify the existing app instead? I can add features, fix issues, or make other changes to the current application.`,
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => [...prev, appExistsMessage]);
+        return;
+      }
+
       console.log("Calling generate-app function with prompt:", content);
       
       setGenerationDialog(true);
@@ -394,6 +433,7 @@ const Index = () => {
         const appData = data;
         console.log("App generation successful:", appData);
         setCurrentProjectId(appData.projectId);
+        setHasGeneratedApp(true); // Mark that we've generated an app
         
         setGenerationDialog(false);
         
