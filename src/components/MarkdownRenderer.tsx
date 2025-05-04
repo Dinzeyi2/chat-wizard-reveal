@@ -115,7 +115,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
            (hasGenerationPhrase && (hasAppKeyword || hasFileStructure)) ||
            (hasGenerationKeyword && hasAppKeyword && (hasFileStructure || hasMultipleCodeBlocks)) ||
            (projectId !== null) || 
-           (hasMultipleCodeBlocks && hasFileStructure);
+           (hasMultipleCodeBlocks && hasFileStructure) ||
+           (message.metadata?.isGuidance === true);  // Added check for guidance messages
   }, [content, message, projectId]);
   
   if (message && isAppGeneration) {
