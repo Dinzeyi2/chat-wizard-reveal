@@ -106,7 +106,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
       hasMultipleCodeBlocks,
       projectId,
       isModification,
-      codeBlockCount
+      codeBlockCount,
+      isGuidance: message.metadata?.isGuidance
     });
     
     // Be VERY lenient - if multiple conditions are met, treat it as app generation
@@ -119,6 +120,25 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
            (message.metadata?.isGuidance === true);  // Added check for guidance messages
   }, [content, message, projectId]);
   
+  // Check if this is specifically AI guidance content that should get special formatting
+  const isAIGuidance = React.useMemo(() => {
+    if (!message) return false;
+    
+    // Explicit metadata flag for guidance
+    if (message.metadata?.isGuidance === true) return true;
+    
+    // Check content for guidance patterns
+    const hasGuidancePatterns = 
+      content.includes("Let's start by") ||
+      content.includes("Your next task") ||
+      content.includes("In this challenge") ||
+      (content.includes("file") && content.includes("modify")) ||
+      content.includes("When you've completed this task");
+      
+    // If it has multiple guidance patterns and is NOT an app generation
+    return hasGuidancePatterns && message.role === "assistant" && !isAppGeneration;
+  }, [content, message, isAppGeneration]);
+  
   if (message && isAppGeneration) {
     console.log("Rendering AppGeneratorDisplay for message:", message.id);
     return (
@@ -127,10 +147,33 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
       </ArtifactProvider>
     );
   }
+  
+  // Special formatting for AI guidance (non-app-generation)
+  if (message && isAIGuidance) {
+    return (
+      <ScrollArea className="max-h-[500px]">
+        <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
+          <h3 className="text-lg font-semibold text-blue-800 mb-3">📝 AI Guidance</h3>
+          <div className="prose prose-blue max-w-none">
+            {processMarkdownContent(content)}
+          </div>
+        </div>
+      </ScrollArea>
+    );
+  }
 
   // Process normal markdown with better formatting
+  return (
+    <ScrollArea className="max-h-[500px] pr-2">
+      <div className="whitespace-pre-wrap">{processMarkdownContent(content)}</div>
+    </ScrollArea>
+  );
+};
+
+// Helper function to process markdown content
+function processMarkdownContent(content: string) {
   // This is a simple implementation - could be expanded with a full markdown parser
-  const formattedContent = content
+  return content
     .split('```')
     .map((block, index) => {
       if (index % 2 === 0) {
@@ -156,12 +199,6 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
         );
       }
     });
-
-  return (
-    <ScrollArea className="max-h-[500px] pr-2">
-      <div className="whitespace-pre-wrap">{formattedContent}</div>
-    </ScrollArea>
-  );
-};
+}
 
 export default MarkdownRenderer;

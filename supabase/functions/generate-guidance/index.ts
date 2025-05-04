@@ -13,17 +13,20 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Starting guidance generation");
+    
     const { projectName, description, challenge, codeSamples } = await req.json();
+    console.log(`Generating guidance for project: ${projectName}, challenge: ${challenge.title}`);
 
     // Get the Gemini API key from environment variables
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
     if (!geminiApiKey) {
+      console.error("Gemini API key not configured");
       throw new Error("Gemini API key not configured");
     }
     
-    console.log("Generating guidance for project:", projectName);
-    
     // Call Gemini API to generate custom guidance
+    console.log("Calling Gemini API for guidance generation");
     const geminiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent", {
       method: "POST",
       headers: {
@@ -59,7 +62,7 @@ serve(async (req) => {
           }]
         }],
         generationConfig: {
-          temperature: 0.7,
+          temperature: 0.5, // Lowered for more consistent outputs
           topK: 40,
           topP: 0.95,
           maxOutputTokens: 1024
@@ -74,25 +77,44 @@ serve(async (req) => {
     }
 
     const geminiData = await geminiResponse.json();
-    console.log("Guidance generated successfully");
+    console.log("Gemini API response received");
     
-    // Extract the guidance content
+    // Extract the guidance content with error handling
     if (!geminiData.candidates || geminiData.candidates.length === 0 || !geminiData.candidates[0].content) {
+      console.error("Empty or invalid response from Gemini API", geminiData);
       throw new Error("Empty or invalid response from Gemini API");
     }
 
-    const guidance = geminiData.candidates[0].content.parts[0].text;
+    let guidance = "";
+    try {
+      guidance = geminiData.candidates[0].content.parts[0].text;
+      console.log("Successfully extracted guidance text", guidance.substring(0, 100) + "...");
+    } catch (error) {
+      console.error("Error extracting guidance from Gemini response:", error);
+      console.error("Response structure:", JSON.stringify(geminiData));
+      throw new Error("Failed to extract guidance from response");
+    }
+    
+    if (!guidance || guidance.trim() === "") {
+      console.error("Empty guidance text extracted");
+      throw new Error("Empty guidance returned from Gemini");
+    }
     
     // Add a call to action at the end
     const fullGuidance = `${guidance.trim()}\n\nWhen you've completed this task, let me know and I'll guide you to the next step.`;
 
+    console.log("Returning guidance successfully");
     return new Response(JSON.stringify({ guidance: fullGuidance }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   } catch (error) {
     console.error('Error generating guidance:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    // Return a proper error response so the client knows something went wrong
+    return new Response(JSON.stringify({ 
+      error: error.message, 
+      success: false
+    }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });

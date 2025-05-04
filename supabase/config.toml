@@ -27,3 +27,4 @@ verify_jwt = false
 
 [functions.generate-challenge]
 verify_jwt = false
+

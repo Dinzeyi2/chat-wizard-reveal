@@ -37,9 +37,10 @@ export class AIGuide {
     this.currentChallengeIndex = 0;
     this.conversationHistory = [];
     
-    // Generate dynamic guidance if we have files
+    // Generate dynamic guidance immediately during construction
     if (this.project.files && this.project.files.length > 0) {
       this.generateDynamicGuidance();
+      console.log("AIGuide: Generating dynamic guidance during initialization");
     }
   }
   
@@ -49,6 +50,8 @@ export class AIGuide {
   
   async generateDynamicGuidance(): Promise<void> {
     try {
+      console.log("AIGuide: Starting dynamic guidance generation");
+      
       // Get first challenge to use as context
       const currentChallenge = this.getCurrentChallenge();
       
@@ -60,6 +63,8 @@ export class AIGuide {
       const codeSamples = relevantFiles.map(file => 
         `File: ${file.path}\n\`\`\`\n${file.content.substring(0, 1000)}${file.content.length > 1000 ? '...' : ''}\n\`\`\``
       ).join('\n\n');
+      
+      console.log(`AIGuide: Found ${relevantFiles.length} relevant files for guidance generation`);
       
       // Call Supabase edge function to generate guidance with Gemini
       const response = await fetch('/api/generate-guidance', {
@@ -76,23 +81,34 @@ export class AIGuide {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to generate guidance');
+        console.error(`AIGuide: Failed to generate guidance - Status ${response.status}`);
+        throw new Error(`Failed to generate guidance - Status ${response.status}`);
       }
       
       const data = await response.json();
+      
+      if (!data || !data.guidance) {
+        console.error("AIGuide: No guidance data returned from function", data);
+        throw new Error("No guidance data returned");
+      }
+      
+      console.log("AIGuide: Successfully generated guidance:", data.guidance.substring(0, 100) + "...");
       this.dynamicGuidance = data.guidance;
       
     } catch (error) {
-      console.error('Error generating dynamic guidance:', error);
-      // Fallback to static guidance if dynamic generation fails
+      console.error('AIGuide: Error generating dynamic guidance:', error);
+      // Don't set fallback - leave dynamicGuidance as null so we know generation failed
+      this.dynamicGuidance = null;
     }
   }
   
   getNextGuidanceMessage(): string {
     const currentChallenge = this.getCurrentChallenge();
     
-    // If we have dynamic guidance, use it
+    // Always prioritize dynamic guidance if available
     if (this.dynamicGuidance) {
+      console.log("AIGuide: Using dynamic guidance from Gemini");
+      
       // Mark that we've provided guidance for this challenge
       this.conversationHistory.push({
         type: 'guide',
@@ -102,6 +118,8 @@ export class AIGuide {
       
       return this.dynamicGuidance;
     }
+    
+    console.log("AIGuide: No dynamic guidance available, falling back to template");
     
     // If this is the first message about this challenge
     if (!this.conversationHistory.some(msg => msg.challengeId === currentChallenge.description)) {
@@ -139,8 +157,12 @@ export class AIGuide {
   private _generateIntroMessage(challenge: Challenge): string {
     // Try to use dynamic guidance if available
     if (this.dynamicGuidance) {
+      console.log("AIGuide: Using dynamic guidance in _generateIntroMessage");
       return this.dynamicGuidance;
     }
+    
+    // Log that we're falling back to template-based messages
+    console.log("AIGuide: Falling back to template-based messages in _generateIntroMessage");
     
     // Fall back to template-based messages if no dynamic guidance
     const messages = [
@@ -181,6 +203,7 @@ export class AIGuide {
         
         // Generate new dynamic guidance for the next challenge
         if (this.project.files && this.project.files.length > 0) {
+          console.log("AIGuide: Generating new guidance after challenge completion");
           this.generateDynamicGuidance();
         }
         
@@ -263,9 +286,11 @@ export class AIGuide {
     
     // If we have dynamic guidance from Gemini, use it
     if (this.dynamicGuidance) {
+      console.log("AIGuide: Using dynamic guidance in _provideCodeSnippet");
       return this.dynamicGuidance + "\n\nHere's a code snippet to help you get started.";
     }
     
+    console.log("AIGuide: No dynamic guidance available for code snippet");
     return "Here's some sample code to help you with this challenge...";
   }
   
