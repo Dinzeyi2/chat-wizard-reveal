@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { marked } from "marked";
@@ -11,6 +11,26 @@ interface ChatWindowProps {
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
+  // Add state to track if an app has been generated in this conversation
+  const [hasGeneratedApp, setHasGeneratedApp] = useState(false);
+  
+  // Effect to check messages for app generation
+  useEffect(() => {
+    // Look for messages that indicate an app was generated
+    const appGeneratedMessage = messages.find(message => 
+      message.role === "assistant" && 
+      message.metadata?.projectId && 
+      (message.content.includes("I've generated") || 
+       message.content.includes("generated a full-stack application") ||
+       message.content.includes("app generation successful"))
+    );
+    
+    // Update state if we found evidence of app generation
+    if (appGeneratedMessage && !hasGeneratedApp) {
+      setHasGeneratedApp(true);
+    }
+  }, [messages]);
+  
   return (
     <div className="px-4 py-5 md:px-8 lg:px-12">
       {messages.map((message) => (
@@ -24,6 +44,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
           ) : (
             <div>
               <div className="ml-0 bg-white border border-gray-200 rounded-3xl px-6 py-4 max-w-3xl">
+                {/* Display warning if user asks for another app and one has already been generated */}
+                {hasGeneratedApp && 
+                 message.content.includes("I've generated") && 
+                 message.metadata?.projectId && 
+                 message !== messages.find(m => m.metadata?.projectId) ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+                    <p className="text-amber-800 font-medium">
+                      An app has already been generated in this conversation. If you'd like to create a new app, please start a new conversation.
+                    </p>
+                  </div>
+                ) : null}
                 <MarkdownRenderer content={message.content} message={message} />
               </div>
             </div>
