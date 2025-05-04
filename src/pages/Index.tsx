@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { UiScraperDemo } from '@/components/UiScraperDemo';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { UICodeGenerator } from '@/utils/UICodeGenerator';
-import { ArtifactSystem, ArtifactProvider } from '@/components/artifact/ArtifactSystem';
+import { ArtifactProvider, ArtifactLayout } from '@/components/artifact/ArtifactSystem';
 import { HamburgerMenuButton } from '@/components/HamburgerMenuButton';
 import Dashboard from '@/components/Dashboard';
 import { UserProfileMenu } from '@/components/UserProfileMenu';
@@ -149,7 +149,7 @@ Would you like to make any adjustments to this design?`,
           
         } else {
           // Process the response from Claude
-          if (data.response) {
+          if (data && data.response) {
             // Look for generated app data in the response
             let projectId = null;
             let projectData = null;
@@ -312,11 +312,9 @@ Would you like to make any adjustments to this design?`,
             className="w-full md:w-1/2 lg:w-3/5 border-t md:border-t-0 md:border-l border-gray-200 dark:border-gray-800"
           >
             <ArtifactProvider>
-              <ArtifactSystem 
-                messages={messages} 
-                activeProject={currentProjectId} 
-                onSendMessage={handleSendMessage} 
-              />
+              <ArtifactLayout>
+                {/* The ArtifactSystem component is now used as a child of ArtifactLayout in ArtifactSystem.tsx */}
+              </ArtifactLayout>
             </ArtifactProvider>
           </div>
         </div>
