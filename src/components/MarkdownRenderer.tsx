@@ -152,9 +152,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
   if (message && (isAIGuidance || message.metadata?.isGuidance)) {
     return (
       <ScrollArea className="max-h-[500px]">
-        <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
-          <h3 className="text-lg font-semibold text-blue-800 mb-3">📝 AI Guidance</h3>
-          <div className="prose prose-blue max-w-none">
+        <div className="p-4">
+          <div className="prose max-w-none">
             {processMarkdownContent(content)}
           </div>
         </div>
