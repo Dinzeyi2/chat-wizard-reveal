@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
@@ -99,6 +100,22 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
     setTimeout(() => setCurrentArtifact(null), 300); // Clear after animation
   };
 
+  const updateFileContent = (fileId: string, newContent: string) => {
+    if (!currentArtifact) return;
+    
+    const updatedFiles = currentArtifact.files.map(file => {
+      if (file.id === fileId) {
+        return { ...file, content: newContent };
+      }
+      return file;
+    });
+    
+    setCurrentArtifact({
+      ...currentArtifact,
+      files: updatedFiles
+    });
+  };
+
   return (
     <ArtifactContext.Provider value={{
       openArtifact,
@@ -107,16 +124,17 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
       isOpen
     }}>
       {children}
-      {isOpen && currentArtifact && <ArtifactViewer />}
+      {isOpen && currentArtifact && <ArtifactViewer updateFileContent={updateFileContent} />}
     </ArtifactContext.Provider>
   );
 };
 
 // File Viewer Component
-export const ArtifactViewer: React.FC = () => {
+export const ArtifactViewer: React.FC<{ updateFileContent?: (fileId: string, newContent: string) => void }> = ({ updateFileContent }) => {
   const { currentArtifact, closeArtifact, isOpen } = useArtifact();
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'code' | 'preview'>('code');
+  const [readOnly, setReadOnly] = useState<boolean>(false);
 
   useEffect(() => {
     console.log("ArtifactViewer mounted, isOpen:", isOpen);
@@ -159,6 +177,12 @@ export const ArtifactViewer: React.FC = () => {
   const handleFileSelect = (fileId: string) => {
     console.log("Selected file with ID:", fileId);
     setActiveFileId(fileId);
+  };
+
+  const handleFileContentChange = (fileId: string, newContent: string) => {
+    if (updateFileContent) {
+      updateFileContent(fileId, newContent);
+    }
   };
 
   if (!isOpen || !currentArtifact) {
@@ -250,6 +274,8 @@ export const ArtifactViewer: React.FC = () => {
                 files={currentArtifact.files}
                 activeFileId={activeFileId}
                 onFileSelect={handleFileSelect}
+                onFileContentChange={handleFileContentChange}
+                readOnly={readOnly}
               />
             </div>
           )}
