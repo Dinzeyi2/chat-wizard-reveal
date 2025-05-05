@@ -2,8 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
-import SyntaxHighlighter from 'react-syntax-highlighter';
-import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 
 interface CodeEditorProps {
   content: string;
@@ -24,13 +22,6 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
 }) => {
   const [analyzing, setAnalyzing] = useState(false);
   const [sentGuidanceMessage, setSentGuidanceMessage] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editableContent, setEditableContent] = useState(content);
-
-  useEffect(() => {
-    // Sync content prop with internal state
-    setEditableContent(content);
-  }, [content]);
 
   useEffect(() => {
     // When the component mounts and has a project ID but hasn't sent guidance yet
@@ -73,12 +64,6 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   };
 
   const handleSave = () => {
-    // Update the parent component with the edited content
-    if (isEditing) {
-      onChange(editableContent);
-      setIsEditing(false);
-    }
-    
     if (onSave) {
       onSave();
     } else {
@@ -96,38 +81,6 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
         action: "check_progress"
       }));
     }
-  };
-
-  // Get language for syntax highlighting
-  const getLanguageFromFilename = (fileName: string | null): string => {
-    if (!fileName) return 'plaintext';
-    
-    const extension = fileName.split('.').pop()?.toLowerCase() || '';
-    const languageMap: Record<string, string> = {
-      'js': 'javascript',
-      'jsx': 'javascript',
-      'ts': 'typescript',
-      'tsx': 'typescript',
-      'css': 'css',
-      'scss': 'scss',
-      'html': 'html',
-      'json': 'json',
-      'md': 'markdown',
-    };
-    return languageMap[extension] || 'plaintext';
-  };
-
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setEditableContent(e.target.value);
-    // We don't immediately call onChange here to avoid excessive updates
-  };
-
-  const toggleEditMode = () => {
-    if (isEditing) {
-      // Save when exiting edit mode
-      onChange(editableContent);
-    }
-    setIsEditing(!isEditing);
   };
 
   // File validation function - integrated from the code snippet
@@ -153,8 +106,8 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex justify-between items-center p-2 border-b bg-zinc-800 text-white">
-        <div className="font-mono text-sm text-gray-300">
+      <div className="flex justify-between items-center p-4 border-b">
+        <div className="font-mono text-sm">
           {filename || 'No file selected'}
         </div>
         <div className="flex gap-2">
@@ -166,16 +119,6 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
           >
             {analyzing ? 'Analyzing...' : 'Analyze Code'}
           </Button>
-          {!readOnly && (
-            <Button 
-              variant="outline"
-              size="sm"
-              onClick={toggleEditMode}
-              disabled={!filename}
-            >
-              {isEditing ? 'View' : 'Edit'}
-            </Button>
-          )}
           <Button 
             size="sm"
             onClick={handleSave}
@@ -186,37 +129,17 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 p-4 overflow-auto">
         {filename ? (
-          isEditing ? (
-            <textarea
-              className="w-full h-full font-mono text-sm p-4 border-0 resize-none bg-zinc-900 text-gray-300"
-              value={editableContent}
-              onChange={handleContentChange}
-              disabled={readOnly || !filename}
-              spellCheck="false"
-            />
-          ) : (
-            <div className="w-full h-full bg-zinc-900">
-              <SyntaxHighlighter
-                language={getLanguageFromFilename(filename)}
-                style={vs2015}
-                customStyle={{
-                  margin: 0,
-                  padding: '16px',
-                  height: '100%',
-                  fontSize: '14px',
-                  lineHeight: '1.5',
-                  backgroundColor: '#18181b'
-                }}
-                showLineNumbers={true}
-              >
-                {content}
-              </SyntaxHighlighter>
-            </div>
-          )
+          <textarea
+            className="w-full h-full font-mono text-sm p-4 border rounded resize-none"
+            value={content}
+            onChange={(e) => onChange(e.target.value)}
+            disabled={readOnly || !filename}
+            spellCheck="false"
+          />
         ) : (
-          <div className="flex items-center justify-center h-full text-gray-500 bg-zinc-900">
+          <div className="flex items-center justify-center h-full text-gray-500">
             Select a file to edit
           </div>
         )}
