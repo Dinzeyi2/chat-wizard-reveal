@@ -157,7 +157,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
         <div className="p-4">
           <div className="prose max-w-none" 
                dangerouslySetInnerHTML={{ 
-                 __html: DOMPurify.sanitize(marked.parse(content)) 
+                 __html: DOMPurify.sanitize(marked.parse(content, { async: false })) 
                }}>
           </div>
         </div>
@@ -170,7 +170,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
     <ScrollArea className="max-h-[500px] pr-2">
       <div className="whitespace-pre-wrap" 
            dangerouslySetInnerHTML={{ 
-             __html: DOMPurify.sanitize(marked.parse(content)) 
+             __html: DOMPurify.sanitize(marked.parse(content, { async: false })) 
            }}>
       </div>
     </ScrollArea>
