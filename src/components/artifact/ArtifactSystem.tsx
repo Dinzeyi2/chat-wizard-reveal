@@ -160,6 +160,17 @@ export const ArtifactViewer: React.FC = () => {
     console.log("Active tab changed to:", activeTab);
   }, [activeTab]);
 
+  // Add effect to monitor activeFile changes
+  useEffect(() => {
+    console.log("Active file changed to:", activeFile);
+    if (activeFile) {
+      const selectedFile = currentArtifact?.files.find(f => f.id === activeFile);
+      if (selectedFile) {
+        console.log("Selected file content length:", selectedFile.content.length);
+      }
+    }
+  }, [activeFile, currentArtifact]);
+
   const handleTabChange = (tab: 'code' | 'preview') => {
     console.log("Changing tab to:", tab);
     setActiveTab(tab);
@@ -187,6 +198,8 @@ export const ArtifactViewer: React.FC = () => {
 
   if (currentFile) {
     console.log("Current file path:", currentFile.path);
+    console.log("Current file content type:", typeof currentFile.content);
+    console.log("Current file content length:", currentFile.content.length);
   } else {
     console.log("No current file selected");
   }
@@ -211,6 +224,11 @@ export const ArtifactViewer: React.FC = () => {
     const tree: Record<string, ArtifactFile[]> = {};
     const rootFiles: ArtifactFile[] = [];
     
+    if (!currentArtifact || !currentArtifact.files) {
+      console.error("No artifact or files available");
+      return { tree, rootFiles };
+    }
+    
     currentArtifact.files.forEach(file => {
       const parts = file.path.split('/');
       if (parts.length === 1) {
@@ -227,11 +245,22 @@ export const ArtifactViewer: React.FC = () => {
     return { tree, rootFiles };
   };
   
-  const toggleFolder = (folderPath: string) => {
+  const toggleFolder = (folderPath: string, event: React.MouseEvent) => {
+    // Prevent the click from propagating to parent elements
+    event.stopPropagation();
+    
     setExpandedFolders(prev => ({
       ...prev,
       [folderPath]: !prev[folderPath]
     }));
+  };
+  
+  const handleFileClick = (fileId: string, event: React.MouseEvent) => {
+    // Prevent the click from propagating to parent elements
+    event.stopPropagation();
+    
+    console.log("File clicked:", fileId);
+    setActiveFile(fileId);
   };
   
   const renderFileTree = () => {
@@ -255,7 +284,7 @@ export const ArtifactViewer: React.FC = () => {
           <li 
             className="flex items-center py-1 cursor-pointer text-gray-300 hover:bg-zinc-800"
             style={{ paddingLeft: `${indent * 12 + 12}px` }}
-            onClick={() => toggleFolder(folderPath)}
+            onClick={(e) => toggleFolder(folderPath, e)}
           >
             <span className="mr-1 text-gray-400">
               {isExpanded ? (
@@ -276,12 +305,9 @@ export const ArtifactViewer: React.FC = () => {
                 return (
                   <li 
                     key={file.id}
-                    className={`py-1 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400' : 'text-gray-300'}`}
+                    className={`py-1 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'bg-zinc-800 text-green-400' : 'text-gray-300'}`}
                     style={{ paddingLeft: `${indent * 12 + 28}px` }}
-                    onClick={() => {
-                      console.log("Setting active file to:", file.id, file.path);
-                      setActiveFile(file.id);
-                    }}
+                    onClick={(e) => handleFileClick(file.id, e)}
                   >
                     <div className="flex items-center">
                       <File className="h-4 w-4 mr-2 text-gray-500" />
@@ -306,11 +332,8 @@ export const ArtifactViewer: React.FC = () => {
         {rootFiles.map(file => (
           <li 
             key={file.id}
-            className={`py-1 pl-3 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400' : 'text-gray-300'}`}
-            onClick={() => {
-              console.log("Setting active root file to:", file.id, file.path);
-              setActiveFile(file.id);
-            }}
+            className={`py-1 pl-3 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'bg-zinc-800 text-green-400' : 'text-gray-300'}`}
+            onClick={(e) => handleFileClick(file.id, e)}
           >
             <div className="flex items-center px-2 py-1">
               <File className="h-4 w-4 mr-2 text-gray-500" />
