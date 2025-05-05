@@ -44,7 +44,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
           ) : (
             <div>
               <div className="ml-0 bg-white border border-gray-200 rounded-3xl px-6 py-4 max-w-3xl">
-                {/* Ensure consistent UI for all assistant messages */}
+                {/* Display warning if user asks for another app and one has already been generated */}
+                {hasGeneratedApp && 
+                 message.content.includes("I've generated") && 
+                 message.metadata?.projectId && 
+                 message !== messages.find(m => m.metadata?.projectId) ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+                    <p className="text-amber-800 font-medium">
+                      An app has already been generated in this conversation. If you'd like to create a new app, please start a new conversation.
+                    </p>
+                  </div>
+                ) : null}
                 <MarkdownRenderer content={message.content} message={message} />
               </div>
             </div>
