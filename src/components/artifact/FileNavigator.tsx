@@ -53,11 +53,20 @@ const FileNavigator: React.FC<FileNavigatorProps> = ({
     return { tree, rootFiles };
   };
   
-  const toggleFolder = (folderPath: string) => {
+  const toggleFolder = (folderPath: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setExpandedFolders(prev => ({
       ...prev,
       [folderPath]: !prev[folderPath]
     }));
+  };
+
+  const handleFileClick = (fileId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("File clicked:", fileId);
+    onFileSelect(fileId);
   };
 
   const getLanguageFromPath = (path: string): string => {
@@ -96,11 +105,7 @@ const FileNavigator: React.FC<FileNavigatorProps> = ({
         <li 
           className="flex items-center py-1 cursor-pointer text-gray-300 hover:bg-zinc-800"
           style={{ paddingLeft: `${indent * 12 + 12}px` }}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleFolder(folderPath);
-          }}
+          onClick={(e) => toggleFolder(folderPath, e)}
         >
           <span className="mr-1 text-gray-400">
             {isExpanded ? (
@@ -124,11 +129,7 @@ const FileNavigator: React.FC<FileNavigatorProps> = ({
                   key={file.id}
                   className={`py-1 cursor-pointer text-sm hover:bg-zinc-800 ${activeFileId === file.id ? 'bg-zinc-800 text-green-400' : 'text-gray-300'}`}
                   style={{ paddingLeft: `${indent * 12 + 28}px` }}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onFileSelect(file.id);
-                  }}
+                  onClick={(e) => handleFileClick(file.id, e)}
                 >
                   <div className="flex items-center">
                     <File className="h-4 w-4 mr-2 text-gray-500" />
@@ -158,11 +159,7 @@ const FileNavigator: React.FC<FileNavigatorProps> = ({
           <li 
             key={file.id}
             className={`py-1 pl-3 cursor-pointer text-sm hover:bg-zinc-800 ${activeFileId === file.id ? 'bg-zinc-800 text-green-400' : 'text-gray-300'}`}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onFileSelect(file.id);
-            }}
+            onClick={(e) => handleFileClick(file.id, e)}
           >
             <div className="flex items-center px-2 py-1">
               <File className="h-4 w-4 mr-2 text-gray-500" />
