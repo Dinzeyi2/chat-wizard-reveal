@@ -18,6 +18,7 @@ interface MarkdownRendererProps {
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message }) => {
   // Add state to track if an app has been generated in this message
   const [hasGeneratedApp, setHasGeneratedApp] = useState(false);
+  const [cleanedContent, setCleanedContent] = useState(content);
   // Get artifact system context to open code viewer
   const { openArtifact } = useArtifact();
   
@@ -30,6 +31,14 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
          content.includes("generated a full-stack application") ||
          content.includes("app generation successful"))) {
       setHasGeneratedApp(true);
+      
+      // Clean the content by removing the JSON code block
+      const cleanContent = content.replace(/```json[\s\S]*?```/g, 
+        "[App code is available in the artifact viewer above]");
+      
+      setCleanedContent(cleanContent);
+    } else {
+      setCleanedContent(content);
     }
   }, [content, message]);
 
@@ -97,13 +106,13 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
             An app has already been generated in this conversation. If you'd like to create a new app, please start a new conversation.
           </p>
         </div>
-        <div dangerouslySetInnerHTML={{ __html: processContent(content) }} />
+        <div dangerouslySetInnerHTML={{ __html: processContent(cleanedContent) }} />
       </div>
     );
   }
 
-  // Regular rendering
-  return <div dangerouslySetInnerHTML={{ __html: processContent(content) }} />;
+  // Regular rendering with cleaned content if it's an app generation message
+  return <div dangerouslySetInnerHTML={{ __html: processContent(hasGeneratedApp ? cleanedContent : content) }} />;
 };
 
 export default MarkdownRenderer;

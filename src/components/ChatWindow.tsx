@@ -56,6 +56,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
                       </p>
                     </div>
                   ) : null}
+                  
+                  {/* If this is an app-generating message, add a button to view code */}
+                  {message.metadata?.projectId && message.role === "assistant" && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                      <p className="font-medium text-blue-800">
+                        App code is available in the artifact viewer. 
+                      </p>
+                    </div>
+                  )}
+                  
                   <MarkdownRenderer content={message.content} message={message} />
                 </div>
               </div>
