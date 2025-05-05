@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -116,70 +115,23 @@ const Index = () => {
     setLoading(true);
     
     try {
-      // Try to load from Supabase first if authenticated
-      if (isAuthenticated) {
-        try {
-          // Try to load from Supabase
-          const { data, error } = await supabase
-            .from('chat_history')
-            .select('*')
-            .eq('id', chatId)
-            .maybeSingle(); // Use maybeSingle to avoid errors when the chat isn't found
-          
-          if (error) {
-            console.error("Error fetching chat from Supabase:", error);
-          } else if (data) {
-            console.log("Found chat in Supabase:", data);
-            if (data.messages && Array.isArray(data.messages)) {
-              // Format dates in the messages
-              const formattedMessages = data.messages.map((msg: any) => ({
-                ...msg,
-                timestamp: new Date(msg.timestamp)
-              }));
-              
-              setMessages(formattedMessages);
-              
-              // If this chat had a project ID, restore it
-              const projectMsg = formattedMessages.find((msg: Message) => msg.metadata?.projectId);
-              if (projectMsg && projectMsg.metadata?.projectId) {
-                setCurrentProjectId(projectMsg.metadata.projectId);
-                setHasGeneratedApp(true);
-              }
-              
-              setLoading(false);
-              return; // Successfully loaded from Supabase, exit the function
-            }
-          }
-          // If we get here, we couldn't load from Supabase, fall through to localStorage
-        } catch (supabaseError) {
-          console.error("Error accessing Supabase:", supabaseError);
-          // Fall through to localStorage
-        }
+      // Try to load from Supabase first
+      const { data, error } = await supabase
+        .from('chat_history')
+        .select('*')
+        .eq('id', chatId)
+        .maybeSingle(); // Use maybeSingle to avoid errors when the chat isn't found
+      
+      if (error) {
+        console.error("Error fetching chat from Supabase:", error);
+        throw new Error(`Supabase error: ${error.message}`);
       }
       
-      // Try to load from localStorage as fallback
-      const storedHistory = localStorage.getItem('chatHistory');
-      if (!storedHistory) {
-        throw new Error("No chat history found in local storage");
-      }
-      
-      let localChatHistory;
-      try {
-        localChatHistory = JSON.parse(storedHistory);
-      } catch (parseError) {
-        console.error("Error parsing chat history from localStorage:", parseError);
-        throw new Error("Invalid chat history format in local storage");
-      }
-      
-      const selectedChat = localChatHistory.find((chat: ChatHistoryItem) => chat.id === chatId);
-      
-      if (selectedChat) {
-        if (selectedChat.messages && selectedChat.messages.length > 0) {
-          // Use stored message history if available
-          console.log("Loading saved conversation with", selectedChat.messages.length, "messages from localStorage");
-          
+      if (data) {
+        console.log("Found chat in Supabase:", data);
+        if (data.messages && Array.isArray(data.messages)) {
           // Format dates in the messages
-          const formattedMessages = selectedChat.messages.map((msg: any) => ({
+          const formattedMessages = data.messages.map((msg: any) => ({
             ...msg,
             timestamp: new Date(msg.timestamp)
           }));
@@ -192,28 +144,19 @@ const Index = () => {
             setCurrentProjectId(projectMsg.metadata.projectId);
             setHasGeneratedApp(true);
           }
+          
+          toast({
+            title: "Chat loaded",
+            description: `Loaded "${data.title}"`,
+          });
+          
+          setLoading(false);
+          return; // Successfully loaded from Supabase, exit the function
         } else {
-          // Fallback to creating placeholder messages if no saved messages
-          console.log("No stored messages found, creating placeholder messages");
-          const userMessage: Message = {
-            id: "user-" + Date.now().toString(),
-            role: "user",
-            content: selectedChat.title,
-            timestamp: new Date(Date.now() - 3600000) // 1 hour ago
-          };
-          
-          const assistantMessage: Message = {
-            id: "assistant-" + Date.now().toString(),
-            role: "assistant",
-            content: `This is a previous conversation about "${selectedChat.title}". I'm here to continue helping you with this topic.`,
-            timestamp: new Date(Date.now() - 3500000) // A bit less than 1 hour ago
-          };
-          
-          setMessages([userMessage, assistantMessage]);
+          throw new Error("Chat found but has no messages");
         }
       } else {
-        // If no chat was found with this ID, display an error message
-        throw new Error("Chat not found in local storage");
+        throw new Error("Chat not found in Supabase");
       }
     } catch (error) {
       console.error("Error loading chat history:", error);
