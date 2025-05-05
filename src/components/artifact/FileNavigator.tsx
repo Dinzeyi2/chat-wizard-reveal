@@ -97,6 +97,7 @@ const FileNavigator: React.FC<FileNavigatorProps> = ({
           className="flex items-center py-1 cursor-pointer text-gray-300 hover:bg-zinc-800"
           style={{ paddingLeft: `${indent * 12 + 12}px` }}
           onClick={(e) => {
+            e.preventDefault();
             e.stopPropagation();
             toggleFolder(folderPath);
           }}
@@ -124,6 +125,7 @@ const FileNavigator: React.FC<FileNavigatorProps> = ({
                   className={`py-1 cursor-pointer text-sm hover:bg-zinc-800 ${activeFileId === file.id ? 'bg-zinc-800 text-green-400' : 'text-gray-300'}`}
                   style={{ paddingLeft: `${indent * 12 + 28}px` }}
                   onClick={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     onFileSelect(file.id);
                   }}
@@ -157,6 +159,7 @@ const FileNavigator: React.FC<FileNavigatorProps> = ({
             key={file.id}
             className={`py-1 pl-3 cursor-pointer text-sm hover:bg-zinc-800 ${activeFileId === file.id ? 'bg-zinc-800 text-green-400' : 'text-gray-300'}`}
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               onFileSelect(file.id);
             }}
