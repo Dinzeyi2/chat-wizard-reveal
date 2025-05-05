@@ -216,11 +216,24 @@ export const ArtifactViewer: React.FC = () => {
     return { tree, rootFiles };
   };
   
-  const toggleFolder = (folderPath: string) => {
+  const toggleFolder = (folderPath: string, e: React.MouseEvent) => {
+    // Prevent click event from bubbling up
+    e.stopPropagation();
+    e.preventDefault();
+    
     setExpandedFolders(prev => ({
       ...prev,
       [folderPath]: !prev[folderPath]
     }));
+  };
+  
+  const handleFileClick = (fileId: string, e: React.MouseEvent) => {
+    // Prevent click event from bubbling up
+    e.stopPropagation();
+    e.preventDefault();
+    
+    console.log("File clicked:", fileId);
+    setActiveFile(fileId);
   };
   
   const renderFileTree = () => {
@@ -240,11 +253,11 @@ export const ArtifactViewer: React.FC = () => {
       const files = tree[folderPath] || [];
       
       return (
-        <React.Fragment key={folderPath}>
+        <div key={folderPath}>
           <li 
             className="flex items-center py-1 cursor-pointer text-gray-300 hover:bg-zinc-800"
             style={{ paddingLeft: `${indent * 12 + 12}px` }}
-            onClick={() => toggleFolder(folderPath)}
+            onClick={(e) => toggleFolder(folderPath, e)}
           >
             <span className="mr-1 text-gray-400">
               {isExpanded ? (
@@ -267,7 +280,7 @@ export const ArtifactViewer: React.FC = () => {
                     key={file.id}
                     className={`py-1 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400' : 'text-gray-300'}`}
                     style={{ paddingLeft: `${indent * 12 + 28}px` }}
-                    onClick={() => setActiveFile(file.id)}
+                    onClick={(e) => handleFileClick(file.id, e)}
                   >
                     <div className="flex items-center">
                       <File className="h-4 w-4 mr-2 text-gray-500" />
@@ -281,7 +294,7 @@ export const ArtifactViewer: React.FC = () => {
               })}
             </>
           )}
-        </React.Fragment>
+        </div>
       );
     };
     
@@ -289,21 +302,24 @@ export const ArtifactViewer: React.FC = () => {
       <ul className="file-tree">
         {topLevelFolders.map(folder => renderFolder(folder))}
         
-        {rootFiles.map(file => (
-          <li 
-            key={file.id}
-            className={`py-1 pl-3 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400' : 'text-gray-300'}`}
-            onClick={() => setActiveFile(file.id)}
-          >
-            <div className="flex items-center px-2 py-1">
-              <File className="h-4 w-4 mr-2 text-gray-500" />
-              {file.path}
-              {activeFile === file.id && 
-                <span className="text-green-400 ml-2 text-xs">+31</span>
-              }
-            </div>
-          </li>
-        ))}
+        {rootFiles.map(file => {
+          const fileName = file.path.split('/').pop();
+          return (
+            <li 
+              key={file.id}
+              className={`py-1 pl-3 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400' : 'text-gray-300'}`}
+              onClick={(e) => handleFileClick(file.id, e)}
+            >
+              <div className="flex items-center px-2 py-1">
+                <File className="h-4 w-4 mr-2 text-gray-500" />
+                {fileName}
+                {activeFile === file.id && 
+                  <span className="text-green-400 ml-2 text-xs">+31</span>
+                }
+              </div>
+            </li>
+          );
+        })}
       </ul>
     );
   };
