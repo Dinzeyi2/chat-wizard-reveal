@@ -69,6 +69,11 @@ const ChatHistory = () => {
               console.error("Error parsing chat history from localStorage:", error);
               // Initialize empty array if parsing fails
               setChatHistory([]);
+              toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to load chat history. The saved data might be corrupted.",
+              });
             }
           } else {
             // Initialize empty array if no history exists
@@ -108,7 +113,7 @@ const ChatHistory = () => {
             const formattedHistory = data.map((item: any) => ({
               id: item.id,
               title: item.title,
-              lastMessage: item.last_message || "No messages",
+              last_message: item.last_message || "No messages",
               timestamp: formatTimestamp(item.updated_at || item.created_at),
               messages: item.messages || []
             }));
@@ -123,6 +128,11 @@ const ChatHistory = () => {
         console.error("Error loading chat history:", error);
         // Initialize empty array if error
         setChatHistory([]);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load chat history. Please try again later.",
+        });
       } finally {
         setLoading(false);
       }
@@ -220,6 +230,12 @@ const ChatHistory = () => {
               localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
             } catch (error) {
               console.error("Error updating chat history in localStorage:", error);
+              toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to update chat title in local storage.",
+              });
+              return;
             }
           }
         }
@@ -277,6 +293,12 @@ const ChatHistory = () => {
               localStorage.setItem('chatHistory', JSON.stringify(updatedHistory));
             } catch (error) {
               console.error("Error updating chat history in localStorage:", error);
+              toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to delete chat from local storage.",
+              });
+              return;
             }
           }
         }
@@ -305,7 +327,7 @@ const ChatHistory = () => {
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <div className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-3">
-          <Link to="/">
+          <Link to="/app">
             <Button variant="outline" size="icon" className="rounded-full">
               <ArrowLeft className="h-4 w-4" />
             </Button>

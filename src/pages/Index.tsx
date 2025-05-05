@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -115,53 +116,60 @@ const Index = () => {
     setLoading(true);
     
     try {
+      // Try to load from Supabase first if authenticated
       if (isAuthenticated) {
-        // Try to load from Supabase
-        const { data, error } = await supabase
-          .from('chat_history')
-          .select('*')
-          .eq('id', chatId)
-          .maybeSingle(); // Use maybeSingle instead of single to avoid errors when the chat isn't found
-        
-        if (error) {
-          console.error("Error fetching chat from Supabase:", error);
-          throw error;
-        }
-        
-        if (data) {
-          console.log("Found chat in Supabase:", data);
-          if (data.messages && Array.isArray(data.messages)) {
-            // Format dates in the messages
-            const formattedMessages = data.messages.map((msg: any) => ({
-              ...msg,
-              timestamp: new Date(msg.timestamp)
-            }));
-            
-            setMessages(formattedMessages);
-            
-            // If this chat had a project ID, restore it
-            const projectMsg = formattedMessages.find((msg: Message) => msg.metadata?.projectId);
-            if (projectMsg && projectMsg.metadata?.projectId) {
-              setCurrentProjectId(projectMsg.metadata.projectId);
-              setHasGeneratedApp(true);
+        try {
+          // Try to load from Supabase
+          const { data, error } = await supabase
+            .from('chat_history')
+            .select('*')
+            .eq('id', chatId)
+            .maybeSingle(); // Use maybeSingle to avoid errors when the chat isn't found
+          
+          if (error) {
+            console.error("Error fetching chat from Supabase:", error);
+          } else if (data) {
+            console.log("Found chat in Supabase:", data);
+            if (data.messages && Array.isArray(data.messages)) {
+              // Format dates in the messages
+              const formattedMessages = data.messages.map((msg: any) => ({
+                ...msg,
+                timestamp: new Date(msg.timestamp)
+              }));
+              
+              setMessages(formattedMessages);
+              
+              // If this chat had a project ID, restore it
+              const projectMsg = formattedMessages.find((msg: Message) => msg.metadata?.projectId);
+              if (projectMsg && projectMsg.metadata?.projectId) {
+                setCurrentProjectId(projectMsg.metadata.projectId);
+                setHasGeneratedApp(true);
+              }
+              
+              setLoading(false);
+              return; // Successfully loaded from Supabase, exit the function
             }
-            
-            setLoading(false);
-            return;
           }
-        } else {
-          // Chat not found in Supabase
-          throw new Error("Chat not found in database");
+          // If we get here, we couldn't load from Supabase, fall through to localStorage
+        } catch (supabaseError) {
+          console.error("Error accessing Supabase:", supabaseError);
+          // Fall through to localStorage
         }
       }
       
-      // Fall back to localStorage if not found in Supabase or not authenticated
+      // Try to load from localStorage as fallback
       const storedHistory = localStorage.getItem('chatHistory');
       if (!storedHistory) {
         throw new Error("No chat history found in local storage");
       }
       
-      let localChatHistory = JSON.parse(storedHistory);
+      let localChatHistory;
+      try {
+        localChatHistory = JSON.parse(storedHistory);
+      } catch (parseError) {
+        console.error("Error parsing chat history from localStorage:", parseError);
+        throw new Error("Invalid chat history format in local storage");
+      }
       
       const selectedChat = localChatHistory.find((chat: ChatHistoryItem) => chat.id === chatId);
       
@@ -221,7 +229,7 @@ const Index = () => {
       // Navigate back to home with a short delay to allow the toast to be seen
       setTimeout(() => {
         navigate('/app', { replace: true });
-      }, 1500);
+      }, 1000); // Reduced delay to 1 second for better user experience
     } finally {
       setLoading(false);
     }
@@ -713,7 +721,7 @@ If you were trying to generate an app, this might be due to limits with our AI m
             </div>
             
             <div className="flex-1 overflow-y-auto">
-              {messages.length === 0 ? (
+              {messages.length === 0 && !loading && !chatLoadingError ? (
                 <WelcomeScreen onSendMessage={handleSendMessage} />
               ) : (
                 <ChatWindow 
