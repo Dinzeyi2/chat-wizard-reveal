@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -162,20 +161,15 @@ const ChatHistory = () => {
   );
 
   const handleChatSelection = (chatId: string) => {
-    // Check if chat exists before navigating
-    const chatExists = chatHistory.some(chat => chat.id === chatId);
+    // Navigate to the main chat page with the specific chat ID
+    // No validation needed here - we'll handle "not found" logic in Index.tsx
+    navigate(`/app?chat=${chatId}`);
     
-    if (chatExists) {
-      // Navigate to the main chat page with the specific chat ID
-      navigate(`/app?chat=${chatId}`);
-    } else {
-      // Show error if chat doesn't exist
-      toast({
-        variant: "destructive",
-        title: "Chat not found",
-        description: "The selected chat could not be found.",
-      });
-    }
+    // Show a loading toast to indicate navigation
+    toast({
+      title: "Opening chat",
+      description: "Loading conversation...",
+    });
   };
 
   // Function to handle creating a new chat
