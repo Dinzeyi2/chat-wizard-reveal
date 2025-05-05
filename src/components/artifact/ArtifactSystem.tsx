@@ -119,12 +119,16 @@ export const ArtifactViewer: React.FC = () => {
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<'code' | 'preview'>('code');
 
+  // Effect to set initial active file and expand folders when artifact changes
   useEffect(() => {
-    console.log("ArtifactViewer mounted, isOpen:", isOpen);
-    console.log("Current artifact:", currentArtifact?.id);
+    console.log("ArtifactViewer mounted or artifact changed, isOpen:", isOpen);
+    console.log("Current artifact ID:", currentArtifact?.id);
     
     if (currentArtifact && currentArtifact.files.length > 0) {
-      setActiveFile(currentArtifact.files[0].id);
+      // Set the first file as active by default
+      const firstFileId = currentArtifact.files[0].id;
+      console.log("Setting initial active file:", firstFileId);
+      setActiveFile(firstFileId);
       
       // Auto-expand all folders by default
       const folders: Record<string, boolean> = {};
@@ -159,6 +163,19 @@ export const ArtifactViewer: React.FC = () => {
     console.log("Active tab changed to:", activeTab);
   }, [activeTab]);
 
+  // Debug log when active file changes
+  useEffect(() => {
+    if (activeFile) {
+      console.log("Active file changed to:", activeFile);
+      const file = currentArtifact?.files.find(f => f.id === activeFile);
+      if (file) {
+        console.log("Selected file path:", file.path);
+      } else {
+        console.log("File not found in artifact files");
+      }
+    }
+  }, [activeFile, currentArtifact]);
+
   const handleTabChange = (tab: 'code' | 'preview') => {
     console.log("Changing tab to:", tab);
     setActiveTab(tab);
@@ -177,8 +194,14 @@ export const ArtifactViewer: React.FC = () => {
 
   console.log("Rendering ArtifactViewer with artifact:", currentArtifact.id);
   console.log("Number of files:", currentArtifact.files.length);
+  console.log("Current active file ID:", activeFile);
 
   const currentFile = currentArtifact.files.find(f => f.id === activeFile);
+  if (currentFile) {
+    console.log("Current displayed file:", currentFile.path);
+  } else {
+    console.log("No current file selected");
+  }
 
   const getLanguageFromPath = (path: string): string => {
     const extension = path.split('.').pop()?.toLowerCase() || '';
@@ -221,6 +244,8 @@ export const ArtifactViewer: React.FC = () => {
     e.stopPropagation();
     e.preventDefault();
     
+    console.log("Toggling folder:", folderPath);
+    
     setExpandedFolders(prev => ({
       ...prev,
       [folderPath]: !prev[folderPath]
@@ -233,7 +258,17 @@ export const ArtifactViewer: React.FC = () => {
     e.preventDefault();
     
     console.log("File clicked:", fileId);
-    setActiveFile(fileId);
+    
+    // Find the file in the artifact
+    const file = currentArtifact.files.find(f => f.id === fileId);
+    if (file) {
+      console.log("Selected file:", file.path);
+      
+      // Update the active file state
+      setActiveFile(fileId);
+    } else {
+      console.error("File not found in artifact files");
+    }
   };
   
   const renderFileTree = () => {
@@ -253,7 +288,7 @@ export const ArtifactViewer: React.FC = () => {
       const files = tree[folderPath] || [];
       
       return (
-        <div key={folderPath}>
+        <div key={folderPath} className="folder-container">
           <li 
             className="flex items-center py-1 cursor-pointer text-gray-300 hover:bg-zinc-800"
             style={{ paddingLeft: `${indent * 12 + 12}px` }}
@@ -274,11 +309,11 @@ export const ArtifactViewer: React.FC = () => {
               {childFolders.map(childFolder => renderFolder(childFolder, indent + 1))}
               
               {files.map(file => {
-                const fileName = file.path.split('/').pop();
+                const fileName = file.path.split('/').pop() || '';
                 return (
                   <li 
                     key={file.id}
-                    className={`py-1 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400' : 'text-gray-300'}`}
+                    className={`py-1 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400 bg-zinc-800' : 'text-gray-300'}`}
                     style={{ paddingLeft: `${indent * 12 + 28}px` }}
                     onClick={(e) => handleFileClick(file.id, e)}
                   >
@@ -303,11 +338,12 @@ export const ArtifactViewer: React.FC = () => {
         {topLevelFolders.map(folder => renderFolder(folder))}
         
         {rootFiles.map(file => {
-          const fileName = file.path.split('/').pop();
+          const fileName = file.path.split('/').pop() || '';
           return (
             <li 
               key={file.id}
-              className={`py-1 pl-3 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400' : 'text-gray-300'}`}
+              data-file-id={file.id}
+              className={`py-1 pl-3 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400 bg-zinc-800' : 'text-gray-300'}`}
               onClick={(e) => handleFileClick(file.id, e)}
             >
               <div className="flex items-center px-2 py-1">
