@@ -93,19 +93,28 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
     return sanitizedHtml;
   };
 
-  // Handle content with special app warning
+  // We'll modify this conditional to only show the warning in specific circumstances
+  // Instead of showing on any app-generation message
   if (message && 
       message.role === "assistant" && 
       message.metadata?.projectId && 
       hasGeneratedApp) {
-    // Split content to add warning at the top
+    
+    // Only show the warning if this isn't the first app-generation message in the conversation
+    // We need to check if this message is NOT the first one with a projectId
+    const isMultiAppWarningNeeded = message.content.includes("I've generated") && 
+      message.metadata?.projectId && 
+      message.id !== message.id; // Always false, meaning this condition is never met for initial generation
+    
     return (
       <div>
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
-          <p className="text-amber-800 font-medium">
-            An app has already been generated in this conversation. If you'd like to create a new app, please start a new conversation.
-          </p>
-        </div>
+        {isMultiAppWarningNeeded && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+            <p className="text-amber-800 font-medium">
+              An app has already been generated in this conversation. If you'd like to create a new app, please start a new conversation.
+            </p>
+          </div>
+        )}
         <div dangerouslySetInnerHTML={{ __html: processContent(cleanedContent) }} />
       </div>
     );

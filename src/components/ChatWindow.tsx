@@ -30,6 +30,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
     }
   }, [messages, hasGeneratedApp]);
   
+  // Find the first message with a projectId
+  const firstAppMessage = messages.find(message => 
+    message.role === "assistant" && 
+    message.metadata?.projectId
+  );
+  
   // Wrap the chat window in the ArtifactProvider for artifact system integration
   return (
     <ArtifactProvider>
@@ -45,11 +51,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
             ) : (
               <div>
                 <div className="ml-0 bg-white border border-gray-200 rounded-3xl px-6 py-4 max-w-3xl">
-                  {/* Display warning if user asks for another app and one has already been generated */}
+                  {/* Display warning only if this is not the first app-generating message */}
                   {hasGeneratedApp && 
                    message.content.includes("I've generated") && 
                    message.metadata?.projectId && 
-                   message !== messages.find(m => m.metadata?.projectId) ? (
+                   firstAppMessage && 
+                   message.id !== firstAppMessage.id ? (
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
                       <p className="text-amber-800 font-medium">
                         An app has already been generated in this conversation. If you'd like to create a new app, please start a new conversation.
