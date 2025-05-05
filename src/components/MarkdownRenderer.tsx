@@ -19,8 +19,10 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
   // Add state to track if an app has been generated in this message
   const [hasGeneratedApp, setHasGeneratedApp] = useState(false);
   const [cleanedContent, setCleanedContent] = useState(content);
+  
   // Get artifact system context to open code viewer
-  const { openArtifact } = useArtifact();
+  // Wrap in try/catch to prevent errors when context is not available
+  const artifactContext = React.useContext(useArtifact['context'] || React.createContext(null));
   
   // Effect to check if this message indicates app generation
   useEffect(() => {
@@ -44,7 +46,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
 
   // Effect to extract app data and open artifact viewer if app code is detected
   useEffect(() => {
-    if (message?.role === "assistant" && message.metadata?.projectId) {
+    if (message?.role === "assistant" && message.metadata?.projectId && artifactContext) {
       // Check for app generation pattern in content (looking for JSON)
       const appDataMatch = content.match(/(\{[\s\S]*"projectId"\s*:\s*"[^"]*"[\s\S]*\})/);
       
@@ -72,15 +74,17 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
               files: artifactFiles
             };
             
-            // Open the artifact viewer
-            openArtifact(artifact);
+            // Open the artifact viewer if context is available
+            if (artifactContext && artifactContext.openArtifact) {
+              artifactContext.openArtifact(artifact);
+            }
           }
         } catch (error) {
           console.error("Failed to parse app data from message:", error);
         }
       }
     }
-  }, [message, content, openArtifact]);
+  }, [message, content, artifactContext]);
 
   // Process code blocks with syntax highlighting
   const processContent = (markdown: string) => {

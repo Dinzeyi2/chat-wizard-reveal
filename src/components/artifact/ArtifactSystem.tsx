@@ -33,7 +33,7 @@ interface ArtifactContextType {
 }
 
 // Create Context
-const ArtifactContext = createContext<ArtifactContextType | null>(null);
+export const ArtifactContext = createContext<ArtifactContextType | null>(null);
 
 export const useArtifact = () => {
   const context = useContext(ArtifactContext);
@@ -135,6 +135,8 @@ export const ArtifactViewer: React.FC<{ updateFileContent?: (fileId: string, new
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'code' | 'preview'>('code');
   const [readOnly, setReadOnly] = useState<boolean>(false);
+  const [isCodeEditing, setIsCodeEditing] = useState<boolean>(false);
+  const [editedContent, setEditedContent] = useState<string>("");
 
   useEffect(() => {
     console.log("ArtifactViewer mounted, isOpen:", isOpen);
@@ -157,6 +159,13 @@ export const ArtifactViewer: React.FC<{ updateFileContent?: (fileId: string, new
       document.body.style.overflow = '';
     };
   }, [currentArtifact, isOpen]);
+  
+  // Set edited content when active file changes
+  useEffect(() => {
+    if (currentFile) {
+      setEditedContent(currentFile.content);
+    }
+  }, [activeFileId]);
 
   // Debug log when tab changes
   useEffect(() => {
@@ -177,11 +186,30 @@ export const ArtifactViewer: React.FC<{ updateFileContent?: (fileId: string, new
   const handleFileSelect = (fileId: string) => {
     console.log("Selected file with ID:", fileId);
     setActiveFileId(fileId);
+    setIsCodeEditing(false); // Reset editing mode when changing files
   };
 
   const handleFileContentChange = (fileId: string, newContent: string) => {
     if (updateFileContent) {
       updateFileContent(fileId, newContent);
+    }
+  };
+  
+  const toggleEditMode = () => {
+    setIsCodeEditing(!isCodeEditing);
+  };
+  
+  const handleCodeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setEditedContent(e.target.value);
+  };
+  
+  const saveCodeChanges = () => {
+    if (activeFileId && updateFileContent) {
+      updateFileContent(activeFileId, editedContent);
+      toast({
+        title: "Changes saved",
+        description: "Your code changes have been saved successfully."
+      });
     }
   };
 
@@ -241,6 +269,28 @@ export const ArtifactViewer: React.FC<{ updateFileContent?: (fileId: string, new
             </Button>
           </div>
           <div className="file-viewer-actions">
+            {activeTab === 'code' && currentFile && (
+              <>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="text-gray-400 hover:text-white hover:bg-transparent"
+                  onClick={toggleEditMode}
+                >
+                  {isCodeEditing ? <Code size={16} /> : <Edit size={16} />}
+                </Button>
+                {isCodeEditing && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="text-gray-400 hover:text-white hover:bg-transparent"
+                    onClick={saveCodeChanges}
+                  >
+                    <Save size={16} />
+                  </Button>
+                )}
+              </>
+            )}
             <Button 
               variant="ghost" 
               size="sm"
@@ -289,14 +339,23 @@ export const ArtifactViewer: React.FC<{ updateFileContent?: (fileId: string, new
                     <span className="text-gray-500">{getLanguageFromPath(currentFile.path).toUpperCase()}</span>
                   </div>
                   <div className="code-container flex-1 overflow-auto bg-zinc-900">
-                    <SyntaxHighlighter 
-                      language={getLanguageFromPath(currentFile.path)}
-                      style={vs2015}
-                      customStyle={{ margin: 0, padding: '16px', height: '100%', fontSize: '14px', lineHeight: '1.5', backgroundColor: '#18181b' }}
-                      showLineNumbers={true}
-                    >
-                      {currentFile.content}
-                    </SyntaxHighlighter>
+                    {isCodeEditing ? (
+                      <textarea 
+                        value={editedContent}
+                        onChange={handleCodeChange}
+                        className="w-full h-full p-4 bg-zinc-900 text-gray-200 font-mono text-sm resize-none border-0 outline-none"
+                        spellCheck="false"
+                      />
+                    ) : (
+                      <SyntaxHighlighter 
+                        language={getLanguageFromPath(currentFile.path)}
+                        style={vs2015}
+                        customStyle={{ margin: 0, padding: '16px', height: '100%', fontSize: '14px', lineHeight: '1.5', backgroundColor: '#18181b' }}
+                        showLineNumbers={true}
+                      >
+                        {currentFile.content}
+                      </SyntaxHighlighter>
+                    )}
                   </div>
                 </>
               ) : (
