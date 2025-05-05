@@ -2,8 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
-import SyntaxHighlighter from 'react-syntax-highlighter';
-import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 
 interface CodeEditorProps {
   content: string;
@@ -85,20 +83,25 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     }
   };
 
-  const getLanguageFromPath = (path: string): string => {
-    const extension = path?.split('.').pop()?.toLowerCase() || '';
-    const languageMap: Record<string, string> = {
-      'js': 'javascript',
-      'jsx': 'javascript',
-      'ts': 'typescript',
-      'tsx': 'typescript',
-      'css': 'css',
-      'scss': 'scss',
-      'html': 'html',
-      'json': 'json',
-      'md': 'markdown',
-    };
-    return languageMap[extension] || 'plaintext';
+  // File validation function - integrated from the code snippet
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+    
+    // Continue with file processing...
+    console.log("File validated for CodeEditor:", file.name);
+    
+    // You could add more processing here in a real implementation
+    toast({
+      title: "File Validated",
+      description: "The selected image file is valid and ready for upload."
+    });
   };
 
   return (
@@ -126,32 +129,30 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-zinc-900">
+      <div className="flex-1 p-4 overflow-auto">
         {filename ? (
-          readOnly ? (
-            <SyntaxHighlighter 
-              language={getLanguageFromPath(filename)}
-              style={vs2015}
-              customStyle={{ margin: 0, padding: '16px', height: '100%', fontSize: '14px', lineHeight: '1.5' }}
-              showLineNumbers={true}
-            >
-              {content}
-            </SyntaxHighlighter>
-          ) : (
-            <textarea
-              className="w-full h-full font-mono text-sm p-4 border rounded resize-none"
-              value={content}
-              onChange={(e) => onChange(e.target.value)}
-              disabled={readOnly || !filename}
-              spellCheck="false"
-            />
-          )
+          <textarea
+            className="w-full h-full font-mono text-sm p-4 border rounded resize-none"
+            value={content}
+            onChange={(e) => onChange(e.target.value)}
+            disabled={readOnly || !filename}
+            spellCheck="false"
+          />
         ) : (
           <div className="flex items-center justify-center h-full text-gray-500">
             Select a file to edit
           </div>
         )}
       </div>
+
+      {/* Hidden file input for demonstration purposes */}
+      <input 
+        type="file"
+        id="code-file-upload"
+        className="hidden"
+        accept="image/*"
+        onChange={handleFileChange}
+      />
     </div>
   );
 };

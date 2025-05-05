@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,6 @@ import ChallengeDetail from '@/components/challenge/ChallengeDetail';
 import CodeEditor from '@/components/challenge/CodeEditor';
 import { toast } from '@/hooks/use-toast';
 import { Json } from '@/types/chat';
-import { FileIcon, FolderIcon, ChevronRight } from 'lucide-react';
 
 interface FileStructure {
   [key: string]: string | FileStructure;
@@ -44,7 +43,6 @@ const ChallengeWorkspace = () => {
   const [view, setView] = useState<'split' | 'code' | 'challenge'>('split');
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
-  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
 
   const { data: projectData, isLoading } = useQuery({
     queryKey: ['challengeProject', projectId],
@@ -83,24 +81,6 @@ const ChallengeWorkspace = () => {
     }
   });
 
-  // Automatically expand all folders on initial load
-  useEffect(() => {
-    if (projectData?.files) {
-      const folders: Record<string, boolean> = {};
-      projectData.files.forEach(file => {
-        const parts = file.path.split('/');
-        if (parts.length > 1) {
-          let currentPath = '';
-          parts.slice(0, -1).forEach(part => {
-            currentPath = currentPath ? `${currentPath}/${part}` : part;
-            folders[currentPath] = true;
-          });
-        }
-      });
-      setExpandedFolders(folders);
-    }
-  }, [projectData]);
-
   useEffect(() => {
     // If a specific challenge ID is provided in the URL, find and select that challenge
     if (challengeId && projectData?.challenges) {
@@ -108,11 +88,8 @@ const ChallengeWorkspace = () => {
       if (challenge && challenge.filesPaths && challenge.filesPaths.length > 0) {
         setSelectedFile(challenge.filesPaths[0]);
       }
-    } else if (projectData?.files && projectData.files.length > 0 && !selectedFile) {
-      // If no specific file is selected yet, select the first one
-      setSelectedFile(projectData.files[0].path);
     }
-  }, [challengeId, projectData, selectedFile]);
+  }, [challengeId, projectData]);
 
   useEffect(() => {
     // When a file is selected, fetch its content
@@ -133,18 +110,7 @@ const ChallengeWorkspace = () => {
     if (!selectedFile || !projectId) return;
     
     try {
-      // Update the local file content
-      if (projectData && projectData.files) {
-        const updatedFiles = projectData.files.map(file => {
-          if (file.path === selectedFile) {
-            return { ...file, content: fileContent };
-          }
-          return file;
-        });
-        
-        // In a real implementation, this would also save to the backend
-      }
-      
+      // In a real implementation, this would save to the backend
       toast({
         title: "File saved",
         description: `${selectedFile} has been saved.`
@@ -163,19 +129,41 @@ const ChallengeWorkspace = () => {
     setFileContent(newCode);
   };
 
-  const handleFileClick = (filePath: string) => {
-    console.log("Selecting file:", filePath); // Debug log
-    setSelectedFile(filePath);
+  const renderFileTree = (structure: FileStructure, path: string = '') => {
+    if (!structure || typeof structure !== 'object') return null;
+    
+    return (
+      <ul className="space-y-1">
+        {Object.entries(structure).map(([key, value]) => {
+          const currentPath = path ? `${path}/${key}` : key;
+          const isFolder = typeof value === 'object';
+          
+          return (
+            <li key={currentPath} className="pl-2">
+              {isFolder ? (
+                <div>
+                  <div className="flex items-center text-sm">
+                    <span className="mr-1">📁</span>
+                    <span className="font-medium">{key}</span>
+                  </div>
+                  {renderFileTree(value as FileStructure, currentPath)}
+                </div>
+              ) : (
+                <div 
+                  className={`flex items-center text-sm cursor-pointer hover:bg-gray-100 rounded px-2 py-1 ${selectedFile === currentPath ? 'bg-blue-100' : ''}`}
+                  onClick={() => setSelectedFile(currentPath)}
+                >
+                  <span className="mr-1">📄</span>
+                  <span>{key}</span>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    );
   };
 
-  const toggleFolder = (folderPath: string) => {
-    setExpandedFolders(prev => ({
-      ...prev,
-      [folderPath]: !prev[folderPath]
-    }));
-  };
-
-  // Build a tree structure from the flat list of files
   const buildFileStructure = (files: AppFile[]) => {
     if (!files) return {};
     
@@ -200,50 +188,7 @@ const ChallengeWorkspace = () => {
     return structure;
   };
 
-  // Recursive function to render the file tree
-  const renderFileTree = (structure: FileStructure, path: string = '') => {
-    if (!structure || typeof structure !== 'object') return null;
-    
-    return (
-      <ul className="space-y-1">
-        {Object.entries(structure).map(([key, value]) => {
-          const currentPath = path ? `${path}/${key}` : key;
-          const isFolder = typeof value === 'object';
-          const isExpanded = expandedFolders[currentPath] || false;
-          
-          return (
-            <li key={currentPath} className="pl-2">
-              {isFolder ? (
-                <div>
-                  <div 
-                    className="flex items-center text-sm cursor-pointer hover:bg-gray-100 rounded px-2 py-1"
-                    onClick={() => toggleFolder(currentPath)}
-                  >
-                    <ChevronRight className={`h-4 w-4 mr-1 transition-transform ${isExpanded ? 'transform rotate-90' : ''}`} />
-                    <FolderIcon size={16} className="mr-2 text-blue-500" />
-                    <span className="font-medium">{key}</span>
-                  </div>
-                  {isExpanded && renderFileTree(value as FileStructure, currentPath)}
-                </div>
-              ) : (
-                <div 
-                  className={`flex items-center text-sm cursor-pointer hover:bg-gray-100 rounded px-2 py-1 ${selectedFile === currentPath ? 'bg-blue-100' : ''}`}
-                  onClick={() => handleFileClick(currentPath)}
-                >
-                  <FileIcon size={16} className="mr-2 text-gray-500" />
-                  <span>{key}</span>
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    );
-  };
-
-  const fileStructure = useMemo(() => 
-    projectData?.files ? buildFileStructure(projectData.files) : {},
-  [projectData?.files]);
+  const fileStructure = projectData?.files ? buildFileStructure(projectData.files) : {};
   
   if (isLoading) {
     return (
@@ -294,7 +239,6 @@ const ChallengeWorkspace = () => {
                   onChange={handleCodeChange}
                   filename={selectedFile}
                   onSave={handleSaveFile}
-                  projectId={projectId}
                 />
               </div>
             )}
