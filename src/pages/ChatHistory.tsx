@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,7 +67,12 @@ const ChatHistory = () => {
               setChatHistory(JSON.parse(storedHistory));
             } catch (error) {
               console.error("Error parsing chat history from localStorage:", error);
+              // Initialize empty array if parsing fails
+              setChatHistory([]);
             }
+          } else {
+            // Initialize empty array if no history exists
+            setChatHistory([]);
           }
         } else {
           // User is logged in, fetch from Supabase
@@ -90,7 +96,12 @@ const ChatHistory = () => {
                 setChatHistory(JSON.parse(storedHistory));
               } catch (error) {
                 console.error("Error parsing chat history from localStorage:", error);
+                // Initialize empty array if parsing fails
+                setChatHistory([]);
               }
+            } else {
+              // Initialize empty array if no history exists
+              setChatHistory([]);
             }
           } else if (data) {
             // Format data from Supabase to match our ChatHistoryItem interface
@@ -103,10 +114,15 @@ const ChatHistory = () => {
             }));
             
             setChatHistory(formattedHistory);
+          } else {
+            // Initialize empty array if no data
+            setChatHistory([]);
           }
         }
       } catch (error) {
         console.error("Error loading chat history:", error);
+        // Initialize empty array if error
+        setChatHistory([]);
       } finally {
         setLoading(false);
       }
@@ -136,8 +152,20 @@ const ChatHistory = () => {
   );
 
   const handleChatSelection = (chatId: string) => {
-    // Navigate to the main chat page with the specific chat ID
-    navigate(`/app?chat=${chatId}`);
+    // Check if chat exists before navigating
+    const chatExists = chatHistory.some(chat => chat.id === chatId);
+    
+    if (chatExists) {
+      // Navigate to the main chat page with the specific chat ID
+      navigate(`/app?chat=${chatId}`);
+    } else {
+      // Show error if chat doesn't exist
+      toast({
+        variant: "destructive",
+        title: "Chat not found",
+        description: "The selected chat could not be found.",
+      });
+    }
   };
 
   // Function to handle creating a new chat
@@ -302,7 +330,7 @@ const ChatHistory = () => {
       </div>
       
       <p className="text-gray-600 mb-6">
-        You have {filteredChats.length} previous chats with Claude. <span className="text-blue-500 cursor-pointer">Select</span>
+        You have {filteredChats.length} previous chats with Claude.
       </p>
       
       {loading ? (

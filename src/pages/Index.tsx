@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -33,6 +32,7 @@ const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [firstStepGuidanceSent, setFirstStepGuidanceSent] = useState<boolean>(false);
   const [hasGeneratedApp, setHasGeneratedApp] = useState<boolean>(false); // Track if an app has been generated
+  const [chatLoadingError, setChatLoadingError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const location = useLocation();
@@ -104,11 +104,15 @@ const Index = () => {
       setCurrentChatId(null);
       setCurrentProjectId(null);
       setHasGeneratedApp(false);
+      // Clear any previous errors
+      setChatLoadingError(null);
     }
   }, [location.search]); // Changed from [location] to [location.search] to avoid unnecessary rerenders
 
   const loadChatHistory = async (chatId: string) => {
     console.log(`Loading chat history for chat ID: ${chatId}`);
+    setChatLoadingError(null);
+    setLoading(true);
     
     try {
       if (isAuthenticated) {
@@ -117,7 +121,7 @@ const Index = () => {
           .from('chat_history')
           .select('*')
           .eq('id', chatId)
-          .single();
+          .maybeSingle(); // Use maybeSingle instead of single to avoid errors when the chat isn't found
         
         if (error) {
           console.error("Error fetching chat from Supabase:", error);
@@ -142,14 +146,22 @@ const Index = () => {
               setHasGeneratedApp(true);
             }
             
+            setLoading(false);
             return;
           }
+        } else {
+          // Chat not found in Supabase
+          throw new Error("Chat not found in database");
         }
       }
       
       // Fall back to localStorage if not found in Supabase or not authenticated
       const storedHistory = localStorage.getItem('chatHistory');
-      let localChatHistory = storedHistory ? JSON.parse(storedHistory) : [];
+      if (!storedHistory) {
+        throw new Error("No chat history found in local storage");
+      }
+      
+      let localChatHistory = JSON.parse(storedHistory);
       
       const selectedChat = localChatHistory.find((chat: ChatHistoryItem) => chat.id === chatId);
       
@@ -193,22 +205,25 @@ const Index = () => {
         }
       } else {
         // If no chat was found with this ID, display an error message
-        toast({
-          variant: "destructive",
-          title: "Chat not found",
-          description: "The requested conversation could not be found.",
-        });
-        
-        // Navigate back to home
-        navigate('/app', { replace: true });
+        throw new Error("Chat not found in local storage");
       }
     } catch (error) {
       console.error("Error loading chat history:", error);
+      setChatLoadingError("The requested conversation could not be found.");
+      
+      // Show toast notification
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Failed to load chat history. Please try again.",
+        title: "Chat not found",
+        description: "The requested conversation could not be found.",
       });
+      
+      // Navigate back to home with a short delay to allow the toast to be seen
+      setTimeout(() => {
+        navigate('/app', { replace: true });
+      }, 1500);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -707,6 +722,17 @@ If you were trying to generate an app, this might be due to limits with our AI m
                 />
               )}
               <div ref={messagesEndRef} />
+              
+              {chatLoadingError && (
+                <div className="px-4 py-3 mx-auto my-4 max-w-3xl bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700">
+                    <strong>Error loading chat:</strong> {chatLoadingError}
+                  </p>
+                  <p className="text-xs text-red-600 mt-1">
+                    You'll be redirected to the home page.
+                  </p>
+                </div>
+              )}
               
               {generationError && (
                 <div className="px-4 py-3 mx-auto my-4 max-w-3xl bg-red-50 border border-red-200 rounded-lg">
