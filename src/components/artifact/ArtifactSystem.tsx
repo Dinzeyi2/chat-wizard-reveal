@@ -96,7 +96,8 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
   const closeArtifact = () => {
     console.log("Closing artifact viewer");
     setIsOpen(false);
-    setTimeout(() => setCurrentArtifact(null), 300); // Clear after animation
+    // Wait for animation to complete before clearing the artifact
+    setTimeout(() => setCurrentArtifact(null), 300);
   };
 
   return (
@@ -278,14 +279,18 @@ export const ArtifactViewer: React.FC = () => {
   const handleFileClick = (fileId: string) => (event: React.MouseEvent) => {
     // Prevent the click from propagating to parent elements
     event.stopPropagation();
+    event.preventDefault();
     
     console.log("File clicked:", fileId);
-    const fileToSelect = currentArtifact.files.find(f => f.id === fileId);
-    if (fileToSelect) {
-      console.log("Setting active file to:", fileToSelect.path);
-      setActiveFile(fileId);
-    } else {
-      console.error("Clicked file not found in artifact files");
+    
+    if (currentArtifact && currentArtifact.files) {
+      const fileToSelect = currentArtifact.files.find(f => f.id === fileId);
+      if (fileToSelect) {
+        console.log("Setting active file to:", fileToSelect.path);
+        setActiveFile(fileId);
+      } else {
+        console.error("Clicked file not found in artifact files");
+      }
     }
   };
   
@@ -306,7 +311,7 @@ export const ArtifactViewer: React.FC = () => {
       const files = tree[folderPath] || [];
       
       return (
-        <React.Fragment key={folderPath}>
+        <div key={folderPath}>
           <li 
             className="flex items-center py-1 cursor-pointer text-gray-300 hover:bg-zinc-800"
             style={{ paddingLeft: `${indent * 12 + 12}px` }}
@@ -347,7 +352,7 @@ export const ArtifactViewer: React.FC = () => {
               })}
             </>
           )}
-        </React.Fragment>
+        </div>
       );
     };
     
