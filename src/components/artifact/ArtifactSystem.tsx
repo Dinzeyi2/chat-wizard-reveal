@@ -124,6 +124,7 @@ export const ArtifactViewer: React.FC = () => {
     console.log("Current artifact:", currentArtifact?.id);
     
     if (currentArtifact && currentArtifact.files.length > 0) {
+      // Set the first file as active by default
       setActiveFile(currentArtifact.files[0].id);
       
       // Auto-expand all folders by default
@@ -177,8 +178,18 @@ export const ArtifactViewer: React.FC = () => {
 
   console.log("Rendering ArtifactViewer with artifact:", currentArtifact.id);
   console.log("Number of files:", currentArtifact.files.length);
+  console.log("Active file ID:", activeFile);
 
-  const currentFile = currentArtifact.files.find(f => f.id === activeFile);
+  // Find the currently selected file
+  const currentFile = activeFile 
+    ? currentArtifact.files.find(f => f.id === activeFile)
+    : null;
+
+  if (currentFile) {
+    console.log("Current file path:", currentFile.path);
+  } else {
+    console.log("No current file selected");
+  }
 
   const getLanguageFromPath = (path: string): string => {
     const extension = path.split('.').pop()?.toLowerCase() || '';
@@ -267,13 +278,16 @@ export const ArtifactViewer: React.FC = () => {
                     key={file.id}
                     className={`py-1 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400' : 'text-gray-300'}`}
                     style={{ paddingLeft: `${indent * 12 + 28}px` }}
-                    onClick={() => setActiveFile(file.id)}
+                    onClick={() => {
+                      console.log("Setting active file to:", file.id, file.path);
+                      setActiveFile(file.id);
+                    }}
                   >
                     <div className="flex items-center">
                       <File className="h-4 w-4 mr-2 text-gray-500" />
                       {fileName}
                       {activeFile === file.id && 
-                        <span className="text-green-400 ml-2 text-xs">+31</span>
+                        <span className="text-green-400 ml-2 text-xs">•</span>
                       }
                     </div>
                   </li>
@@ -293,13 +307,16 @@ export const ArtifactViewer: React.FC = () => {
           <li 
             key={file.id}
             className={`py-1 pl-3 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400' : 'text-gray-300'}`}
-            onClick={() => setActiveFile(file.id)}
+            onClick={() => {
+              console.log("Setting active root file to:", file.id, file.path);
+              setActiveFile(file.id);
+            }}
           >
             <div className="flex items-center px-2 py-1">
               <File className="h-4 w-4 mr-2 text-gray-500" />
               {file.path}
               {activeFile === file.id && 
-                <span className="text-green-400 ml-2 text-xs">+31</span>
+                <span className="text-green-400 ml-2 text-xs">•</span>
               }
             </div>
           </li>
