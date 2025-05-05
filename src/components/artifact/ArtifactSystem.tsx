@@ -118,6 +118,18 @@ export const ArtifactViewer: React.FC = () => {
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<'code' | 'preview'>('code');
+  const [fileClickCounter, setFileClickCounter] = useState(0); // Track file clicks for debugging
+
+  // Debug state changes
+  useEffect(() => {
+    console.log("Active file state changed to:", activeFile);
+    
+    // Debug which file is currently selected
+    if (activeFile && currentArtifact) {
+      const selectedFile = currentArtifact.files.find(f => f.id === activeFile);
+      console.log("Selected file:", selectedFile ? selectedFile.path : "File not found");
+    }
+  }, [activeFile, currentArtifact]);
 
   // Effect to set initial active file and expand folders when artifact changes
   useEffect(() => {
@@ -162,19 +174,6 @@ export const ArtifactViewer: React.FC = () => {
   useEffect(() => {
     console.log("Active tab changed to:", activeTab);
   }, [activeTab]);
-
-  // Debug log when active file changes
-  useEffect(() => {
-    if (activeFile) {
-      console.log("Active file changed to:", activeFile);
-      const file = currentArtifact?.files.find(f => f.id === activeFile);
-      if (file) {
-        console.log("Selected file path:", file.path);
-      } else {
-        console.log("File not found in artifact files");
-      }
-    }
-  }, [activeFile, currentArtifact]);
 
   const handleTabChange = (tab: 'code' | 'preview') => {
     console.log("Changing tab to:", tab);
@@ -257,15 +256,21 @@ export const ArtifactViewer: React.FC = () => {
     e.stopPropagation();
     e.preventDefault();
     
-    console.log("File clicked:", fileId);
+    // Increment click counter for debugging
+    setFileClickCounter(prev => prev + 1);
+    
+    console.log(`File clicked (${fileClickCounter}):`, fileId);
     
     // Find the file in the artifact
     const file = currentArtifact.files.find(f => f.id === fileId);
     if (file) {
       console.log("Selected file:", file.path);
       
-      // Update the active file state
-      setActiveFile(fileId);
+      // Force file selection with a small timeout to avoid race conditions
+      setTimeout(() => {
+        setActiveFile(fileId);
+        console.log("Active file set to:", fileId);
+      }, 0);
     } else {
       console.error("File not found in artifact files");
     }
@@ -305,29 +310,31 @@ export const ArtifactViewer: React.FC = () => {
           </li>
           
           {isExpanded && (
-            <>
+            <div className="folder-contents">
               {childFolders.map(childFolder => renderFolder(childFolder, indent + 1))}
               
               {files.map(file => {
                 const fileName = file.path.split('/').pop() || '';
+                const isActive = activeFile === file.id;
                 return (
                   <li 
                     key={file.id}
-                    className={`py-1 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400 bg-zinc-800' : 'text-gray-300'}`}
+                    className={`py-1 cursor-pointer text-sm hover:bg-zinc-800 ${isActive ? 'text-green-400 bg-zinc-800' : 'text-gray-300'}`}
                     style={{ paddingLeft: `${indent * 12 + 28}px` }}
                     onClick={(e) => handleFileClick(file.id, e)}
+                    data-file-id={file.id} // Add data attribute for easier debugging
                   >
                     <div className="flex items-center">
                       <File className="h-4 w-4 mr-2 text-gray-500" />
                       {fileName}
-                      {activeFile === file.id && 
-                        <span className="text-green-400 ml-2 text-xs">+31</span>
+                      {isActive && 
+                        <span className="text-green-400 ml-2 text-xs">•</span>
                       }
                     </div>
                   </li>
                 );
               })}
-            </>
+            </div>
           )}
         </div>
       );
@@ -339,18 +346,19 @@ export const ArtifactViewer: React.FC = () => {
         
         {rootFiles.map(file => {
           const fileName = file.path.split('/').pop() || '';
+          const isActive = activeFile === file.id;
           return (
             <li 
               key={file.id}
               data-file-id={file.id}
-              className={`py-1 pl-3 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400 bg-zinc-800' : 'text-gray-300'}`}
+              className={`py-1 pl-3 cursor-pointer text-sm hover:bg-zinc-800 ${isActive ? 'text-green-400 bg-zinc-800' : 'text-gray-300'}`}
               onClick={(e) => handleFileClick(file.id, e)}
             >
               <div className="flex items-center px-2 py-1">
                 <File className="h-4 w-4 mr-2 text-gray-500" />
                 {fileName}
-                {activeFile === file.id && 
-                  <span className="text-green-400 ml-2 text-xs">+31</span>
+                {isActive && 
+                  <span className="text-green-400 ml-2 text-xs">•</span>
                 }
               </div>
             </li>
