@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
@@ -29,6 +30,7 @@ interface ArtifactContextType {
   closeArtifact: () => void;
   currentArtifact: Artifact | null;
   isOpen: boolean;
+  updateFileContent?: (fileId: string, newContent: string) => void;
 }
 
 // Create Context
@@ -99,12 +101,30 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
     setTimeout(() => setCurrentArtifact(null), 300); // Clear after animation
   };
 
+  const updateFileContent = (fileId: string, newContent: string) => {
+    if (!currentArtifact) return;
+    
+    setCurrentArtifact(prev => {
+      if (!prev) return null;
+      
+      const updatedFiles = prev.files.map(file => 
+        file.id === fileId ? { ...file, content: newContent } : file
+      );
+      
+      return {
+        ...prev,
+        files: updatedFiles
+      };
+    });
+  };
+
   return (
     <ArtifactContext.Provider value={{
       openArtifact,
       closeArtifact,
       currentArtifact,
-      isOpen
+      isOpen,
+      updateFileContent
     }}>
       {children}
       {isOpen && currentArtifact && <ArtifactViewer />}
@@ -114,7 +134,7 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
 
 // File Viewer Component
 export const ArtifactViewer: React.FC = () => {
-  const { currentArtifact, closeArtifact, isOpen } = useArtifact();
+  const { currentArtifact, closeArtifact, isOpen, updateFileContent } = useArtifact();
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'code' | 'preview'>('code');
 
@@ -161,6 +181,12 @@ export const ArtifactViewer: React.FC = () => {
     setActiveFileId(fileId);
   };
 
+  const handleFileContentChange = (fileId: string, newContent: string) => {
+    if (updateFileContent) {
+      updateFileContent(fileId, newContent);
+    }
+  };
+
   if (!isOpen || !currentArtifact) {
     console.log("ArtifactViewer not rendering because isOpen:", isOpen, "currentArtifact:", !!currentArtifact);
     return null;
@@ -169,24 +195,6 @@ export const ArtifactViewer: React.FC = () => {
   console.log("Rendering ArtifactViewer with artifact:", currentArtifact.id);
   console.log("Number of files:", currentArtifact.files.length);
   console.log("Active file ID:", activeFileId);
-
-  const currentFile = currentArtifact.files.find(f => f.id === activeFileId);
-
-  const getLanguageFromPath = (path: string): string => {
-    const extension = path.split('.').pop()?.toLowerCase() || '';
-    const languageMap: Record<string, string> = {
-      'js': 'javascript',
-      'jsx': 'javascript',
-      'ts': 'typescript',
-      'tsx': 'typescript',
-      'css': 'css',
-      'scss': 'scss',
-      'html': 'html',
-      'json': 'json',
-      'md': 'markdown',
-    };
-    return languageMap[extension] || 'plaintext';
-  };
 
   return (
     <div className="artifact-expanded-view">
@@ -250,35 +258,13 @@ export const ArtifactViewer: React.FC = () => {
                 files={currentArtifact.files}
                 activeFileId={activeFileId}
                 onFileSelect={handleFileSelect}
+                onFileContentChange={handleFileContentChange}
               />
             </div>
           )}
           
           <div className="file-content flex-1 overflow-auto flex flex-col">
-            {activeTab === 'code' ? (
-              currentFile ? (
-                <>
-                  <div className="file-path px-4 py-2 text-xs text-gray-400 bg-zinc-900 border-b border-zinc-800 flex justify-between items-center">
-                    <span>{currentFile.path}</span>
-                    <span className="text-gray-500">{getLanguageFromPath(currentFile.path).toUpperCase()}</span>
-                  </div>
-                  <div className="code-container flex-1 overflow-auto bg-zinc-900">
-                    <SyntaxHighlighter 
-                      language={getLanguageFromPath(currentFile.path)}
-                      style={vs2015}
-                      customStyle={{ margin: 0, padding: '16px', height: '100%', fontSize: '14px', lineHeight: '1.5', backgroundColor: '#18181b' }}
-                      showLineNumbers={true}
-                    >
-                      {currentFile.content}
-                    </SyntaxHighlighter>
-                  </div>
-                </>
-              ) : (
-                <div className="no-file-selected p-4 text-center text-gray-500 mt-8 bg-zinc-900">
-                  Select a file to view its content
-                </div>
-              )
-            ) : (
+            {activeTab === 'preview' && (
               <div className="preview-container h-full w-full flex-1">
                 <ArtifactPreview files={currentArtifact.files} />
               </div>
