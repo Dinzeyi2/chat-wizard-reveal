@@ -83,7 +83,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     }
   };
 
-  // File validation function - integrated from the code snippet
+  // File validation function
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -97,7 +97,6 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     // Continue with file processing...
     console.log("File validated for CodeEditor:", file.name);
     
-    // You could add more processing here in a real implementation
     toast({
       title: "File Validated",
       description: "The selected image file is valid and ready for upload."
