@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { ArtifactProvider, useArtifact } from "./artifact/ArtifactSystem";
+import { AlertTriangle } from "lucide-react";
 
 interface ChatWindowProps {
   messages: Message[];
@@ -90,6 +91,23 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
                     </p>
                   </div>
                 ) : null}
+                
+                {/* Display fallback AI notice if the response mentions fallback system */}
+                {message.content.includes("fallback AI system") && (
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-start">
+                      <AlertTriangle className="h-5 w-5 text-amber-500 mr-2 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-amber-800">
+                          Using fallback AI model
+                        </p>
+                        <p className="text-sm text-amber-700 mt-1">
+                          The primary AI system (Gemini) has reached its rate limit. This response was generated using our fallback model. Normal service should resume shortly.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 {/* If this is an app-generating message, add a button to view code */}
                 {message.metadata?.projectId && message.role === "assistant" && (
