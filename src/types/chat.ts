@@ -6,6 +6,9 @@ export interface Message {
   timestamp: Date;
   metadata?: {
     projectId?: string;
+    isGuidance?: boolean;
+    codeAnalysis?: boolean;
+    codeSuggestion?: string;
     [key: string]: any;
   };
 }
@@ -61,4 +64,28 @@ export interface ChallengeResult {
     difficulty: string;
   }>;
   explanation: string;
+}
+
+// Add GeminiAIContext interface for the AI-assisted coding feature
+export interface GeminiAIContext {
+  projectId: string;
+  projectName: string;
+  specification: string;
+  components?: Array<{
+    name: string;
+    description: string;
+  }>;
+  dependencies?: string[];
+  architecture?: string;
+  challenges?: string[];
+  nextSteps?: string[];
+}
+
+// Add CodeAnalysis interface for Gemini AI code analysis results
+export interface CodeAnalysis {
+  projectId: string;
+  filename: string;
+  feedback: string;
+  suggestedChanges?: string;
+  timestamp: string;
 }
