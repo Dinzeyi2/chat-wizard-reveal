@@ -12,16 +12,19 @@ async function callWithRetries(apiCall: () => Promise<any>, maxRetries = 3, back
       console.error(`Attempt ${attempt + 1} failed:`, error);
       lastError = error;
       
-      // Check if this is a rate limit error (429)
-      const isRateLimit = error.message && error.message.includes('429');
+      // Check if this is a rate limit error (429) or other temporary error
+      const isTemporaryError = error.message && 
+        (error.message.includes('429') || 
+         error.message.includes('timeout') ||
+         error.message.includes('non-2xx'));
       
-      if (isRateLimit && attempt < maxRetries - 1) {
+      if (isTemporaryError && attempt < maxRetries - 1) {
         // Wait longer for rate limit errors before retry
         const waitTime = backoffMs * Math.pow(2, attempt);
-        console.log(`Rate limit detected. Waiting ${waitTime}ms before retry...`);
+        console.log(`Temporary error detected. Waiting ${waitTime}ms before retry...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
-      } else if (!isRateLimit) {
-        // If not a rate limit error, don't retry
+      } else if (!isTemporaryError) {
+        // If not a temporary error, don't retry
         break;
       }
     }
@@ -89,6 +92,11 @@ serve(async (req) => {
       if (!geminiResponse.ok) {
         const errorText = await geminiResponse.text();
         console.error(`Gemini API error (${geminiResponse.status}):`, errorText);
+        
+        if (geminiResponse.status === 429) {
+          throw new Error("Rate limit exceeded. Please try again in a few moments.");
+        }
+        
         throw new Error(`Error from Gemini API: ${geminiResponse.status}`);
       }
 
@@ -117,13 +125,23 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error:", error);
     
+    // Create user-friendly error message based on error type
+    let userFriendlyMessage = error.message || "An unexpected error occurred";
+    let statusCode = 500;
+    
+    if (error.message && error.message.includes("Rate limit")) {
+      userFriendlyMessage = "The AI service is currently experiencing high demand. Please try again in a few moments.";
+      statusCode = 429;
+    }
+    
     // Improved error response
     return new Response(
       JSON.stringify({ 
-        error: error.message || "An unexpected error occurred",
-        details: error.stack || "No additional details available"
+        error: userFriendlyMessage,
+        details: error.stack || "No additional details available",
+        suggestion: "You can try using a shorter prompt, or try again later."
       }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: statusCode, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

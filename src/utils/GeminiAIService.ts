@@ -90,12 +90,20 @@ class GeminiAIService {
           attempt++;
         } else {
           // Permanent error or out of retries
-          throw new Error("Failed to generate app: " + (error.message || "Unknown error"));
+          if (error.message && error.message.includes('429')) {
+            throw new Error("AI service is temporarily unavailable due to high demand. Please try again in a few minutes with a simpler prompt.");
+          } else {
+            throw new Error("Failed to generate app: " + (error.message || "Unknown error"));
+          }
         }
       }
     }
     
-    // If we exhausted all retries, throw the last error
+    // If we exhausted all retries, throw the last error with detailed message
+    if (lastError && lastError.message && lastError.message.includes('429')) {
+      throw new Error("AI service is temporarily unavailable due to rate limits. Please try again in a few minutes with a simpler prompt.");
+    }
+    
     throw lastError || new Error("Failed to initialize project after multiple attempts");
   }
 }
