@@ -7,10 +7,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
-import { ArtifactProvider, ArtifactLayout } from "@/components/artifact/ArtifactSystem";
+import { ArtifactProvider, ArtifactLayout, useArtifact } from "@/components/artifact/ArtifactSystem";
 import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
 import { useLocation, useNavigate } from "react-router-dom";
 import { UserProfileMenu } from "@/components/UserProfileMenu";
+import { geminiAIService } from "@/utils/GeminiAIService";
 
 // Interface for chat history items
 interface ChatHistoryItem {
@@ -33,10 +34,12 @@ const Index = () => {
   const [firstStepGuidanceSent, setFirstStepGuidanceSent] = useState<boolean>(false);
   const [hasGeneratedApp, setHasGeneratedApp] = useState<boolean>(false); // Track if an app has been generated
   const [chatLoadingError, setChatLoadingError] = useState<string | null>(null);
+  const [currentCode, setCurrentCode] = useState<string>(''); // Added for code tracking
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
+  const { openArtifact } = useArtifact();
 
   // Check for initial prompt from landing page
   useEffect(() => {
@@ -86,6 +89,24 @@ const Index = () => {
     };
     
     checkAuth();
+    
+    // Initialize Gemini AI Service with API key from environment if available
+    const initGeminiAPI = async () => {
+      try {
+        const { data } = await supabase.functions.invoke('get-env', {
+          body: { key: 'GEMINI_API_KEY' }
+        });
+        
+        if (data && data.value) {
+          geminiAIService.setApiKey(data.value);
+          console.log('Gemini API key loaded from environment');
+        }
+      } catch (error) {
+        console.error('Error getting Gemini API key:', error);
+      }
+    };
+    
+    initGeminiAPI();
   }, []);
 
   useEffect(() => {
@@ -143,6 +164,26 @@ const Index = () => {
           if (projectMsg && projectMsg.metadata?.projectId) {
             setCurrentProjectId(projectMsg.metadata.projectId);
             setHasGeneratedApp(true);
+            
+            // Try to load the code from the project
+            try {
+              const { data: projects } = await supabase
+                .from('app_projects')
+                .select('app_data')
+                .eq('id', projectMsg.metadata.projectId)
+                .order('version', { ascending: false })
+                .limit(1);
+                
+              if (projects && projects.length > 0 && projects[0].app_data) {
+                // Extract code from the app data
+                const appData = projects[0].app_data;
+                if (appData.files && appData.files.length > 0) {
+                  setCurrentCode(appData.files[0].content);
+                }
+              }
+            } catch (err) {
+              console.error("Error loading project code:", err);
+            }
           }
           
           toast({
@@ -385,7 +426,7 @@ Would you like me to help you modify the existing app instead? I can add feature
         return;
       }
 
-      console.log("Calling generate-app function with prompt:", content);
+      console.log("Initializing project with prompt:", content);
       
       setGenerationDialog(true);
       setIsGeneratingApp(true);
@@ -401,66 +442,75 @@ Would you like me to help you modify the existing app instead? I can add feature
       setMessages(prev => [...prev, processingMessage]);
       
       try {
-        const { data, error } = await supabase.functions.invoke('generate-app', {
-          body: { prompt: content }
-        });
-
-        if (error) {
-          console.error("Supabase function error:", error);
-          
-          setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
-          
-          throw new Error(`Error generating application: ${error.message || "Unknown error"}`);
-        }
-
-        const appData = data;
-        console.log("App generation successful:", appData);
-        setCurrentProjectId(appData.projectId);
+        // Use new Gemini AI service to initialize project
+        const projectName = content.length > 20 ? content.substring(0, 20) + "..." : content;
+        const result = await geminiAIService.initializeProject(content, projectName);
+        
+        console.log("Project initialization successful:", result);
+        setCurrentProjectId(result.projectId);
         setHasGeneratedApp(true); // Mark that we've generated an app
+        setCurrentCode(result.initialCode); // Store the code for future modification
         
         setGenerationDialog(false);
         
         setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
 
+        // Create a formatted response similar to the original app generation
         const formattedResponse = `I've generated a full-stack application based on your request. Here's what I created:
 
-\`\`\`json
-${JSON.stringify(appData, null, 2)}
-\`\`\`
+${result.assistantMessage}
 
-You can explore the file structure and content in the panel above. This is a starting point that you can further customize and expand.`;
+You can explore the code structure and files in the panel above. This is a starting point that you can further customize and expand.`;
 
         const aiMessage: Message = {
           id: (Date.now() + 2).toString(),
           role: "assistant",
           content: formattedResponse,
           metadata: {
-            projectId: appData.projectId
+            projectId: result.projectId
           },
           timestamp: new Date()
         };
         
         setMessages(prev => [...prev, aiMessage]);
         
+        // Open code in artifact viewer
+        if (result.appData) {
+          openArtifact({
+            id: result.projectId,
+            title: result.projectContext.projectName || "Generated App",
+            description: result.projectContext.description || "Generated application code",
+            files: result.appData.files.map((file: any) => ({
+              id: `file-${file.path.replace(/\//g, '-')}`,
+              name: file.path.split('/').pop(),
+              path: file.path,
+              language: file.path.split('.').pop() || 'js',
+              content: file.content
+            }))
+          });
+        }
+        
         toast({
           title: "App Generated Successfully",
-          description: `${appData.projectName} has been generated with ${appData.files.length} files.`,
+          description: `${result.projectContext.projectName} has been generated.`,
         });
         
         // Save this conversation to chat history
-        if (data && data.response) {
-          saveToHistory(content, formattedResponse);
-        }
+        saveToHistory(content, formattedResponse);
 
-        // If we have first step guidance, send it automatically after a small delay
-        if (appData.firstStepGuidance && !firstStepGuidanceSent) {
+        // Send first step guidance if available
+        if (result.projectContext.nextSteps && result.projectContext.nextSteps.length > 0) {
           setTimeout(() => {
+            const guidance = `## Next Steps\n\nHere are some suggestions to help you get started:\n\n${
+              result.projectContext.nextSteps.map((step: string, i: number) => `${i+1}. ${step}`).join('\n\n')
+            }\n\nLet me know if you need help with any of these steps!`;
+            
             const guidanceMessage: Message = {
               id: (Date.now() + 3).toString(),
               role: "assistant",
-              content: appData.firstStepGuidance,
+              content: guidance,
               metadata: {
-                projectId: appData.projectId,
+                projectId: result.projectId,
                 isGuidance: true
               },
               timestamp: new Date()
@@ -470,8 +520,8 @@ You can explore the file structure and content in the panel above. This is a sta
             setFirstStepGuidanceSent(true);
           }, 1500);
         }
-      } catch (error) {
-        console.error('Error calling function:', error);
+      } catch (error: any) {
+        console.error('Error initializing project:', error);
         setGenerationDialog(false);
         setGenerationError(error.message || "An unexpected error occurred");
         
@@ -499,25 +549,50 @@ If you were trying to generate an app, this might be due to limits with our AI m
         setLoading(false);
         setIsGeneratingApp(false);
       }
-    } else if (isModificationRequest) {
-      console.log("Calling chat function with modification request for project:", currentProjectId);
+    } else if (isModificationRequest || (currentProjectId && currentCode)) {
+      console.log("Processing modification or analysis request for project:", currentProjectId);
       
       setLoading(true);
       
       const processingMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "I'm working on modifying your application. This may take a moment...",
+        content: "I'm analyzing your code and working on a response...",
         timestamp: new Date()
       };
       
       setMessages(prev => [...prev, processingMessage]);
       
       try {
+        // Get project context from service if available
+        let projectContext = null;
+        try {
+          // Try to get from Supabase
+          const { data: projects } = await supabase
+            .from('app_projects')
+            .select('*')
+            .eq('id', currentProjectId)
+            .order('version', { ascending: false })
+            .limit(1);
+            
+          if (projects && projects.length > 0) {
+            projectContext = {
+              projectId: currentProjectId,
+              projectName: projects[0].app_data?.projectName || "Unnamed Project",
+              specification: content,
+              description: projects[0].app_data?.description || "Project based on user specification",
+            };
+          }
+        } catch (error) {
+          console.error("Error fetching project context:", error);
+        }
+        
+        // Send to Edge Function for chat with code context
         const { data, error } = await supabase.functions.invoke('chat', {
           body: { 
             message: content,
-            projectId: currentProjectId 
+            projectId: currentProjectId,
+            code: currentCode
           }
         });
 
@@ -528,10 +603,16 @@ If you were trying to generate an app, this might be due to limits with our AI m
           role: "assistant",
           content: data.response,
           metadata: {
-            projectId: data.projectId || currentProjectId
+            projectId: data.projectId || currentProjectId,
+            codeUpdate: data.codeUpdate // Include any code update suggestions
           },
           timestamp: new Date()
         };
+        
+        // Update code if we have code updates
+        if (data.codeUpdate) {
+          setCurrentCode(data.codeUpdate);
+        }
         
         setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
         setMessages(prev => [...prev, aiMessage]);
@@ -542,15 +623,13 @@ If you were trying to generate an app, this might be due to limits with our AI m
         }
         
         toast({
-          title: "App Modified Successfully",
-          description: "Your application has been updated with your requested changes.",
+          title: "Analysis Complete",
+          description: "Your code has been analyzed and I've provided a response.",
         });
         
         // Save this conversation to chat history
-        if (data && data.response) {
-          saveToHistory(content, data.response);
-        }
-      } catch (error) {
+        saveToHistory(content, data.response);
+      } catch (error: any) {
         console.error('Error calling function:', error);
         setGenerationError(error.message || "An unexpected error occurred");
         
@@ -563,7 +642,7 @@ If you were trying to generate an app, this might be due to limits with our AI m
         const errorMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: `I'm sorry, but I encountered an error while modifying your application: ${error.message || 'Please try again later.'}`,
+          content: `I'm sorry, but I encountered an error while analyzing your code: ${error.message || 'Please try again later.'}`,
           timestamp: new Date()
         };
         
@@ -603,7 +682,7 @@ If you were trying to generate an app, this might be due to limits with our AI m
         
         // Save this conversation to chat history
         saveToHistory(content, data.response);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error calling function:', error);
         setGenerationError(error.message || "An unexpected error occurred");
         

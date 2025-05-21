@@ -1,6 +1,9 @@
 
 import { toast } from "@/hooks/use-toast";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { ProjectContext, ProjectContextManager } from "./ProjectContextManager";
+import { saveArtifact, loadArtifact } from "@/server/codeArtifactManager";
+import { v4 as uuidv4 } from "uuid";
 
 interface GeminiCodeAnalysisParams {
   code: string;
@@ -22,6 +25,7 @@ export class GeminiAIService {
   private apiKey: string | null = null;
   private baseUrl: string = "https://generativelanguage.googleapis.com/v1beta";
   private genAI: GoogleGenerativeAI | null = null;
+  private projectContextManager = ProjectContextManager.getInstance();
   
   constructor(apiKey?: string) {
     this.apiKey = apiKey || null;
@@ -196,6 +200,8 @@ export class GeminiAIService {
         throw new Error("Gemini API key is not set");
       }
       
+      console.log("Initializing project with specification:", specification);
+      
       // Use the Gemini Pro model
       const model = this.genAI.getGenerativeModel({ model: "gemini-pro" });
       
@@ -284,10 +290,40 @@ export class GeminiAIService {
       const messageResult = await model.generateContent(messagePrompt);
       const assistantMessage = messageResult.response.text();
       
+      // Generate a unique project ID
+      const projectId = uuidv4();
+      
+      // Save project context
+      this.projectContextManager.saveContext(projectId, projectContext);
+      
+      // Save artifact
+      const artifactData = saveArtifact(projectId, initialCode, projectContext);
+      
+      // Transform the data to match the expected response format from artifact system
+      const files = [
+        {
+          id: `file-main-js`,
+          name: 'main.js',
+          path: 'main.js',
+          language: 'javascript',
+          content: initialCode
+        }
+      ];
+      
+      const appData = {
+        projectId,
+        projectName: projectContext.projectName,
+        description: projectContext.description,
+        specification: projectContext.specification,
+        files
+      };
+      
       return {
         projectContext,
         initialCode,
-        assistantMessage
+        assistantMessage,
+        appData,
+        projectId
       };
     } catch (error: any) {
       console.error("Error initializing project with Gemini:", error);
@@ -398,6 +434,44 @@ export class GeminiAIService {
         updatedContext = projectContext;
       }
       
+      // Update the project context in our manager
+      if (projectContext.projectId) {
+        this.projectContextManager.updateContext(projectContext.projectId, updatedContext);
+      }
+      
+      // Save updated artifact
+      if (projectContext.projectId && codeUpdate) {
+        saveArtifact(projectContext.projectId, codeUpdate, updatedContext);
+      }
+      
+      // Format response for the artifact system if needed
+      if (codeUpdate) {
+        const files = [
+          {
+            id: `file-updated-js`,
+            name: 'updated.js',
+            path: 'updated.js',
+            language: 'javascript',
+            content: codeUpdate
+          }
+        ];
+        
+        // Create artifact data structure compatible with the system
+        const artifactData = {
+          projectId: projectContext.projectId,
+          projectName: updatedContext.projectName,
+          description: updatedContext.description,
+          files
+        };
+        
+        return {
+          assistantMessage,
+          updatedContext,
+          codeUpdate,
+          artifactData
+        };
+      }
+      
       return {
         assistantMessage,
         updatedContext,
@@ -413,6 +487,100 @@ export class GeminiAIService {
       });
       
       throw error;
+    }
+  }
+  
+  /**
+   * Analyze code changes and provide automated feedback
+   */
+  async analyzeCodeChanges(code: string, projectContext: any): Promise<any> {
+    try {
+      if (!this.apiKey || !this.genAI) {
+        throw new Error("Gemini API key is not set");
+      }
+      
+      // Use the Gemini Pro model
+      const model = this.genAI.getGenerativeModel({ model: "gemini-pro" });
+      
+      // Load previous artifact to compare
+      let previousCode = "";
+      if (projectContext.projectId) {
+        const previousArtifact = loadArtifact(projectContext.projectId);
+        previousCode = previousArtifact?.code || "";
+      }
+      
+      // Only analyze if code has changed significantly
+      if (previousCode && Math.abs(previousCode.length - code.length) < 50) {
+        return { feedback: "", updatedContext: projectContext };
+      }
+      
+      // Generate analysis prompt
+      const analysisPrompt = `
+        You are an AI assistant helping a user build a software project. 
+        
+        Project context: ${JSON.stringify(projectContext)}
+        
+        Analyze this code to:
+        1. Understand what the user has implemented or changed
+        2. Identify progress towards the project goals
+        3. Spot any issues, bugs, or anti-patterns
+        
+        Current code:
+        \`\`\`
+        ${code}
+        \`\`\`
+        
+        Provide brief, helpful feedback only if there's something significant to note.
+        If the code looks good and is progressing well, just respond with "GOOD_PROGRESS".
+      `;
+      
+      // Generate analysis
+      const analysisResult = await model.generateContent(analysisPrompt);
+      const feedback = analysisResult.response.text();
+      
+      // Skip feedback that's not useful
+      if (feedback === "GOOD_PROGRESS") {
+        return { feedback: "", updatedContext: projectContext };
+      }
+      
+      // Update project context based on analysis
+      const contextUpdatePrompt = `
+        You are an AI assistant tracking a software project's development. 
+        Based on this code analysis, update the project context:
+        
+        Current project context: ${JSON.stringify(projectContext)}
+        
+        Code analysis result: "${feedback}"
+        
+        Update the project context object to reflect any new information, progress, or next steps.
+        Return ONLY the updated JSON object with no additional text.
+      `;
+      
+      const contextResult = await model.generateContent(contextUpdatePrompt);
+      let updatedContext;
+      
+      try {
+        updatedContext = JSON.parse(contextResult.response.text());
+      } catch (parseError) {
+        console.error('Error parsing updated context:', parseError);
+        updatedContext = projectContext;
+      }
+      
+      // Update the project context in our manager
+      if (projectContext.projectId) {
+        this.projectContextManager.updateContext(projectContext.projectId, updatedContext);
+        
+        // Save updated artifact
+        saveArtifact(projectContext.projectId, code, updatedContext);
+      }
+      
+      return {
+        feedback,
+        updatedContext
+      };
+    } catch (error: any) {
+      console.error("Error analyzing code changes with Gemini:", error);
+      return { feedback: "", updatedContext: projectContext };
     }
   }
 }

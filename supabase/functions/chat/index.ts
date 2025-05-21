@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, projectId, lastModification } = await req.json()
+    const { message, projectId, lastModification, code } = await req.json()
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY')
     
     // Create a Supabase client
@@ -59,7 +59,8 @@ serve(async (req) => {
         console.log("Detected code generation request:", message);
         
         try {
-          // Call the generate-challenge function to create an intentionally incomplete application
+          // Initialize project with Gemini
+          // Call the standard generate-challenge function but enhance it with project context tracking
           console.log("Calling generate-challenge function...");
           const challengeResponse = await fetch(`${supabaseUrl}/functions/v1/generate-challenge`, {
             method: "POST",
@@ -84,6 +85,39 @@ serve(async (req) => {
           if (!challengeData.success) {
             throw new Error(challengeData.error || "Failed to generate code challenge");
           }
+          
+          // Save project context for this generated code
+          console.log("Saving project context with Gemini...");
+          await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": geminiApiKey
+            },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{
+                  text: `Create a project context for this generated code challenge:
+                  ${JSON.stringify(challengeData)}
+                  
+                  Format as a JSON object with these fields:
+                  {
+                    "projectName": "${challengeData.projectName}",
+                    "description": "Detailed description",
+                    "specification": "Original prompt that created this",
+                    "components": [{"name": "ComponentName", "description": "Purpose"}],
+                    "dependencies": ["dependencies used"],
+                    "nextSteps": ["suggested next steps"]
+                  }
+                  `
+                }]
+              }],
+              generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: 2048
+              }
+            })
+          });
           
           // Format a message that clearly explains this is an intentionally incomplete application
           let aiResponse = `I've created an **educational code challenge** based on your request for "${message}". \n\n`;
@@ -192,8 +226,202 @@ serve(async (req) => {
         }
       }
     }
+
+    // For project modification requests with context, use enhanced capabilities
+    if (projectId && code) {
+      try {
+        console.log("Processing code analysis with Gemini for projectId:", projectId);
+        
+        // Get project context if available
+        let projectContext = null;
+        try {
+          // Try to get the latest version from Supabase
+          const { data: projects } = await supabase
+            .from('app_projects')
+            .select('*')
+            .eq('id', projectId)
+            .order('version', { ascending: false })
+            .limit(1);
+            
+          if (projects && projects.length > 0) {
+            projectContext = {
+              projectId,
+              projectName: projects[0].app_data?.projectName || "Unnamed Project",
+              specification: message,
+              description: projects[0].app_data?.description || "Project based on user specification",
+            };
+          }
+        } catch (error) {
+          console.error("Error fetching project context:", error);
+        }
+        
+        if (!projectContext) {
+          projectContext = {
+            projectId,
+            projectName: "Unnamed Project",
+            specification: message,
+            description: "Project based on user specification"
+          };
+        }
+        
+        // Call Gemini for code analysis and response
+        const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": geminiApiKey
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: `
+                You are an AI code assistant helping a user build this project:
+                
+                Project Context: ${JSON.stringify(projectContext)}
+                
+                The user's current message is: "${message}"
+                
+                Current code:
+                \`\`\`
+                ${code}
+                \`\`\`
+                
+                Analyze this code and the user's request to provide:
+                1. A helpful response to their question
+                2. Specific guidance based on their code
+                3. Educational explanations rather than just solutions
+                4. References to their code where relevant
+                5. Suggestions for next steps
+                
+                Keep your response conversational and focused on helping them learn.
+                `
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.7,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 4096
+            }
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Error from Gemini API: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (!data.candidates || data.candidates.length === 0) {
+          throw new Error("Empty response from Gemini API");
+        }
+        
+        const assistantResponse = data.candidates[0].content.parts[0].text;
+        
+        // If the message asks about implementing something, generate code suggestion
+        let codeUpdate = null;
+        if (message.toLowerCase().includes('implement') || 
+            message.toLowerCase().includes('how do i') || 
+            message.toLowerCase().includes('how to') || 
+            message.toLowerCase().includes('fix')) {
+            
+          console.log("Generating code suggestion based on user request");
+          
+          // Generate code suggestion
+          const suggestionResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": geminiApiKey
+            },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{
+                  text: `
+                  You are an expert code assistant. Based on this request:
+                  "${message}"
+                  
+                  And this current code:
+                  \`\`\`
+                  ${code}
+                  \`\`\`
+                  
+                  Provide a code implementation that would help them progress.
+                  Important:
+                  1. Do NOT rewrite the entire codebase
+                  2. Only update/add the specific parts needed to address their request
+                  3. Preserve their existing implementation style
+                  4. Include comments explaining your changes
+                  
+                  Provide ONLY the updated code with no explanations before or after.
+                  `
+                }]
+              }],
+              generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: 4096
+              }
+            })
+          });
+          
+          if (suggestionResponse.ok) {
+            const suggestionData = await suggestionResponse.json();
+            if (suggestionData.candidates && suggestionData.candidates.length > 0) {
+              codeUpdate = suggestionData.candidates[0].content.parts[0].text;
+            }
+          }
+        }
+        
+        // Include code suggestion if available
+        const finalResponse = {
+          response: assistantResponse,
+          projectId: projectId,
+          codeUpdate: codeUpdate
+        };
+        
+        // Store in user history if authenticated
+        if (userId) {
+          try {
+            await supabase
+              .from('chat_history')
+              .insert({
+                user_id: userId,
+                title: message.length > 50 ? message.substring(0, 50) + '...' : message,
+                last_message: 'Last message just now',
+                messages: JSON.stringify([
+                  {
+                    id: Date.now().toString(),
+                    role: "user",
+                    content: message,
+                    timestamp: new Date().toISOString()
+                  },
+                  {
+                    id: (Date.now() + 1).toString(),
+                    role: "assistant",
+                    content: assistantResponse,
+                    metadata: { projectId, codeUpdate },
+                    timestamp: new Date().toISOString()
+                  }
+                ])
+              });
+          } catch (dbError) {
+            console.error("Error storing chat history in Supabase:", dbError);
+          }
+        }
+        
+        return new Response(JSON.stringify(finalResponse), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (error) {
+        console.error("Error in code analysis:", error);
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
     
-    // For regular chat messages or project modification requests, use Gemini
+    // For regular chat messages, use standard Gemini
     try {
       console.log("Processing with Gemini API");
       let prompt = message;

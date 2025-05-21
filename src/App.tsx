@@ -49,7 +49,7 @@ const App = () => {
             <Route path="/callback/github" element={<GitHubCallback />} />
             <Route path="callback/github" element={<GitHubCallback />} />
             
-            {/* New CodeCraft Challenge routes */}
+            {/* CodeCraft Challenge routes */}
             <Route path="/challenges" element={<ChallengeGenerator />} />
             <Route path="/challenge/:projectId" element={<ChallengeWorkspace />} />
             <Route path="/challenge/:projectId/:challengeId" element={<ChallengeWorkspace />} />
