@@ -2,11 +2,12 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
-import { FileCode, X, ExternalLink, ChevronRight, Download, File, Code } from 'lucide-react';
+import { FileCode, X, ExternalLink, ChevronRight, Download, File, Code, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import './ArtifactSystem.css';
 import { ArtifactPreview } from './ArtifactPreview';
+import Editor from '@monaco-editor/react';
 
 // Types
 interface ArtifactFile {
@@ -29,6 +30,7 @@ interface ArtifactContextType {
   closeArtifact: () => void;
   currentArtifact: Artifact | null;
   isOpen: boolean;
+  updateFileContent?: (fileId: string, newContent: string) => void;
 }
 
 // Create Context
@@ -99,12 +101,32 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
     setTimeout(() => setCurrentArtifact(null), 300); // Clear after animation
   };
 
+  const updateFileContent = (fileId: string, newContent: string) => {
+    if (!currentArtifact) return;
+    
+    setCurrentArtifact(prev => {
+      if (!prev) return prev;
+      
+      const updatedFiles = prev.files.map(file => 
+        file.id === fileId ? {...file, content: newContent} : file
+      );
+      
+      return {...prev, files: updatedFiles};
+    });
+    
+    toast({
+      title: "File updated",
+      description: "Your changes have been saved",
+    });
+  };
+
   return (
     <ArtifactContext.Provider value={{
       openArtifact,
       closeArtifact,
       currentArtifact,
-      isOpen
+      isOpen,
+      updateFileContent
     }}>
       {children}
       {isOpen && currentArtifact && <ArtifactViewer />}
@@ -114,10 +136,13 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
 
 // File Viewer Component
 export const ArtifactViewer: React.FC = () => {
-  const { currentArtifact, closeArtifact, isOpen } = useArtifact();
+  const { currentArtifact, closeArtifact, isOpen, updateFileContent } = useArtifact();
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<'code' | 'preview'>('code');
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedContent, setEditedContent] = useState<string>('');
+  const [isEditorReady, setIsEditorReady] = useState(false);
 
   useEffect(() => {
     console.log("ArtifactViewer mounted, isOpen:", isOpen);
@@ -154,6 +179,17 @@ export const ArtifactViewer: React.FC = () => {
     };
   }, [currentArtifact, isOpen]);
 
+  // Reset editor state when active file changes
+  useEffect(() => {
+    if (currentArtifact && activeFile) {
+      const currentFile = currentArtifact.files.find(f => f.id === activeFile);
+      if (currentFile) {
+        setEditedContent(currentFile.content);
+        setIsEditMode(false);
+      }
+    }
+  }, [activeFile, currentArtifact]);
+
   // Debug log when tab changes
   useEffect(() => {
     console.log("Active tab changed to:", activeTab);
@@ -170,6 +206,23 @@ export const ArtifactViewer: React.FC = () => {
     }
   };
 
+  const handleEditorDidMount = () => {
+    setIsEditorReady(true);
+  };
+
+  const handleEditorChange = (value: string | undefined) => {
+    if (value !== undefined) {
+      setEditedContent(value);
+    }
+  };
+
+  const handleSaveChanges = () => {
+    if (activeFile && updateFileContent) {
+      updateFileContent(activeFile, editedContent);
+      setIsEditMode(false);
+    }
+  };
+
   if (!isOpen || !currentArtifact) {
     console.log("ArtifactViewer not rendering because isOpen:", isOpen, "currentArtifact:", !!currentArtifact);
     return null;
@@ -181,6 +234,23 @@ export const ArtifactViewer: React.FC = () => {
   const currentFile = currentArtifact.files.find(f => f.id === activeFile);
 
   const getLanguageFromPath = (path: string): string => {
+    const extension = path.split('.').pop()?.toLowerCase() || '';
+    const languageMap: Record<string, string> = {
+      'js': 'javascript',
+      'jsx': 'javascript',
+      'ts': 'typescript',
+      'tsx': 'typescript',
+      'css': 'css',
+      'scss': 'scss',
+      'html': 'html',
+      'json': 'json',
+      'md': 'markdown',
+    };
+    return languageMap[extension] || 'plaintext';
+  };
+
+  const getMonacoLanguage = (path: string): string => {
+    // Monaco uses slightly different language identifiers
     const extension = path.split('.').pop()?.toLowerCase() || '';
     const languageMap: Record<string, string> = {
       'js': 'javascript',
@@ -379,17 +449,58 @@ export const ArtifactViewer: React.FC = () => {
                 <>
                   <div className="file-path px-4 py-2 text-xs text-gray-400 bg-zinc-900 border-b border-zinc-800 flex justify-between items-center">
                     <span>{currentFile.path}</span>
-                    <span className="text-gray-500">{getLanguageFromPath(currentFile.path).toUpperCase()}</span>
+                    <div className="flex items-center">
+                      <span className="text-gray-500 mr-3">{getLanguageFromPath(currentFile.path).toUpperCase()}</span>
+                      {!isEditMode ? (
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-7 px-2 py-0 text-xs"
+                          onClick={() => setIsEditMode(true)}
+                        >
+                          Edit
+                        </Button>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-7 px-2 py-0 text-xs bg-green-600 text-white hover:bg-green-700"
+                          onClick={handleSaveChanges}
+                        >
+                          <Save className="h-3 w-3 mr-1" />
+                          Save
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   <div className="code-container flex-1 overflow-auto bg-zinc-900">
-                    <SyntaxHighlighter 
-                      language={getLanguageFromPath(currentFile.path)}
-                      style={vs2015}
-                      customStyle={{ margin: 0, padding: '16px', height: '100%', fontSize: '14px', lineHeight: '1.5', backgroundColor: '#18181b' }}
-                      showLineNumbers={true}
-                    >
-                      {currentFile.content}
-                    </SyntaxHighlighter>
+                    {isEditMode ? (
+                      <Editor
+                        height="100%"
+                        language={getMonacoLanguage(currentFile.path)}
+                        value={editedContent}
+                        theme="vs-dark"
+                        onChange={handleEditorChange}
+                        onMount={handleEditorDidMount}
+                        options={{
+                          fontSize: 14,
+                          minimap: { enabled: false },
+                          scrollBeyondLastLine: false,
+                          automaticLayout: true,
+                          lineNumbers: 'on',
+                          tabSize: 2,
+                        }}
+                      />
+                    ) : (
+                      <SyntaxHighlighter 
+                        language={getLanguageFromPath(currentFile.path)}
+                        style={vs2015}
+                        customStyle={{ margin: 0, padding: '16px', height: '100%', fontSize: '14px', lineHeight: '1.5', backgroundColor: '#18181b' }}
+                        showLineNumbers={true}
+                      >
+                        {currentFile.content}
+                      </SyntaxHighlighter>
+                    )}
                   </div>
                 </>
               ) : (
