@@ -79,12 +79,6 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
           console.error("Failed to parse app data from message:", error);
         }
       }
-      
-      // Check for code analysis feedback messages
-      if (content.includes('AI_CODE_ANALYSIS') || content.includes('CODE_ANALYSIS_RESULT')) {
-        // Here we would handle code analysis feedback messages
-        console.log("Code analysis feedback detected in message");
-      }
     }
   }, [message, content, openArtifact]);
 
