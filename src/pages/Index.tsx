@@ -195,9 +195,9 @@ const Index = () => {
                 .limit(1);
                 
               if (projects && projects.length > 0 && projects[0].app_data) {
-                // Extract code from the app data
-                const appData = projects[0].app_data as { files?: Array<{path: string, content: string}> };
-                if (appData.files && appData.files.length > 0) {
+                // Extract code from the app data - properly type cast app_data as ProjectContext
+                const appData = projects[0].app_data as ProjectContext;
+                if (appData.files && Array.isArray(appData.files)) {
                   setCurrentCode(appData.files[0].content);
                 }
               }
@@ -596,11 +596,14 @@ If you were trying to generate an app, this might be due to limits with our AI m
             .limit(1);
             
           if (projects && projects.length > 0) {
+            // Properly type cast the app_data as ProjectContext
+            const appData = projects[0].app_data as ProjectContext;
+            
             projectContext = {
               projectId: currentProjectId,
-              projectName: projects[0].app_data?.projectName || "Unnamed Project",
+              projectName: appData?.projectName || "Unnamed Project",
               specification: content,
-              description: projects[0].app_data?.description || "Project based on user specification",
+              description: appData?.description || "Project based on user specification",
             };
           }
         } catch (error) {
