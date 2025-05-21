@@ -6,8 +6,8 @@ import { Message, Json } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, AlertCircle } from "lucide-react";
-import { ArtifactProvider, ArtifactLayout } from "@/components/artifact/ArtifactSystem";
+import { Loader2 } from "lucide-react";
+import { ArtifactProvider, ArtifactLayout, useArtifact } from "@/components/artifact/ArtifactSystem";
 import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
 import { useLocation, useNavigate } from "react-router-dom";
 import { UserProfileMenu } from "@/components/UserProfileMenu";
@@ -18,8 +18,8 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { TabsContent } from "@/components/ui/tabs";
+} from "@/components/ui/card"
+import { TabsContent } from "@/components/ui/tabs"
 
 // Interface for chat history items
 interface ChatHistoryItem {
@@ -51,13 +51,14 @@ const Index = () => {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [firstStepGuidanceSent, setFirstStepGuidanceSent] = useState<boolean>(false);
-  const [hasGeneratedApp, setHasGeneratedApp] = useState<boolean>(false); 
+  const [hasGeneratedApp, setHasGeneratedApp] = useState<boolean>(false); // Track if an app has been generated
   const [chatLoadingError, setChatLoadingError] = useState<string | null>(null);
-  const [currentCode, setCurrentCode] = useState<string>(''); 
+  const [currentCode, setCurrentCode] = useState<string>(''); // Added for code tracking
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
+  const { openArtifact } = useArtifact();
   const [projectContext, setProjectContext] = useState<ProjectContext | null>(null);
 
   // Check for initial prompt from landing page
@@ -461,40 +462,14 @@ Would you like me to help you modify the existing app instead? I can add feature
       setMessages(prev => [...prev, processingMessage]);
       
       try {
-        // Use new Gemini AI service to initialize project with retry logic
-        const maxRetries = 3;
-        let attempt = 0;
-        let projectResult = null;
-        let lastError = null;
-
-        while (attempt < maxRetries && !projectResult) {
-          try {
-            const projectName = content.length > 20 ? content.substring(0, 20) + "..." : content;
-            projectResult = await geminiAIService.initializeProject(content, projectName);
-            break; // Success! Exit the loop
-          } catch (error) {
-            console.error(`App generation attempt ${attempt + 1} failed:`, error);
-            lastError = error;
-            attempt++;
-            
-            // If we still have retries left, wait before trying again
-            if (attempt < maxRetries) {
-              const backoffTime = 1000 * Math.pow(2, attempt - 1); // Exponential backoff
-              console.log(`Waiting ${backoffTime}ms before retry...`);
-              await new Promise(resolve => setTimeout(resolve, backoffTime));
-            }
-          }
-        }
+        // Use new Gemini AI service to initialize project
+        const projectName = content.length > 20 ? content.substring(0, 20) + "..." : content;
+        const result = await geminiAIService.initializeProject(content, projectName);
         
-        // If we exhausted all retries and still failed, throw the last error
-        if (!projectResult) {
-          throw lastError || new Error("Failed to initialize project after multiple attempts");
-        }
-        
-        console.log("Project initialization successful:", projectResult);
-        setCurrentProjectId(projectResult.projectId);
+        console.log("Project initialization successful:", result);
+        setCurrentProjectId(result.projectId);
         setHasGeneratedApp(true); // Mark that we've generated an app
-        setCurrentCode(projectResult.initialCode); // Store the code for future modification
+        setCurrentCode(result.initialCode); // Store the code for future modification
         
         setGenerationDialog(false);
         
@@ -503,7 +478,7 @@ Would you like me to help you modify the existing app instead? I can add feature
         // Create a formatted response similar to the original app generation
         const formattedResponse = `I've generated a full-stack application based on your request. Here's what I created:
 
-${projectResult.assistantMessage}
+${result.assistantMessage}
 
 You can explore the code structure and files in the panel above. This is a starting point that you can further customize and expand.`;
 
@@ -512,32 +487,42 @@ You can explore the code structure and files in the panel above. This is a start
           role: "assistant",
           content: formattedResponse,
           metadata: {
-            projectId: projectResult.projectId,
-            appData: projectResult.appData // Store app data in the metadata for ArtifactHandler to use
+            projectId: result.projectId
           },
           timestamp: new Date()
         };
         
         setMessages(prev => [...prev, aiMessage]);
         
-        // Store project context
-        if (projectResult.projectContext) {
-          setProjectContext(projectResult.projectContext);
+        // Open code in artifact viewer
+        if (result.appData) {
+          openArtifact({
+            id: result.projectId,
+            title: result.projectContext.projectName || "Generated App",
+            description: result.projectContext.description || "Generated application code",
+            files: result.appData.files.map((file: any) => ({
+              id: `file-${file.path.replace(/\//g, '-')}`,
+              name: file.path.split('/').pop(),
+              path: file.path,
+              language: file.path.split('.').pop() || 'js',
+              content: file.content
+            }))
+          });
         }
         
         toast({
           title: "App Generated Successfully",
-          description: `${projectResult.projectContext.projectName} has been generated.`,
+          description: `${result.projectContext.projectName} has been generated.`,
         });
         
         // Save this conversation to chat history
         saveToHistory(content, formattedResponse);
 
         // Send first step guidance if available
-        if (projectResult.projectContext.nextSteps && projectResult.projectContext.nextSteps.length > 0) {
+        if (result.projectContext.nextSteps && result.projectContext.nextSteps.length > 0) {
           setTimeout(() => {
             const guidance = `## Next Steps\n\nHere are some suggestions to help you get started:\n\n${
-              projectResult.projectContext.nextSteps.map((step: string, i: number) => `${i+1}. ${step}`).join('\n\n')
+              result.projectContext.nextSteps.map((step: string, i: number) => `${i+1}. ${step}`).join('\n\n')
             }\n\nLet me know if you need help with any of these steps!`;
             
             const guidanceMessage: Message = {
@@ -545,7 +530,7 @@ You can explore the code structure and files in the panel above. This is a start
               role: "assistant",
               content: guidance,
               metadata: {
-                projectId: projectResult.projectId,
+                projectId: result.projectId,
                 isGuidance: true
               },
               timestamp: new Date()
@@ -786,21 +771,17 @@ If you were trying to generate an app, this might be due to limits with our AI m
               ) : (
                 <ChatWindow 
                   messages={messages} 
-                  isLoading={loading}
-                  projectId={currentProjectId} 
+                  isLoading={loading} 
                 />
               )}
               <div ref={messagesEndRef} />
               
               {chatLoadingError && (
                 <div className="px-4 py-3 mx-auto my-4 max-w-3xl bg-red-50 border border-red-200 rounded-lg">
-                  <div className="flex items-center">
-                    <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-                    <p className="text-sm text-red-700">
-                      <strong>Error loading chat:</strong> {chatLoadingError}
-                    </p>
-                  </div>
-                  <p className="text-xs text-red-600 mt-1 ml-7">
+                  <p className="text-sm text-red-700">
+                    <strong>Error loading chat:</strong> {chatLoadingError}
+                  </p>
+                  <p className="text-xs text-red-600 mt-1">
                     You'll be redirected to the home page.
                   </p>
                 </div>
@@ -808,14 +789,11 @@ If you were trying to generate an app, this might be due to limits with our AI m
               
               {generationError && (
                 <div className="px-4 py-3 mx-auto my-4 max-w-3xl bg-red-50 border border-red-200 rounded-lg">
-                  <div className="flex items-center">
-                    <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-                    <p className="text-sm text-red-700">
-                      <strong>Error generating app:</strong> {generationError}
-                    </p>
-                  </div>
-                  <p className="text-xs text-red-600 mt-1 ml-7">
-                    Try using a simpler prompt or breaking down your request into smaller parts.
+                  <p className="text-sm text-red-700">
+                    <strong>Error generating app:</strong> {generationError}
+                  </p>
+                  <p className="text-xs text-red-600 mt-1">
+                    Try refreshing the page and using a simpler prompt.
                   </p>
                 </div>
               )}

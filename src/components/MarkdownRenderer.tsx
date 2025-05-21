@@ -49,10 +49,13 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
   // Effect to extract app data and open artifact viewer if app code is detected
   useEffect(() => {
     if (message?.role === "assistant" && message.metadata?.projectId) {
-      // Check if we have appData in the metadata
-      if (message.metadata.appData) {
+      // Check for app generation pattern in content (looking for JSON)
+      const appDataMatch = content.match(/(\{[\s\S]*"projectId"\s*:\s*"[^"]*"[\s\S]*\})/);
+      
+      if (appDataMatch) {
         try {
-          const appData = message.metadata.appData;
+          const appDataString = appDataMatch[1];
+          const appData = JSON.parse(appDataString);
           
           // If we have files, open the artifact viewer
           if (appData.files && Array.isArray(appData.files)) {

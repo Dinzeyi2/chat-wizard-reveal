@@ -1,76 +1,379 @@
 
+/* Artifact System Styles */
 .artifact-system {
   position: relative;
   width: 100%;
-  height: 100vh;
+  height: 100%;
+  display: flex;
 }
 
 .chat-area {
   height: 100%;
-  transition: margin-right 0.3s ease;
+  overflow-y: auto;
+  transition: width 0.3s ease;
+  flex: 1;
 }
 
 .chat-area.artifact-open {
-  margin-right: 50%;
-  border-right: 1px solid #ccc;
+  width: 40% !important;
+  max-width: 40%;
+  flex: 0 0 40%;
 }
 
 .artifact-expanded-view {
   position: fixed;
   top: 0;
   right: 0;
-  width: 50%;
+  width: 60%;
   height: 100vh;
-  background: #18181b;
-  color: white;
-  z-index: 1000;
+  background-color: #18181b;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  z-index: 100;
 }
 
 .artifact-viewer {
+  display: flex;
+  flex-direction: column;
   height: 100%;
 }
 
 .artifact-viewer-header {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #27272a;
-  background-color: #18181b;
+  background-color: #0f0f0f !important;
+  border-bottom: 1px solid #2a2a2a;
+  padding: 0.5rem !important;
+}
+
+.file-viewer-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .file-viewer-tab {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.875rem;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
   color: #a1a1aa;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
 .file-viewer-tab.active {
-  color: white;
-  border-bottom: 2px solid #3b82f6;
+  background-color: #27272a;
+  color: #ffffff;
 }
 
-.artifact-viewer-content {
-  flex: 1;
-  overflow: hidden;
+.file-viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .file-tree {
-  padding: 0.5rem 0;
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 
-.preview-mode .file-explorer {
+.code-container {
+  min-height: 300px;
+}
+
+.preview-container {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background-color: #18181b;
+}
+
+/* File tree styling */
+.file-tree li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .chat-area.artifact-open {
+    width: 0 !important;
+    max-width: 0;
+    flex: 0;
+  }
+  
+  .artifact-expanded-view {
+    width: 100%;
+  }
+}
+
+/* Preview styles */
+.artifact-preview-container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #18181b;
+}
+
+.preview-loading-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  background-color: #18181b;
+}
+
+/* Full preview mode */
+.artifact-viewer-content.preview-mode .file-explorer {
   display: none;
 }
 
-.preview-mode .file-content {
+.artifact-viewer-content.preview-mode .file-content {
   width: 100%;
-  border-left: none;
 }
 
-.monaco-editor {
-  width: 100% !important;
+.artifact-preview-container.full-screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Context menu custom styling - Added */
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
+
+.user-profile-context-menu [data-radix-popper-content-wrapper] {
+  color: white !important;
+}
+
+/* Apply styles to both context menu and dropdown menu items */
+[data-radix-context-menu] [role="menuitem"]:focus,
+[data-radix-dropdown-menu] [role="menuitem"]:focus {
+  background-color: #2A2A2A !important;
+  color: white !important;
+  outline: none;
+}
+
+.dark [data-radix-context-menu] [role="menuitem"]:focus,
+.dark [data-radix-dropdown-menu] [role="menuitem"]:focus {
+  background-color: #2A2A2A !important;
+  color: white !important;
+}
+
+/* Style content for both menu types */
+[data-radix-context-menu] [data-radix-menu-content],
+[data-radix-dropdown-menu] [data-radix-menu-content] {
+  background-color: #1A1F2C !important;
+  border-color: #2A2A2A !important;
+}
+
+/* Enhanced Sandpack custom styles */
+.sp-wrapper {
   height: 100% !important;
+  background-color: #18181b !important;
+  border: none !important;
+}
+
+.sp-stack {
+  height: 100% !important;
+  border: none !important;
+}
+
+.sp-preview-container {
+  background-color: white !important;
+  height: 100% !important;
+  overflow: auto !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.sp-preview-iframe {
+  height: 100% !important;
+  width: 100% !important;
+  border: none !important;
+  background-color: white !important;
+  flex: 1 !important;
+  min-height: 400px !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.sp-console {
+  height: 100% !important;
+  background-color: #1e1e1e !important;
+  color: #d4d4d4 !important;
+  border-radius: 0 !important;
+  overflow: auto !important;
+}
+
+.sp-console-item {
+  font-family: monospace !important;
+  font-size: 13px !important;
+  padding: 6px 12px !important;
+  border-bottom: 1px solid #2a2a2a !important;
+}
+
+.sp-console-error {
+  background-color: rgba(255, 99, 71, 0.1) !important;
+  color: tomato !important;
+}
+
+.sp-layout {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  border: none !important;
+}
+
+.sp-tabs {
+  display: flex !important;
+  background-color: #1e1e1e !important;
+  border-bottom: 1px solid #333 !important;
+}
+
+.sp-tab-button {
+  padding: 8px 16px !important;
+  color: #ccc !important;
+  border: none !important;
+  background: none !important;
+  cursor: pointer !important;
+}
+
+.sp-tab-button.active {
+  color: white !important;
+  border-bottom: 2px solid #4d4dff !important;
+}
+
+/* Fix for Sandpack preview height */
+.artifact-preview-container .sp-wrapper,
+.artifact-preview-container .sp-layout,
+.artifact-preview-container .sp-stack {
+  height: 100% !important;
+  min-height: 500px !important;
+  border: none !important;
+}
+
+.artifact-preview-container [data-radix-tabs-content] {
+  height: calc(100% - 40px) !important;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Make sure Sandpack loading indicator is visible */
+.sp-loading {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+  color: white !important;
+}
+
+/* Critical fix for the iframe visibility */
+iframe.sp-preview-iframe {
+  background-color: #ffffff !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: static !important;
+  transform: none !important;
+  height: 100% !important;
+  width: 100% !important;
+}
+
+/* Additional fixes for preview display issues */
+.sandpack {
+  --sp-layout-height: 100% !important;
+  --sp-border-radius: 0 !important;
+  height: 100% !important;
+}
+
+.sp-preview {
+  height: 100% !important;
+  min-height: 400px !important;
+  overflow: auto !important;
+}
+
+/* Special class to force iframe visibility */
+.sp-preview-force {
+  height: 100% !important;
+}
+
+.sp-preview-force iframe {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  height: 100% !important;
+}
+
+/* Fix CORS security issues with iframe */
+.sp-preview-container {
+  background-color: white !important;
+}
+
+/* Make sure content is shown */
+.sp-wrapper {
+  background-color: transparent !important;
+}
+
+/* Enhanced hot reloading styles */
+.sp-overlay {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+  color: white !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.sp-overlay-loading {
+  padding: 8px 16px !important;
+  border-radius: 4px !important;
+  background-color: #2a2a2a !important;
+  font-size: 14px !important;
+}
+
+/* Fix for hot module replacement flash */
+.sp-preview-container.refresh-triggered {
+  animation: flash-reload 0.3s;
+}
+
+@keyframes flash-reload {
+  0% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+/* Show indicators for live coding */
+.sp-live-indicator {
+  position: absolute !important;
+  top: 8px !important;
+  right: 8px !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  background-color: #4caf50 !important;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.3) !important;
+  animation: pulse-green 2s infinite !important;
+}
+
+@keyframes pulse-green {
+  0% {
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(76, 175, 80, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+  }
 }
