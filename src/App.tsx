@@ -13,7 +13,6 @@ import Auth from "./pages/Auth";
 import Landing from "./pages/Landing";
 import ChallengeGenerator from "./pages/ChallengeGenerator";
 import ChallengeWorkspace from "./pages/ChallengeWorkspace";
-import CodeAssistantPage from "./pages/CodeAssistantPage";
 import "./components/artifact/ArtifactSystem.css";
 
 const App = () => {
@@ -34,12 +33,13 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <Routes>
-            {/* New code assistant as the default route */}
-            <Route path="/" element={<CodeAssistantPage />} />
+            {/* New landing page as the default route */}
+            <Route path="/" element={<Landing />} />
             
-            {/* Original routes moved to subpaths */}
-            <Route path="/original" element={<Landing />} />
+            {/* Original Index page now at /app route with chat parameter support */}
             <Route path="/app" element={<Index />} />
+            
+            {/* All other existing routes preserved */}
             <Route path="/auth" element={<Auth />} />
             <Route path="/history" element={<ChatHistory />} />
             
@@ -49,7 +49,7 @@ const App = () => {
             <Route path="/callback/github" element={<GitHubCallback />} />
             <Route path="callback/github" element={<GitHubCallback />} />
             
-            {/* CodeCraft Challenge routes */}
+            {/* New CodeCraft Challenge routes */}
             <Route path="/challenges" element={<ChallengeGenerator />} />
             <Route path="/challenge/:projectId" element={<ChallengeWorkspace />} />
             <Route path="/challenge/:projectId/:challengeId" element={<ChallengeWorkspace />} />

@@ -15,17 +15,6 @@ interface GeminiCodeResponse {
   status: 'success' | 'error';
 }
 
-interface ProjectContext {
-  projectName: string;
-  description: string;
-  specification: string;
-  components?: Array<{name: string, description: string}>;
-  dependencies?: string[];
-  architecture?: string;
-  challenges?: string[];
-  nextSteps?: string[];
-}
-
 /**
  * Service for interacting with Gemini AI for code analysis and assistance
  */
@@ -173,6 +162,32 @@ export class GeminiAIService {
   }
   
   /**
+   * Process a code analysis request and provide feedback
+   */
+  async processCodeAnalysisRequest(code: string, filename: string, projectId: string): Promise<void> {
+    try {
+      const analysisResult = await this.analyzeCode({
+        code,
+        filename,
+        projectId
+      });
+      
+      if (analysisResult.status === 'success') {
+        // Send feedback to console for the system to pick up
+        console.log("AI_CODE_ANALYSIS_RESULT:", JSON.stringify({
+          projectId,
+          filename,
+          feedback: analysisResult.feedback,
+          suggestedChanges: analysisResult.suggestedChanges,
+          timestamp: new Date().toISOString()
+        }));
+      }
+    } catch (error) {
+      console.error("Error in code analysis processing:", error);
+    }
+  }
+  
+  /**
    * Initialize a new project with Gemini AI
    */
   async initializeProject(specification: string, projectName: string): Promise<any> {
@@ -290,7 +305,7 @@ export class GeminiAIService {
   /**
    * Analyze existing code and respond to user query
    */
-  async analyzeAndRespond(message: string, code: string, projectContext: ProjectContext): Promise<any> {
+  async analyzeAndRespond(message: string, code: string, projectContext: any): Promise<any> {
     try {
       if (!this.apiKey || !this.genAI) {
         throw new Error("Gemini API key is not set");
@@ -398,32 +413,6 @@ export class GeminiAIService {
       });
       
       throw error;
-    }
-  }
-  
-  /**
-   * Process a code analysis request and provide feedback
-   */
-  async processCodeAnalysisRequest(code: string, filename: string, projectId: string): Promise<void> {
-    try {
-      const analysisResult = await this.analyzeCode({
-        code,
-        filename,
-        projectId
-      });
-      
-      if (analysisResult.status === 'success') {
-        // Send feedback to console for the system to pick up
-        console.log("AI_CODE_ANALYSIS_RESULT:", JSON.stringify({
-          projectId,
-          filename,
-          feedback: analysisResult.feedback,
-          suggestedChanges: analysisResult.suggestedChanges,
-          timestamp: new Date().toISOString()
-        }));
-      }
-    } catch (error) {
-      console.error("Error in code analysis processing:", error);
     }
   }
 }
