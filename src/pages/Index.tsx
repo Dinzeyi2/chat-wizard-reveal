@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
-import { ArtifactProvider, ArtifactLayout, useArtifact } from "@/components/artifact/ArtifactSystem";
+import { ArtifactProvider, ArtifactLayout } from "@/components/artifact/ArtifactSystem";
 import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
 import { useLocation, useNavigate } from "react-router-dom";
 import { UserProfileMenu } from "@/components/UserProfileMenu";
@@ -18,8 +18,8 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { TabsContent } from "@/components/ui/tabs"
+} from "@/components/ui/card";
+import { TabsContent } from "@/components/ui/tabs";
 
 // Interface for chat history items
 interface ChatHistoryItem {
@@ -51,14 +51,13 @@ const Index = () => {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [firstStepGuidanceSent, setFirstStepGuidanceSent] = useState<boolean>(false);
-  const [hasGeneratedApp, setHasGeneratedApp] = useState<boolean>(false); // Track if an app has been generated
+  const [hasGeneratedApp, setHasGeneratedApp] = useState<boolean>(false); 
   const [chatLoadingError, setChatLoadingError] = useState<string | null>(null);
-  const [currentCode, setCurrentCode] = useState<string>(''); // Added for code tracking
+  const [currentCode, setCurrentCode] = useState<string>(''); 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
-  const { openArtifact } = useArtifact();
   const [projectContext, setProjectContext] = useState<ProjectContext | null>(null);
 
   // Check for initial prompt from landing page
@@ -487,27 +486,17 @@ You can explore the code structure and files in the panel above. This is a start
           role: "assistant",
           content: formattedResponse,
           metadata: {
-            projectId: result.projectId
+            projectId: result.projectId,
+            appData: result.appData // Store app data in the metadata for ArtifactHandler to use
           },
           timestamp: new Date()
         };
         
         setMessages(prev => [...prev, aiMessage]);
         
-        // Open code in artifact viewer
-        if (result.appData) {
-          openArtifact({
-            id: result.projectId,
-            title: result.projectContext.projectName || "Generated App",
-            description: result.projectContext.description || "Generated application code",
-            files: result.appData.files.map((file: any) => ({
-              id: `file-${file.path.replace(/\//g, '-')}`,
-              name: file.path.split('/').pop(),
-              path: file.path,
-              language: file.path.split('.').pop() || 'js',
-              content: file.content
-            }))
-          });
+        // Store project context
+        if (result.projectContext) {
+          setProjectContext(result.projectContext);
         }
         
         toast({
@@ -771,7 +760,8 @@ If you were trying to generate an app, this might be due to limits with our AI m
               ) : (
                 <ChatWindow 
                   messages={messages} 
-                  isLoading={loading} 
+                  isLoading={loading}
+                  projectId={currentProjectId} 
                 />
               )}
               <div ref={messagesEndRef} />
