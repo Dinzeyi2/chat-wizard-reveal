@@ -21,8 +21,13 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
   const [cleanedContent, setCleanedContent] = useState(content);
   
   // Get artifact system context to open code viewer
-  // Wrap in try/catch to prevent errors when context is not available
-  const artifactContext = React.useContext(useArtifact['context'] || React.createContext(null));
+  // Use try/catch pattern to handle when the context is not available
+  let artifactContext;
+  try {
+    artifactContext = React.useContext(useArtifact.context || React.createContext(null));
+  } catch (error) {
+    artifactContext = null;
+  }
   
   // Effect to check if this message indicates app generation
   useEffect(() => {
@@ -50,7 +55,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
       // Check for app generation pattern in content (looking for JSON)
       const appDataMatch = content.match(/(\{[\s\S]*"projectId"\s*:\s*"[^"]*"[\s\S]*\})/);
       
-      if (appDataMatch) {
+      if (appDataMatch && artifactContext && typeof artifactContext.openArtifact === 'function') {
         try {
           const appDataString = appDataMatch[1];
           const appData = JSON.parse(appDataString);
@@ -75,7 +80,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
             };
             
             // Open the artifact viewer if context is available
-            if (artifactContext && artifactContext.openArtifact) {
+            if (artifactContext.openArtifact) {
               artifactContext.openArtifact(artifact);
             }
           }

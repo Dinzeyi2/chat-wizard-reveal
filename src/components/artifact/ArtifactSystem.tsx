@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
-import { FileCode, X, ExternalLink, ChevronRight, Download, File, Code } from 'lucide-react';
+import { FileCode, X, ExternalLink, ChevronRight, Download, File, Code, Edit, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import './ArtifactSystem.css';
@@ -42,6 +41,9 @@ export const useArtifact = () => {
   }
   return context;
 };
+
+// Allow access to the context directly for components that need to check if it exists
+useArtifact.context = ArtifactContext;
 
 // Provider Component
 export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
