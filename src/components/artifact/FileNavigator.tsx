@@ -1,41 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, File, Folder, Edit, Save, TextCursor } from 'lucide-react';
+import { ChevronRight, File, Folder } from 'lucide-react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
-import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
-import { toast } from '@/hooks/use-toast';
 
 interface FileNavigatorProps {
   files: Array<{id: string; name: string; path: string; language: string; content: string}>;
   activeFileId: string | null;
   onFileSelect: (fileId: string) => void;
-  onFileContentChange?: (fileId: string, newContent: string) => void;
-  readOnly?: boolean;
 }
 
 const FileNavigator: React.FC<FileNavigatorProps> = ({ 
   files, 
   activeFileId, 
-  onFileSelect,
-  onFileContentChange,
-  readOnly = false
+  onFileSelect 
 }) => {
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
-  const [isEditing, setIsEditing] = useState<boolean>(false);
-  const [editedContent, setEditedContent] = useState<string>('');
-  
-  // Get the current file
-  const currentFile = files.find(file => file.id === activeFileId);
-
-  useEffect(() => {
-    // Reset edited content when active file changes
-    if (currentFile) {
-      setEditedContent(currentFile.content);
-      setIsEditing(false);
-    }
-  }, [activeFileId, currentFile]);
 
   useEffect(() => {
     // Auto-expand all folders by default
@@ -104,26 +84,6 @@ const FileNavigator: React.FC<FileNavigatorProps> = ({
     };
     return languageMap[extension] || 'plaintext';
   };
-
-  const toggleEditMode = () => {
-    if (!currentFile || readOnly) return;
-    setIsEditing(!isEditing);
-  };
-
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setEditedContent(e.target.value);
-  };
-
-  const handleSaveContent = () => {
-    if (!currentFile || readOnly) return;
-    if (onFileContentChange && activeFileId) {
-      onFileContentChange(activeFileId, editedContent);
-      toast({
-        title: "File saved",
-        description: `Changes to ${currentFile.path} have been saved.`
-      });
-    }
-  };
   
   const { tree, rootFiles } = getFileTree();
   const allFolders = Object.keys(tree).sort();
@@ -189,70 +149,28 @@ const FileNavigator: React.FC<FileNavigatorProps> = ({
   
   return (
     <div className="file-explorer w-full h-full bg-black overflow-y-auto">
-      <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 px-3 py-2 flex justify-between items-center">
+      <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 px-3 py-2">
         <h4 className="text-sm font-medium text-gray-400">Files</h4>
-        {currentFile && !readOnly && (
-          <div className="flex items-center space-x-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-7 px-2 text-xs"
-              onClick={toggleEditMode}
-            >
-              {isEditing ? <TextCursor size={14} /> : <Edit size={14} />}
-              {isEditing ? 'View' : 'Edit'}
-            </Button>
-            {isEditing && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-7 px-2 text-xs" 
-                onClick={handleSaveContent}
-              >
-                <Save size={14} />
-                Save
-              </Button>
-            )}
-          </div>
-        )}
       </div>
-      {!isEditing ? (
-        <ul className="file-tree">
-          {topLevelFolders.map(folder => renderFolder(folder))}
-          
-          {rootFiles.map(file => (
-            <li 
-              key={file.id}
-              className={`py-1 pl-3 cursor-pointer text-sm hover:bg-zinc-800 ${activeFileId === file.id ? 'bg-zinc-800 text-green-400' : 'text-gray-300'}`}
-              onClick={(e) => handleFileClick(file.id, e)}
-            >
-              <div className="flex items-center px-2 py-1">
-                <File className="h-4 w-4 mr-2 text-gray-500" />
-                {file.path}
-                {activeFileId === file.id && 
-                  <span className="text-green-400 ml-2 text-xs">●</span>
-                }
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <div className="p-3">
-          {currentFile && (
-            <div className="flex flex-col h-full">
-              <div className="mb-2 text-sm font-mono text-gray-400">
-                {currentFile.path}
-              </div>
-              <Textarea
-                value={editedContent}
-                onChange={handleContentChange}
-                className="flex-1 h-[calc(100vh-120px)] font-mono text-sm resize-none bg-zinc-900 text-gray-200 border-zinc-700"
-                spellCheck="false"
-              />
+      <ul className="file-tree">
+        {topLevelFolders.map(folder => renderFolder(folder))}
+        
+        {rootFiles.map(file => (
+          <li 
+            key={file.id}
+            className={`py-1 pl-3 cursor-pointer text-sm hover:bg-zinc-800 ${activeFileId === file.id ? 'bg-zinc-800 text-green-400' : 'text-gray-300'}`}
+            onClick={(e) => handleFileClick(file.id, e)}
+          >
+            <div className="flex items-center px-2 py-1">
+              <File className="h-4 w-4 mr-2 text-gray-500" />
+              {file.path}
+              {activeFileId === file.id && 
+                <span className="text-green-400 ml-2 text-xs">●</span>
+              }
             </div>
-          )}
-        </div>
-      )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };

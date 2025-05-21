@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
-import { ArtifactLayout } from "@/components/artifact/ArtifactSystem";
+import { ArtifactProvider, ArtifactLayout } from "@/components/artifact/ArtifactSystem";
 import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
 import { useLocation, useNavigate } from "react-router-dom";
 import { UserProfileMenu } from "@/components/UserProfileMenu";
@@ -643,87 +643,89 @@ If you were trying to generate an app, this might be due to limits with our AI m
   }, [messages]);
 
   return (
-    <div className="h-screen flex overflow-hidden bg-white">
-      <ArtifactLayout>
-        <div className="flex-1 flex flex-col h-full overflow-hidden">
-          <div className="h-14 border-b flex items-center px-4 justify-between">
-            <div className="flex items-center">
-              <HamburgerMenuButton />
+    <ArtifactProvider>
+      <div className="h-screen flex overflow-hidden bg-white">
+        <ArtifactLayout>
+          <div className="flex-1 flex flex-col h-full overflow-hidden">
+            <div className="h-14 border-b flex items-center px-4 justify-between">
+              <div className="flex items-center">
+                <HamburgerMenuButton />
+              </div>
+              <div className="flex items-center text-sm text-gray-600">
+                <span className="mr-2">Saved memory full</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                <div className="ml-5 px-3 py-1 rounded-full bg-gray-100 flex items-center">
+                  <span>Temporary</span>
+                </div>
+                <UserProfileMenu />
+              </div>
             </div>
-            <div className="flex items-center text-sm text-gray-600">
-              <span className="mr-2">Saved memory full</span>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <div className="ml-5 px-3 py-1 rounded-full bg-gray-100 flex items-center">
-                <span>Temporary</span>
-              </div>
-              <UserProfileMenu />
+            
+            <div className="flex-1 overflow-y-auto">
+              {messages.length === 0 && !loading && !chatLoadingError ? (
+                <WelcomeScreen onSendMessage={handleSendMessage} />
+              ) : (
+                <ChatWindow 
+                  messages={messages} 
+                  isLoading={loading} 
+                />
+              )}
+              <div ref={messagesEndRef} />
+              
+              {chatLoadingError && (
+                <div className="px-4 py-3 mx-auto my-4 max-w-3xl bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700">
+                    <strong>Error loading chat:</strong> {chatLoadingError}
+                  </p>
+                  <p className="text-xs text-red-600 mt-1">
+                    You'll be redirected to the home page.
+                  </p>
+                </div>
+              )}
+              
+              {generationError && (
+                <div className="px-4 py-3 mx-auto my-4 max-w-3xl bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700">
+                    <strong>Error generating app:</strong> {generationError}
+                  </p>
+                  <p className="text-xs text-red-600 mt-1">
+                    Try refreshing the page and using a simpler prompt.
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-4 pb-8">
+              <InputArea onSendMessage={handleSendMessage} loading={loading} />
             </div>
           </div>
-          
-          <div className="flex-1 overflow-y-auto">
-            {messages.length === 0 && !loading && !chatLoadingError ? (
-              <WelcomeScreen onSendMessage={handleSendMessage} />
-            ) : (
-              <ChatWindow 
-                messages={messages} 
-                isLoading={loading} 
-              />
-            )}
-            <div ref={messagesEndRef} />
-            
-            {chatLoadingError && (
-              <div className="px-4 py-3 mx-auto my-4 max-w-3xl bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-700">
-                  <strong>Error loading chat:</strong> {chatLoadingError}
-                </p>
-                <p className="text-xs text-red-600 mt-1">
-                  You'll be redirected to the home page.
-                </p>
-              </div>
-            )}
-            
-            {generationError && (
-              <div className="px-4 py-3 mx-auto my-4 max-w-3xl bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-700">
-                  <strong>Error generating app:</strong> {generationError}
-                </p>
-                <p className="text-xs text-red-600 mt-1">
-                  Try refreshing the page and using a simpler prompt.
-                </p>
-              </div>
-            )}
-          </div>
-          
-          <div className="p-4 pb-8">
-            <InputArea onSendMessage={handleSendMessage} loading={loading} />
-          </div>
-        </div>
-      </ArtifactLayout>
+        </ArtifactLayout>
 
-      <Dialog open={generationDialog} onOpenChange={setGenerationDialog}>
-        <DialogContent className="sm:max-w-md" onInteractOutside={e => {
-          if (isGeneratingApp) {
-            e.preventDefault();
-          }
-        }}>
-          <DialogHeader>
-            <DialogTitle>Generating Your Application</DialogTitle>
-            <DialogDescription>
-              Please wait while we generate your application. This may take a minute or two.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col items-center justify-center py-6">
-            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-            <div className="text-center">
-              <p className="font-medium">Building app architecture...</p>
-              <p className="text-sm text-muted-foreground mt-1">This may take up to 2 minutes.</p>
+        <Dialog open={generationDialog} onOpenChange={setGenerationDialog}>
+          <DialogContent className="sm:max-w-md" onInteractOutside={e => {
+            if (isGeneratingApp) {
+              e.preventDefault();
+            }
+          }}>
+            <DialogHeader>
+              <DialogTitle>Generating Your Application</DialogTitle>
+              <DialogDescription>
+                Please wait while we generate your application. This may take a minute or two.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col items-center justify-center py-6">
+              <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+              <div className="text-center">
+                <p className="font-medium">Building app architecture...</p>
+                <p className="text-sm text-muted-foreground mt-1">This may take up to 2 minutes.</p>
+              </div>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </ArtifactProvider>
   );
 };
 

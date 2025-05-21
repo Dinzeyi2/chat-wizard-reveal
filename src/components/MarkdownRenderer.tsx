@@ -19,15 +19,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
   // Add state to track if an app has been generated in this message
   const [hasGeneratedApp, setHasGeneratedApp] = useState(false);
   const [cleanedContent, setCleanedContent] = useState(content);
-  
   // Get artifact system context to open code viewer
-  // Use try/catch pattern to handle when the context is not available
-  let artifactContext;
-  try {
-    artifactContext = React.useContext(useArtifact.context || React.createContext(null));
-  } catch (error) {
-    artifactContext = null;
-  }
+  const { openArtifact } = useArtifact();
   
   // Effect to check if this message indicates app generation
   useEffect(() => {
@@ -51,11 +44,11 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
 
   // Effect to extract app data and open artifact viewer if app code is detected
   useEffect(() => {
-    if (message?.role === "assistant" && message.metadata?.projectId && artifactContext) {
+    if (message?.role === "assistant" && message.metadata?.projectId) {
       // Check for app generation pattern in content (looking for JSON)
       const appDataMatch = content.match(/(\{[\s\S]*"projectId"\s*:\s*"[^"]*"[\s\S]*\})/);
       
-      if (appDataMatch && artifactContext && typeof artifactContext.openArtifact === 'function') {
+      if (appDataMatch) {
         try {
           const appDataString = appDataMatch[1];
           const appData = JSON.parse(appDataString);
@@ -79,17 +72,15 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
               files: artifactFiles
             };
             
-            // Open the artifact viewer if context is available
-            if (artifactContext.openArtifact) {
-              artifactContext.openArtifact(artifact);
-            }
+            // Open the artifact viewer
+            openArtifact(artifact);
           }
         } catch (error) {
           console.error("Failed to parse app data from message:", error);
         }
       }
     }
-  }, [message, content, artifactContext]);
+  }, [message, content, openArtifact]);
 
   // Process code blocks with syntax highlighting
   const processContent = (markdown: string) => {
