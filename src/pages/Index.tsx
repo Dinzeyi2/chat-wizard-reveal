@@ -12,6 +12,14 @@ import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
 import { useLocation, useNavigate } from "react-router-dom";
 import { UserProfileMenu } from "@/components/UserProfileMenu";
 import { geminiAIService } from "@/utils/GeminiAIService";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { TabsContent } from "@/components/ui/tabs"
 
 // Interface for chat history items
 interface ChatHistoryItem {
@@ -40,6 +48,7 @@ const Index = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { openArtifact } = useArtifact();
+  const [projectContext, setProjectContext] = useState<any>(null);
 
   // Check for initial prompt from landing page
   useEffect(() => {
@@ -164,7 +173,7 @@ const Index = () => {
           if (projectMsg && projectMsg.metadata?.projectId) {
             setCurrentProjectId(projectMsg.metadata.projectId);
             setHasGeneratedApp(true);
-            
+          
             // Try to load the code from the project
             try {
               const { data: projects } = await supabase
@@ -176,7 +185,7 @@ const Index = () => {
                 
               if (projects && projects.length > 0 && projects[0].app_data) {
                 // Extract code from the app data
-                const appData = projects[0].app_data;
+                const appData = projects[0].app_data as { files?: Array<{path: string, content: string}> };
                 if (appData.files && appData.files.length > 0) {
                   setCurrentCode(appData.files[0].content);
                 }
