@@ -5,6 +5,7 @@ class GeminiAIService {
   private apiKey: string | null = null;
   private maxRetries = 3;
   private baseBackoffMs = 2000;
+  private fallbackEnabled = true;
 
   constructor() {
     console.log("GeminiAIService initialized");
@@ -44,12 +45,14 @@ class GeminiAIService {
       }
     }
     
-    // Call the generate-app function with retries
+    // Call the generate-app function with enhanced retry logic
     let attempt = 0;
     let lastError;
     
     while (attempt < this.maxRetries) {
       try {
+        console.log(`Project generation attempt ${attempt + 1}...`);
+        
         const { data, error } = await supabase.functions.invoke('generate-app', {
           body: { 
             prompt: prompt,
@@ -57,8 +60,14 @@ class GeminiAIService {
           }
         });
         
-        if (error) throw error;
-        if (!data) throw new Error("Empty response from generate-app function");
+        if (error) {
+          console.error(`Error from generate-app function:`, error);
+          throw new Error(`Error from generate-app function: ${error.message || "Unknown error"}`);
+        }
+        
+        if (!data) {
+          throw new Error("Empty response from generate-app function");
+        }
         
         return {
           projectId: data.projectId,
@@ -77,10 +86,13 @@ class GeminiAIService {
         lastError = error;
         
         // Check if this is a rate limit error or temporary failure
-        const isTemporaryError = error.message && 
-          (error.message.includes('429') || 
-           error.message.includes('timeout') ||
-           error.message.includes('non-2xx'));
+        const isTemporaryError = error.message && (
+          error.message.includes('429') || 
+          error.message.includes('timeout') ||
+          error.message.includes('non-2xx') ||
+          error.message.includes('quota exceeds') ||
+          error.message.includes('unavailable')
+        );
         
         if (isTemporaryError && attempt < this.maxRetries - 1) {
           // Wait using exponential backoff before retry
@@ -90,8 +102,16 @@ class GeminiAIService {
           attempt++;
         } else {
           // Permanent error or out of retries
-          if (error.message && error.message.includes('429')) {
-            throw new Error("AI service is temporarily unavailable due to high demand. Please try again in a few minutes with a simpler prompt.");
+          if (this.fallbackEnabled && error.message && (error.message.includes('429') || error.message.includes('quota'))) {
+            console.log("Trying to use fallback AI service...");
+            try {
+              // Try to fallback to OpenAI instead
+              return await this.fallbackToOpenAI(prompt, projectName);
+            } catch (fallbackError) {
+              console.error("Fallback also failed:", fallbackError);
+              // Continue with normal error flow
+              throw new Error("AI service is temporarily unavailable due to high demand. Please try again in a few minutes with a simpler prompt.");
+            }
           } else {
             throw new Error("Failed to generate app: " + (error.message || "Unknown error"));
           }
@@ -100,11 +120,30 @@ class GeminiAIService {
     }
     
     // If we exhausted all retries, throw the last error with detailed message
-    if (lastError && lastError.message && lastError.message.includes('429')) {
+    if (lastError && lastError.message && (lastError.message.includes('429') || lastError.message.includes('quota'))) {
       throw new Error("AI service is temporarily unavailable due to rate limits. Please try again in a few minutes with a simpler prompt.");
     }
     
     throw lastError || new Error("Failed to initialize project after multiple attempts");
+  }
+  
+  /**
+   * Try to use OpenAI as a fallback if available
+   */
+  private async fallbackToOpenAI(prompt: string, projectName: string) {
+    // Try to get OpenAI key from environment
+    const { data: openAIData, error: openAIError } = await supabase.functions.invoke('get-env', {
+      body: { key: 'OPENAI_API_KEY' }
+    });
+    
+    if (openAIError || !openAIData?.value) {
+      throw new Error("Fallback AI service not available");
+    }
+    
+    // We won't implement the full OpenAI fallback here, but in a real app
+    // you would implement an alternative generation path using OpenAI
+    
+    throw new Error("Fallback service not implemented yet");
   }
 }
 
