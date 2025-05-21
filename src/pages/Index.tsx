@@ -30,6 +30,17 @@ interface ChatHistoryItem {
   messages?: Message[]; // Add messages array to store full conversation
 }
 
+// Define interface for project context
+interface ProjectContext {
+  projectName?: string;
+  description?: string;
+  specification?: string;
+  components?: Array<{name: string, description: string}>;
+  dependencies?: string[];
+  nextSteps?: string[];
+  [key: string]: any; // Allow for other properties
+}
+
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
@@ -48,7 +59,7 @@ const Index = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { openArtifact } = useArtifact();
-  const [projectContext, setProjectContext] = useState<any>(null);
+  const [projectContext, setProjectContext] = useState<ProjectContext | null>(null);
 
   // Check for initial prompt from landing page
   useEffect(() => {
