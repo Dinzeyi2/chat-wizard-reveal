@@ -470,7 +470,7 @@ You can explore the file structure and content in the panel above. This is a sta
             setFirstStepGuidanceSent(true);
           }, 1500);
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('Error calling function:', error);
         setGenerationDialog(false);
         setGenerationError(error.message || "An unexpected error occurred");
@@ -478,7 +478,7 @@ You can explore the file structure and content in the panel above. This is a sta
         toast({
           variant: "destructive",
           title: "Error",
-          description: "App generation temporarily unavailable. Please try a simpler prompt or try again later.",
+          description: error.message || "An unexpected error occurred",
         });
         
         const errorMessage: Message = {
@@ -486,7 +486,7 @@ You can explore the file structure and content in the panel above. This is a sta
           role: "assistant",
           content: `I'm sorry, but I encountered an error while processing your request: ${error.message || 'Please try again later.'}
           
-If you were trying to generate an app, this might be due to temporary service limitations. You can try:
+If you were trying to generate an app, this might be due to limits with our AI model or connectivity issues. You can try:
 1. Using a shorter, more focused prompt (e.g., "Create a simple Twitter clone with basic tweet functionality")
 2. Breaking down your request into smaller parts
 3. Trying again in a few minutes`,

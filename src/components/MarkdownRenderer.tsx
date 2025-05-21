@@ -5,9 +5,6 @@ import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { useArtifact } from "./artifact/ArtifactSystem";
 
-// Install type definitions for marked
-<lov-add-dependency>@types/marked@^6.0.0</lov-add-dependency>
-
 // Ensure marked uses synchronous mode for type safety
 marked.setOptions({
   async: false
@@ -23,8 +20,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
   const [hasGeneratedApp, setHasGeneratedApp] = useState(false);
   const [cleanedContent, setCleanedContent] = useState(content);
   // Get artifact system context to open code viewer
-  const artifactContext = useArtifact();
-  const openArtifact = artifactContext?.openArtifact;
+  const { openArtifact } = useArtifact();
   
   // Effect to check if this message indicates app generation
   useEffect(() => {
@@ -48,7 +44,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
 
   // Effect to extract app data and open artifact viewer if app code is detected
   useEffect(() => {
-    if (message?.role === "assistant" && message.metadata?.projectId && openArtifact) {
+    if (message?.role === "assistant" && message.metadata?.projectId) {
       // Check for app generation pattern in content (looking for JSON)
       const appDataMatch = content.match(/(\{[\s\S]*"projectId"\s*:\s*"[^"]*"[\s\S]*\})/);
       

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
@@ -6,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import './ArtifactSystem.css';
 import { ArtifactPreview } from './ArtifactPreview';
-import FileNavigator from './FileNavigator';
 
 // Types
 interface ArtifactFile {
@@ -115,7 +115,8 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
 // File Viewer Component
 export const ArtifactViewer: React.FC = () => {
   const { currentArtifact, closeArtifact, isOpen } = useArtifact();
-  const [activeFileId, setActiveFileId] = useState<string | null>(null);
+  const [activeFile, setActiveFile] = useState<string | null>(null);
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<'code' | 'preview'>('code');
 
   useEffect(() => {
@@ -123,14 +124,27 @@ export const ArtifactViewer: React.FC = () => {
     console.log("Current artifact:", currentArtifact?.id);
     
     if (currentArtifact && currentArtifact.files.length > 0) {
-      // Set the first file as active by default
-      setActiveFileId(currentArtifact.files[0].id);
+      setActiveFile(currentArtifact.files[0].id);
       
-      // Force reflow on mount
-      window.dispatchEvent(new Event('resize'));
+      // Auto-expand all folders by default
+      const folders: Record<string, boolean> = {};
+      currentArtifact.files.forEach(file => {
+        const parts = file.path.split('/');
+        if (parts.length > 1) {
+          let currentPath = '';
+          parts.slice(0, -1).forEach(part => {
+            currentPath = currentPath ? `${currentPath}/${part}` : part;
+            folders[currentPath] = true;
+          });
+        }
+      });
+      setExpandedFolders(folders);
     } else {
-      setActiveFileId(null);
+      setActiveFile(null);
     }
+    
+    // Force reflow on mount
+    window.dispatchEvent(new Event('resize'));
     
     // Prevent scroll on body when viewer is open
     document.body.style.overflow = 'hidden';
@@ -156,11 +170,6 @@ export const ArtifactViewer: React.FC = () => {
     }
   };
 
-  const handleFileSelect = (fileId: string) => {
-    console.log("Selected file with ID:", fileId);
-    setActiveFileId(fileId);
-  };
-
   if (!isOpen || !currentArtifact) {
     console.log("ArtifactViewer not rendering because isOpen:", isOpen, "currentArtifact:", !!currentArtifact);
     return null;
@@ -168,9 +177,8 @@ export const ArtifactViewer: React.FC = () => {
 
   console.log("Rendering ArtifactViewer with artifact:", currentArtifact.id);
   console.log("Number of files:", currentArtifact.files.length);
-  console.log("Active file ID:", activeFileId);
 
-  const currentFile = currentArtifact.files.find(f => f.id === activeFileId);
+  const currentFile = currentArtifact.files.find(f => f.id === activeFile);
 
   const getLanguageFromPath = (path: string): string => {
     const extension = path.split('.').pop()?.toLowerCase() || '';
@@ -186,6 +194,118 @@ export const ArtifactViewer: React.FC = () => {
       'md': 'markdown',
     };
     return languageMap[extension] || 'plaintext';
+  };
+
+  const getFileTree = () => {
+    const tree: Record<string, ArtifactFile[]> = {};
+    const rootFiles: ArtifactFile[] = [];
+    
+    currentArtifact.files.forEach(file => {
+      const parts = file.path.split('/');
+      if (parts.length === 1) {
+        rootFiles.push(file);
+      } else {
+        const folderPath = parts.slice(0, -1).join('/');
+        if (!tree[folderPath]) {
+          tree[folderPath] = [];
+        }
+        tree[folderPath].push(file);
+      }
+    });
+    
+    return { tree, rootFiles };
+  };
+  
+  const toggleFolder = (folderPath: string) => {
+    setExpandedFolders(prev => ({
+      ...prev,
+      [folderPath]: !prev[folderPath]
+    }));
+  };
+  
+  const renderFileTree = () => {
+    const { tree, rootFiles } = getFileTree();
+    const allFolders = Object.keys(tree).sort();
+    const topLevelFolders = allFolders.filter(folder => !folder.includes('/'));
+    
+    const renderFolder = (folderPath: string, indent: number = 0) => {
+      const isExpanded = expandedFolders[folderPath] || false;
+      const folderName = folderPath.split('/').pop();
+      
+      const childFolders = allFolders.filter(folder => {
+        const parts = folder.split('/');
+        return folder !== folderPath && folder.startsWith(folderPath) && parts.length === folderPath.split('/').length + 1;
+      });
+      
+      const files = tree[folderPath] || [];
+      
+      return (
+        <React.Fragment key={folderPath}>
+          <li 
+            className="flex items-center py-1 cursor-pointer text-gray-300 hover:bg-zinc-800"
+            style={{ paddingLeft: `${indent * 12 + 12}px` }}
+            onClick={() => toggleFolder(folderPath)}
+          >
+            <span className="mr-1 text-gray-400">
+              {isExpanded ? (
+                <ChevronRight className="h-3.5 w-3.5 transform rotate-90" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
+              )}
+            </span>
+            <span className="font-medium">{folderName}/</span>
+          </li>
+          
+          {isExpanded && (
+            <>
+              {childFolders.map(childFolder => renderFolder(childFolder, indent + 1))}
+              
+              {files.map(file => {
+                const fileName = file.path.split('/').pop();
+                return (
+                  <li 
+                    key={file.id}
+                    className={`py-1 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400' : 'text-gray-300'}`}
+                    style={{ paddingLeft: `${indent * 12 + 28}px` }}
+                    onClick={() => setActiveFile(file.id)}
+                  >
+                    <div className="flex items-center">
+                      <File className="h-4 w-4 mr-2 text-gray-500" />
+                      {fileName}
+                      {activeFile === file.id && 
+                        <span className="text-green-400 ml-2 text-xs">+31</span>
+                      }
+                    </div>
+                  </li>
+                );
+              })}
+            </>
+          )}
+        </React.Fragment>
+      );
+    };
+    
+    return (
+      <ul className="file-tree">
+        {topLevelFolders.map(folder => renderFolder(folder))}
+        
+        {rootFiles.map(file => (
+          <li 
+            key={file.id}
+            className={`py-1 pl-3 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400' : 'text-gray-300'}`}
+            onClick={() => setActiveFile(file.id)}
+          >
+            <div className="flex items-center px-2 py-1">
+              <File className="h-4 w-4 mr-2 text-gray-500" />
+              {file.path}
+              {activeFile === file.id && 
+                <span className="text-green-400 ml-2 text-xs">+31</span>
+              }
+            </div>
+          </li>
+        ))}
+      </ul>
+    );
   };
 
   return (
@@ -246,11 +366,10 @@ export const ArtifactViewer: React.FC = () => {
         <div className={`artifact-viewer-content flex flex-1 overflow-hidden ${activeTab === 'preview' ? 'preview-mode' : ''}`}>
           {activeTab === 'code' && (
             <div className="file-explorer w-1/4 min-w-[220px] border-r border-zinc-800 bg-black overflow-y-auto">
-              <FileNavigator 
-                files={currentArtifact.files}
-                activeFileId={activeFileId}
-                onFileSelect={handleFileSelect}
-              />
+              <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 px-3 py-2">
+                <h4 className="text-sm font-medium text-gray-400">Files</h4>
+              </div>
+              {renderFileTree()}
             </div>
           )}
           

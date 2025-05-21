@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -210,19 +211,69 @@ When you've completed this task, let me know and I'll guide you to the next chal
   return guidance;
 }
 
-// Add a better fallback system for when Gemini API is rate limited
-const generateAppWithFallback = async (prompt, completionLevel) => {
-  console.log("Attempting to generate app with prompt:", prompt.substring(0, 100) + "...");
+serve(async (req) => {
+  console.log("Generate app function called");
   
-  // First try with Gemini API
+  // Handle CORS
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   try {
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!geminiApiKey) {
-      console.log("Gemini API key not configured, skipping to OpenAI");
-      throw new Error("Gemini API key not configured");
+    const requestData = await req.json();
+    console.log("Request data:", JSON.stringify(requestData));
+    
+    const { prompt, completionLevel = 'intermediate' } = requestData as AppGenerationRequest;
+
+    if (!prompt) {
+      console.error("Missing prompt in request");
+      return new Response(JSON.stringify({ error: "Prompt is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // Process and potentially summarize input
+    let processedPrompt;
+    try {
+      processedPrompt = await processInput(prompt);
+      console.log("Processed prompt length (chars):", processedPrompt.length);
+    } catch (error) {
+      console.error("Error processing prompt:", error);
+      return new Response(JSON.stringify({ error: `Error processing prompt: ${error.message}` }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
     
-    console.log("Calling Gemini API to generate application");
+    // Step 1: Get application design from Perplexity
+    let appDesign;
+    try {
+      console.log("Getting app design from Perplexity");
+      appDesign = await getDesignWithPerplexity(processedPrompt);
+      console.log("Successfully received app design from Perplexity:", appDesign.projectName);
+    } catch (error) {
+      console.error("Error getting app design from Perplexity:", error);
+      
+      // Create a default app design
+      appDesign = createDefaultAppDesign(processedPrompt);
+      console.log("Created default app design:", appDesign.projectName);
+    }
+
+    const projectId = crypto.randomUUID();
+
+    // Get the Gemini API key from environment variables
+    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+    if (!geminiApiKey) {
+      console.error("Gemini API key not configured");
+      return new Response(JSON.stringify({ error: "Gemini API key not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+    
+    // Step 2: Generate implementation with challenges using Gemini API
+    console.log("Calling Gemini API to generate application with intentional challenges based on Perplexity design");
     
     const geminiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent", {
       method: "POST",
@@ -234,9 +285,13 @@ const generateAppWithFallback = async (prompt, completionLevel) => {
         contents: [{
           parts: [{
             text: `You are an expert software engineer creating educational coding challenges for a learning platform. 
-            Please create an intentionally incomplete application based on the following prompt: 
+            Please create an intentionally incomplete application based on the following design: 
             
-            "${prompt}"
+            Project Name: ${appDesign.projectName}
+            Description: ${appDesign.description}
+            Features: ${JSON.stringify(appDesign.features || [])}
+            Tech Stack: ${JSON.stringify(appDesign.techStack || ["React", "JavaScript", "CSS"])}
+            Main Components: ${JSON.stringify(appDesign.mainComponents || [])}
             
             The application should have the following characteristics:
             - Completion Level: ${completionLevel}
@@ -247,8 +302,8 @@ const generateAppWithFallback = async (prompt, completionLevel) => {
             
             Format your response as a valid JSON object (without any markdown formatting) with the following structure:
             {
-              "projectName": "Name of the project",
-              "description": "Description of the application",
+              "projectName": "${appDesign.projectName}",
+              "description": "${appDesign.description}",
               "fileStructure": {
                 "src": {
                   "components": {
@@ -279,226 +334,124 @@ const generateAppWithFallback = async (prompt, completionLevel) => {
         }
       })
     });
-    
+
     if (!geminiResponse.ok) {
-      console.log(`Gemini API returned status: ${geminiResponse.status}`);
-      if (geminiResponse.status === 429) {
-        console.log("Gemini API rate limiting hit, trying OpenAI fallback");
-        throw new Error("Rate limit reached");
-      }
-      throw new Error(`Gemini API error: ${geminiResponse.status}`);
-    }
-    
-    const geminiData = await geminiResponse.json();
-    return { source: "gemini", data: geminiData };
-    
-  } catch (error) {
-    console.log("Gemini API failed, trying OpenAI fallback", error.message);
-    
-    // Try OpenAI as fallback
-    try {
-      const openAiKey = Deno.env.get("OPENAI_API_KEY");
-      if (!openAiKey) {
-        console.error("OpenAI API key not configured for fallback");
-        throw new Error("All AI providers unavailable");
-      }
-      
-      console.log("Calling OpenAI API as fallback");
-      
-      const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${openAiKey}`
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini", // Using a smaller, more reliable model
-          messages: [
-            {
-              role: "system",
-              content: `You are an expert software engineer creating educational coding challenges for a learning platform.`
-            },
-            {
-              role: "user", 
-              content: `Create an intentionally incomplete React application based on this prompt: "${prompt}"
-              
-The application should have the following characteristics:
-- Completion Level: ${completionLevel}
-- It should be a React-based application using modern web technologies
-- Include 3-5 specific coding challenges/bugs for the user to fix
-- Each challenge should have clear error patterns that are educational to solve
-- IMPORTANT: Include comments that explain what needs to be fixed as TODOs
-
-Format your response as a valid JSON object (without any markdown formatting) with the following structure:
-{
-  "projectName": "Name of the project",
-  "description": "Description of the application",
-  "fileStructure": {
-    "src": {
-      "components": {
-        "ComponentName.js": "// Component code with intentional issues"
-      },
-      "App.js": "// App code with some issues to fix"
-    }
-  },
-  "challenges": [
-    {
-      "id": "challenge-1",
-      "title": "Fix Component Rendering Issue",
-      "description": "There's a problem with how the component renders. Find and fix it.",
-      "filesPaths": ["src/components/ComponentName.js"]
-    }
-  ],
-  "explanation": "Overall explanation of the challenges and what the user will learn"
-}`
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: 4096
-        })
+      const errorText = await geminiResponse.text();
+      console.error(`Gemini API error (${geminiResponse.status}): ${errorText}`);
+      return new Response(JSON.stringify({ error: `Gemini API error: ${geminiResponse.status}` }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
-      
-      if (!openAiResponse.ok) {
-        throw new Error(`OpenAI API error: ${openAiResponse.status}`);
-      }
-      
-      const openAiData = await openAiResponse.json();
-      return { source: "openai", data: openAiData };
-      
-    } catch (openAiError) {
-      console.error("Both Gemini and OpenAI failed:", openAiError);
-      throw new Error("Application generation services temporarily unavailable. Please try again later.");
     }
-  }
-};
 
-// Function to extract app data from AI response
-const extractAppDataFromAIResponse = (response) => {
-  if (response.source === "gemini") {
-    const textContent = response.data.candidates[0].content.parts[0].text;
-    // Extract JSON using regex pattern
-    const jsonPattern = /\{[\s\S]*?\}(?=\s*$|\s*```)/;
-    const jsonMatches = textContent.match(jsonPattern);
+    const geminiData = await geminiResponse.json();
+    console.log("Gemini response received");
     
-    if (jsonMatches && jsonMatches[0]) {
-      const jsonContent = jsonMatches[0];
-      try {
-        return JSON.parse(jsonContent);
-      } catch (error) {
-        console.error("Error parsing Gemini JSON:", error);
-        throw new Error("Could not parse generated application data");
-      }
-    } else {
-      throw new Error("Could not extract application data from Gemini response");
+    // Extract the generated content
+    if (!geminiData.candidates || geminiData.candidates.length === 0 || !geminiData.candidates[0].content) {
+      console.error("Empty or invalid response from Gemini API");
+      return new Response(JSON.stringify({ error: "Empty or invalid response from Gemini API" }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
-  } else if (response.source === "openai") {
+
+    // Extract and parse content from Gemini response
+    console.log("Processing Gemini response");
+    let appData;
     try {
-      // Extract from OpenAI response
-      const content = response.data.choices[0].message.content;
-      // Try to find JSON in the content
-      const jsonMatch = content.match(/(\{[\s\S]*\})/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+      const textContent = geminiData.candidates[0].content.parts[0].text;
+      
+      // Enhanced JSON extraction to handle more cases
+      let jsonContent = textContent;
+      
+      // Try multiple approaches to extract valid JSON
+      const jsonPattern = /\{[\s\S]*?\}(?=\s*$|\s*```)/;
+      const jsonMatches = textContent.match(jsonPattern);
+      
+      if (jsonMatches && jsonMatches[0]) {
+        // Use the longest match which is likely the full JSON object
+        jsonContent = jsonMatches[0];
+        console.log("Extracted JSON using pattern matching");
       } else {
-        throw new Error("Could not extract JSON from OpenAI response");
+        // Find position of first { and last }
+        const firstBrace = textContent.indexOf('{');
+        let lastBrace = textContent.lastIndexOf('}');
+        
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          jsonContent = textContent.substring(firstBrace, lastBrace + 1);
+          console.log("Extracted JSON using brace positions");
+        }
       }
-    } catch (error) {
-      console.error("Error parsing OpenAI JSON:", error);
-      throw new Error("Could not parse generated application data");
-    }
-  } else {
-    throw new Error("Unknown AI response format");
-  }
-};
-
-serve(async (req) => {
-  console.log("Generate app function called");
-  
-  // Handle CORS
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
-  try {
-    const requestData = await req.json();
-    console.log("Request data:", JSON.stringify(requestData));
-    
-    const { prompt, completionLevel = 'intermediate' } = requestData;
-
-    if (!prompt) {
-      console.error("Missing prompt in request");
-      return new Response(JSON.stringify({ error: "Prompt is required" }), {
+      
+      // Clean up common issues in the extracted JSON
+      jsonContent = jsonContent
+        .replace(/```json/g, '')
+        .replace(/```/g, '')
+        .replace(/\\n/g, '\\n')
+        .replace(/\\"/g, '\\"')
+        .replace(/\n\s*\n/g, '\n');
+      
+      console.log("Cleaned JSON for parsing:", jsonContent.substring(0, 100) + "...");
+      
+      try {
+        appData = JSON.parse(jsonContent.trim());
+        console.log("Successfully parsed JSON");
+      } catch (firstError) {
+        console.error("First JSON parse attempt failed:", firstError);
+        
+        // More aggressive cleaning for malformed JSON
+        const cleanedJson = jsonContent
+          // Handle trailing commas in arrays and objects
+          .replace(/,\s*}/g, '}')
+          .replace(/,\s*\]/g, ']')
+          // Fix quotes
+          .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":')
+          // Replace single quotes with double quotes for property values
+          .replace(/:\s*'([^']*)'/g, ':"$1"');
+        
+        try {
+          appData = JSON.parse(cleanedJson.trim());
+          console.log("Successfully parsed JSON after cleaning");
+        } catch (secondError) {
+          // If all parsing attempts fail, create a fallback app
+          console.error("Failed to parse JSON after multiple attempts:", secondError);
+          
+          appData = {
+            projectName: appDesign.projectName || "SimpleApp",
+            description: appDesign.description || `A simple app based on "${prompt}"`,
+            fileStructure: {
+              "src": {
+                "App.js": "import React from 'react';\n\nfunction App() {\n  return <div>Hello World</div>;\n}\n\nexport default App;",
+                "index.js": "import React from 'react';\nimport ReactDOM from 'react-dom';\nimport App from './App';\n\nReactDOM.render(<App />, document.getElementById('root'));"
+              }
+            },
+            challenges: [
+              {
+                id: "challenge-1",
+                title: "Add a Header Component",
+                description: "Create a new Header component and add it to the App.",
+                filesPaths: ["src/App.js"]
+              }
+            ],
+            explanation: "This is a simple starter app with basic React components."
+          };
+          console.log("Using fallback app data");
+        }
+      }
+    } catch (jsonError) {
+      console.error("Failed to parse JSON response:", jsonError);
+      return new Response(JSON.stringify({ error: "Failed to parse application data" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
-    // Process and potentially summarize input
-    let processedPrompt;
-    try {
-      processedPrompt = await processInput(prompt);
-      console.log("Processed prompt length (chars):", processedPrompt.length);
-    } catch (error) {
-      console.error("Error processing prompt:", error);
-      return new Response(JSON.stringify({ error: `Error processing prompt: ${error.message}` }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-    
-    // Get application design with better error handling
-    let appDesign;
-    try {
-      console.log("Getting app design");
-      try {
-        appDesign = await getDesignWithPerplexity(processedPrompt);
-      } catch (perplexityError) {
-        console.log("Perplexity failed, using fallback design");
-        appDesign = createDefaultAppDesign(processedPrompt);
-      }
-      console.log("Successfully received app design:", appDesign.projectName);
-    } catch (error) {
-      console.error("All app design methods failed:", error);
-      // Create a basic default design as absolute fallback
-      appDesign = createDefaultAppDesign(processedPrompt);
-    }
-
-    const projectId = crypto.randomUUID();
-    
-    // Generate implementation with challenges using our fallback system
-    let appData;
-    try {
-      console.log("Generating app implementation");
-      
-      // Use our enhanced fallback generator
-      const aiResponse = await generateAppWithFallback(processedPrompt, completionLevel);
-      appData = extractAppDataFromAIResponse(aiResponse);
-      
-      console.log("Successfully generated app implementation");
-    } catch (error) {
-      console.error("Error generating app:", error);
-      
-      // Create an absolute minimum fallback app if everything else fails
-      console.log("Using minimal fallback app");
-      appData = {
-        projectName: appDesign.projectName || "Simple React App",
-        description: `A simple app based on "${prompt}"`,
-        fileStructure: {
-          "src": {
-            "App.jsx": `import React from 'react';\n\nfunction App() {\n  return (\n    <div className="App">\n      <header className="App-header">\n        <h1>${appDesign.projectName || "Simple React App"}</h1>\n        <p>${appDesign.description || "A simple React application"}</p>\n        {/* TODO: Add more components here */}\n      </header>\n    </div>\n  );\n}\n\nexport default App;`,
-            "index.jsx": `import React from 'react';\nimport ReactDOM from 'react-dom/client';\nimport App from './App';\n\nconst root = ReactDOM.createRoot(document.getElementById('root'));\nroot.render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>\n);`
-          }
-        },
-        challenges: [
-          {
-            id: "challenge-1",
-            title: "Complete the App Component",
-            description: "Add more components to make this application functional.",
-            filesPaths: ["src/App.jsx"]
-          }
-        ],
-        explanation: "This is a simple starter app with basic React components."
-      };
+    // Merge Perplexity design info with Gemini implementation
+    // Use Perplexity data for high-level info if Gemini didn't provide it
+    if (appData) {
+      if (!appData.projectName) appData.projectName = appDesign.projectName;
+      if (!appData.description) appData.description = appDesign.description;
     }
 
     // Convert file structure to actual files
@@ -665,9 +618,7 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Error in generate-app function:", error);
-    return new Response(JSON.stringify({ 
-      error: "App generation temporarily unavailable. Please try with a simpler prompt or try again in a few minutes." 
-    }), {
+    return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
