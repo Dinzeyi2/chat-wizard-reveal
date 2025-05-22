@@ -40,7 +40,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, projectId, code } = await req.json();
+    const { message, projectId, code, editorContent } = await req.json();
     
     if (!message) {
       return new Response(
@@ -63,7 +63,22 @@ serve(async (req) => {
       const response = await callWithRetries(async () => {
         let promptContext = "You are a helpful AI assistant. ";
         
-        if (projectId && code) {
+        // If we have editor content and it's a question about the editor, include it
+        const isAskingAboutCode = 
+          message.toLowerCase().includes("editor") || 
+          message.toLowerCase().includes("see") || 
+          message.toLowerCase().includes("what's in") || 
+          message.toLowerCase().includes("code") || 
+          message.toLowerCase().includes("in the file");
+        
+        if (editorContent && isAskingAboutCode) {
+          promptContext += `The user is asking about code in the editor. Here is the current editor content: 
+\`\`\`
+${editorContent}
+\`\`\`
+Please respond to their question about this code.`;
+        }
+        else if (projectId && code) {
           promptContext += `The user is working on a project with ID: ${projectId}. Here is the code context: ${code.substring(0, 5000)}...`;
         }
         
@@ -117,7 +132,8 @@ serve(async (req) => {
       const responseObj = {
         response: aiResponse,
         projectId: projectId || null,
-        codeUpdate: null
+        codeUpdate: null,
+        editorContent: editorContent || null  // Pass back editor content for context
       };
       
       // Return successful response

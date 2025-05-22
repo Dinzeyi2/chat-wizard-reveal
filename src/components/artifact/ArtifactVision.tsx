@@ -52,10 +52,13 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
         service.startCapturing(captureEditorContent);
         
         // Broadcast status to chat window
-        window.postMessage('GEMINI_VISION_ACTIVATED:' + JSON.stringify({
-          timestamp: new Date().toISOString(),
-          activeFile: activeFile?.name
-        }), '*');
+        window.postMessage({
+          type: 'GEMINI_VISION_ACTIVATED',
+          data: {
+            timestamp: new Date().toISOString(),
+            activeFile: activeFile?.name
+          }
+        }, '*');
       }
     };
     
@@ -88,11 +91,14 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
     
     // Broadcast content to chat window via window messaging
     if (content) {
-      window.postMessage("GEMINI_VISION_UPDATE:" + JSON.stringify({
-        timestamp: new Date().toISOString(),
-        activeFile: activeFile?.name,
-        editorContent: content
-      }), '*');
+      window.postMessage({
+        type: 'GEMINI_VISION_UPDATE',
+        data: {
+          timestamp: new Date().toISOString(),
+          activeFile: activeFile?.name,
+          editorContent: content
+        }
+      }, '*');
     }
     
     return content;
@@ -112,19 +118,25 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
       setIsVisionActive(true);
       
       // Broadcast activation to chat window
-      window.postMessage('GEMINI_VISION_ACTIVATED:' + JSON.stringify({
-        timestamp: new Date().toISOString(),
-        projectId,
-        activeFile: activeFile?.name
-      }), '*');
+      window.postMessage({
+        type: 'GEMINI_VISION_ACTIVATED',
+        data: {
+          timestamp: new Date().toISOString(),
+          projectId,
+          activeFile: activeFile?.name
+        }
+      }, '*');
     } else {
       visionService.stopCapturing();
       setIsVisionActive(false);
       
       // Broadcast deactivation to chat window
-      window.postMessage('GEMINI_VISION_DEACTIVATED:' + JSON.stringify({
-        timestamp: new Date().toISOString()
-      }), '*');
+      window.postMessage({
+        type: 'GEMINI_VISION_DEACTIVATED',
+        data: {
+          timestamp: new Date().toISOString()
+        }
+      }, '*');
     }
   };
 

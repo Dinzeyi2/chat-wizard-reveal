@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { ArtifactProvider, useArtifact } from "./artifact/ArtifactSystem";
-import { FileCode, ChevronRight } from "lucide-react";
+import { FileCode, ChevronRight, Eye } from "lucide-react";
 import { Button } from "./ui/button";
 import AgentOrchestration from "./AgentOrchestration";
 import { contentIncludes, getContentAsString } from "@/utils/contentUtils";
@@ -246,27 +246,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
     const visionService = getGeminiVisionService();
     setVisionEnabled(visionService.isVisionEnabled());
     
-    // Use a safer approach for console monitoring
+    // Listen for window messages from Gemini Vision
     const handleMessage = (event: MessageEvent) => {
-      if (event.data && typeof event.data === 'string') {
-        const logMessage = event.data;
-        if (logMessage.includes('GEMINI_VISION_ACTIVATED')) {
+      if (event.data && typeof event.data === 'object') {
+        if (event.data.type === 'GEMINI_VISION_ACTIVATED') {
           setVisionEnabled(true);
-        } else if (logMessage.includes('GEMINI_VISION_DEACTIVATED')) {
+        } else if (event.data.type === 'GEMINI_VISION_DEACTIVATED') {
           setVisionEnabled(false);
-        } else if (logMessage.includes('GEMINI_VISION_UPDATE')) {
-          try {
-            // Try to extract content information if available
-            const startIndex = logMessage.indexOf('{');
-            if (startIndex !== -1) {
-              const jsonStr = logMessage.substring(startIndex);
-              const data = JSON.parse(jsonStr);
-              if (data.editorContent) {
-                setEditorContent(data.editorContent);
-              }
-            }
-          } catch (err) {
-            console.error("Failed to parse vision update:", err);
+        } else if (event.data.type === 'GEMINI_VISION_UPDATE') {
+          if (event.data.data && event.data.data.editorContent) {
+            setEditorContent(event.data.data.editorContent);
           }
         }
       }
@@ -315,8 +304,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
     return content.toLowerCase().includes("code") ||
            content.toLowerCase().includes("editor") ||
            content.toLowerCase().includes("what do you see") ||
+           content.toLowerCase().includes("tell me") ||
            content.toLowerCase().includes("what is in the editor") ||
-           content.toLowerCase().includes("tell me about") && visionEnabled;
+           content.toLowerCase().includes("what's in the editor");
   };
   
   return (
@@ -342,6 +332,21 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
         </div>
       )}
       
+      {/* Display current editor content when user asks about it */}
+      {visionEnabled && isAskingAboutCode() && editorContent && (
+        <div className="mb-4">
+          <div className="bg-gray-100 rounded-lg p-3 mb-2 border border-gray-200">
+            <div className="flex items-center gap-2 mb-2">
+              <Eye className="h-4 w-4 text-blue-600" />
+              <h3 className="text-sm font-medium text-blue-700">Current Editor Content:</h3>
+            </div>
+            <pre className="text-xs overflow-x-auto max-h-[200px] p-2 bg-gray-50 rounded border border-gray-300">
+              <code>{editorContent}</code>
+            </pre>
+          </div>
+        </div>
+      )}
+      
       {/* Alert for when user asks about code but vision is disabled */}
       {!visionEnabled && isAskingAboutCode() && (
         <div className="mb-4 p-2 bg-amber-50 border border-amber-100 rounded-lg">
@@ -352,6 +357,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
         </div>
       )}
       
+      {/* Message rendering section */}
       {messages.map((message) => (
         <div key={message.id} className="mb-8">
           {message.role === "user" ? (

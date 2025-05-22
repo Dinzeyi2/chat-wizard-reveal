@@ -85,9 +85,12 @@ export class GeminiVisionService {
     });
     
     // Send message to window for listeners to pick up
-    window.postMessage('GEMINI_VISION_ACTIVATED:' + JSON.stringify({
-      timestamp: new Date().toISOString()
-    }), '*');
+    window.postMessage({
+      type: 'GEMINI_VISION_ACTIVATED',
+      data: {
+        timestamp: new Date().toISOString()
+      }
+    }, '*');
   }
 
   public stopCapturing(): void {
@@ -102,9 +105,12 @@ export class GeminiVisionService {
       });
       
       // Send message to window for listeners to pick up
-      window.postMessage('GEMINI_VISION_DEACTIVATED:' + JSON.stringify({
-        timestamp: new Date().toISOString()
-      }), '*');
+      window.postMessage({
+        type: 'GEMINI_VISION_DEACTIVATED',
+        data: {
+          timestamp: new Date().toISOString()
+        }
+      }, '*');
       
       // Clear last content
       this.lastContent = '';
@@ -152,13 +158,16 @@ export class GeminiVisionService {
         this.onVisionResponse(responseText);
       }
 
-      // Log status using window message instead of console log
-      window.postMessage("GEMINI_VISION_UPDATE:" + JSON.stringify({
-        timestamp: new Date().toISOString(),
-        contentLength: content.length,
-        responseReceived: true,
-        editorContent: content // Include the editor content in the update
-      }), '*');
+      // Send the editor content to the chat window via Window messaging
+      window.postMessage({
+        type: 'GEMINI_VISION_UPDATE',
+        data: {
+          timestamp: new Date().toISOString(),
+          contentLength: content.length,
+          responseReceived: true,
+          editorContent: content // Include the editor content in the update
+        }
+      }, '*');
 
     } catch (error: any) {
       console.error('Error in Gemini Vision processing:', error);
