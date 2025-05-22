@@ -8,6 +8,13 @@ import AgentOrchestration from "./AgentOrchestration";
 import { contentIncludes, getContentAsString } from "@/utils/contentUtils";
 import { getGeminiVisionService } from "@/utils/GeminiVisionService";
 
+// Define the ChatWindowProps interface
+interface ChatWindowProps {
+  messages: Message[];
+  isLoading: boolean;
+  projectId?: string | null;
+}
+
 // Create a wrapper component that uses useArtifact and handles artifact operations
 const ArtifactHandler = ({ messages, projectId }: { messages: Message[], projectId: string | null }) => {
   const { openArtifact } = useArtifact();
@@ -223,18 +230,7 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
 
 // Helper function to determine file language from file path
 const getFileLanguage = (path: string): string => {
-  const extension = path.split('.').pop()?.toLowerCase() || '';
-  switch (extension) {
-    case 'js': return 'javascript';
-    case 'jsx': return 'javascript';
-    case 'ts': return 'typescript';
-    case 'tsx': return 'typescript';
-    case 'html': return 'html';
-    case 'css': return 'css';
-    case 'json': return 'json';
-    case 'md': return 'markdown';
-    default: return 'javascript';
-  }
+  return 'javascript';
 };
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId }) => {
@@ -248,10 +244,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
     const visionService = getGeminiVisionService();
     setVisionEnabled(visionService.isVisionEnabled());
     
-    // Listen for console logs that might indicate vision status changes
-    const handleConsoleLog = (event: any) => {
-      if (event.args && event.args[0] && typeof event.args[0] === 'string') {
-        const logMessage = event.args[0];
+    // Use a safer approach for console monitoring
+    const handleConsoleLog = (event: MessageEvent) => {
+      if (event.data && typeof event.data === 'string') {
+        const logMessage = event.data;
         if (logMessage.includes('GEMINI_VISION_ACTIVATED')) {
           setVisionEnabled(true);
         } else if (logMessage.includes('GEMINI_VISION_DEACTIVATED')) {
@@ -260,11 +256,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
       }
     };
     
-    // This is just for demonstration - in a real app, you'd use a proper event system
-    console.addEventListener?.('log', handleConsoleLog);
+    // Use window event listener instead of console event listener
+    window.addEventListener('message', handleConsoleLog);
     
     return () => {
-      console.removeEventListener?.('log', handleConsoleLog);
+      window.removeEventListener('message', handleConsoleLog);
     };
   }, []);
   

@@ -81,6 +81,11 @@ export class GeminiVisionService {
       title: "Gemini Vision Activated",
       description: "Now monitoring your code edits in real-time."
     });
+    
+    // Send message to window for listeners to pick up
+    window.postMessage('GEMINI_VISION_ACTIVATED:' + JSON.stringify({
+      timestamp: new Date().toISOString()
+    }), '*');
   }
 
   public stopCapturing(): void {
@@ -93,6 +98,11 @@ export class GeminiVisionService {
         title: "Gemini Vision Deactivated",
         description: "No longer monitoring your code edits."
       });
+      
+      // Send message to window for listeners to pick up
+      window.postMessage('GEMINI_VISION_DEACTIVATED:' + JSON.stringify({
+        timestamp: new Date().toISOString()
+      }), '*');
     }
   }
 
@@ -137,12 +147,12 @@ export class GeminiVisionService {
         this.onVisionResponse(responseText);
       }
 
-      // Log status to console for the AI to pick up
-      console.log("GEMINI_VISION_UPDATE:", JSON.stringify({
+      // Log status using window message instead of console log
+      window.postMessage("GEMINI_VISION_UPDATE:" + JSON.stringify({
         timestamp: new Date().toISOString(),
         contentLength: content.length,
         responseReceived: true
-      }));
+      }), '*');
 
     } catch (error: any) {
       console.error('Error in Gemini Vision processing:', error);
@@ -167,6 +177,9 @@ let geminiVisionInstance: GeminiVisionService | null = null;
 export const getGeminiVisionService = (config?: VisionServiceConfig): GeminiVisionService => {
   if (!geminiVisionInstance) {
     geminiVisionInstance = new GeminiVisionService(config);
+  } else if (config) {
+    // Update existing instance with new config if provided
+    if (config.apiKey) geminiVisionInstance.setApiKey(config.apiKey);
   }
   return geminiVisionInstance;
 };

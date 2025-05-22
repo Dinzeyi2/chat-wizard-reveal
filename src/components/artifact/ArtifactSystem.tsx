@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
@@ -30,6 +31,12 @@ interface ArtifactContextType {
   currentArtifact: Artifact | null;
   isOpen: boolean;
   updateFileContent?: (fileId: string, newContent: string) => void;
+  // Add these missing properties
+  artifact: Artifact | null;
+  activeFile: ArtifactFile | null;
+  getActiveFileContent: (fileId: string) => string | null;
+  nextFile: () => void;
+  prevFile: () => void;
 }
 
 // Create Context
@@ -47,6 +54,7 @@ export const useArtifact = () => {
 export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
   const [currentArtifact, setCurrentArtifact] = useState<Artifact | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [activeFileId, setActiveFileId] = useState<string | null>(null);
 
   useEffect(() => {
     // Update chat area class when artifact opens/closes
@@ -66,6 +74,9 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
     }
   }, [isOpen]);
 
+  // Get the active file based on activeFileId
+  const activeFile = currentArtifact?.files.find(file => file.id === activeFileId) || null;
+
   const openArtifact = (artifact: Artifact) => {
     console.log("ArtifactProvider.openArtifact called with:", artifact.id);
     if (!artifact || !artifact.files || artifact.files.length === 0) {
@@ -83,6 +94,7 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
     
     // Set the artifact and open the viewer
     setCurrentArtifact(artifact);
+    setActiveFileId(artifact.files[0]?.id || null);
     setIsOpen(true);
     
     // Force reflow to ensure the viewer is rendered
@@ -119,13 +131,48 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
     });
   };
 
+  // Function to navigate to the next file
+  const nextFile = () => {
+    if (!currentArtifact || currentArtifact.files.length <= 1 || !activeFileId) return;
+    
+    const currentIndex = currentArtifact.files.findIndex(f => f.id === activeFileId);
+    if (currentIndex < 0) return;
+    
+    const nextIndex = (currentIndex + 1) % currentArtifact.files.length;
+    setActiveFileId(currentArtifact.files[nextIndex].id);
+  };
+
+  // Function to navigate to the previous file
+  const prevFile = () => {
+    if (!currentArtifact || currentArtifact.files.length <= 1 || !activeFileId) return;
+    
+    const currentIndex = currentArtifact.files.findIndex(f => f.id === activeFileId);
+    if (currentIndex < 0) return;
+    
+    const prevIndex = (currentIndex - 1 + currentArtifact.files.length) % currentArtifact.files.length;
+    setActiveFileId(currentArtifact.files[prevIndex].id);
+  };
+
+  // Function to get content of a specific file by ID
+  const getActiveFileContent = (fileId: string): string | null => {
+    if (!currentArtifact) return null;
+    const file = currentArtifact.files.find(f => f.id === fileId);
+    return file ? file.content : null;
+  };
+
   return (
     <ArtifactContext.Provider value={{
       openArtifact,
       closeArtifact,
       currentArtifact,
       isOpen,
-      updateFileContent
+      updateFileContent,
+      // Add these properties to match the updated interface
+      artifact: currentArtifact,
+      activeFile,
+      getActiveFileContent,
+      nextFile,
+      prevFile
     }}>
       {children}
       {isOpen && currentArtifact && <ArtifactViewer />}
