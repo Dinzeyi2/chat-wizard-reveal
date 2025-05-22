@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Message } from "@/types/chat";
 import { marked } from "marked";
@@ -46,7 +47,11 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
             name: file.path.split('/').pop(),
             path: file.path,
             language: file.path.split('.').pop() || 'js',
-            content: file.content
+            content: file.content,
+            // Add isComplete flag if it exists in the file data
+            isComplete: file.isComplete !== undefined ? file.isComplete : true,
+            // Add challenges if they exist in the file data
+            challenges: file.challenges || []
           }));
           
           // Create an artifact object with ONLY code, no explanations
@@ -54,7 +59,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
             id: message.metadata.projectId,
             title: appData.projectName || "Generated App",
             description: "Generated application code",
-            files: artifactFiles
+            files: artifactFiles,
+            // Add challenges at the artifact level if they exist
+            challenges: appData.challenges || []
           };
           
           // Open the artifact viewer immediately when we detect app generation
@@ -130,14 +137,36 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
       message.metadata?.projectId && 
       hasGeneratedApp) {
     
+    // Check if we have challenges to display
+    const hasChallenges = message.metadata?.appData?.challenges && 
+                         message.metadata.appData.challenges.length > 0;
+    
     return (
       <div>
         <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
           <p className="font-medium text-blue-800">
             Application code is ready! View it in the code editor above.
           </p>
+          {hasChallenges && (
+            <p className="text-blue-700 mt-2">
+              This code has intentional challenges for you to complete. Look for TODO comments and incomplete files.
+            </p>
+          )}
         </div>
         <div dangerouslySetInnerHTML={{ __html: processContent(cleanedContent) }} />
+        
+        {hasChallenges && (
+          <div className="mt-4">
+            <h3 className="font-medium text-lg">Challenges to Complete:</h3>
+            <ul className="list-disc pl-5 mt-2">
+              {message.metadata.appData.challenges.map((challenge: any, index: number) => (
+                <li key={challenge.id || index} className="my-2">
+                  <strong>{challenge.title}</strong>: {challenge.description}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     );
   }

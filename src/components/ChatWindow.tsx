@@ -29,9 +29,34 @@ const ArtifactHandler = ({ messages, projectId }: { messages: Message[], project
         message.content.includes("I've generated")
       );
       
-      if (appGeneratedMessage) {
+      if (appGeneratedMessage && appGeneratedMessage.metadata?.appData?.files) {
         // Logic to extract app data and open in artifact viewer
         console.log("Found app generation message for project:", projectId);
+        
+        const appData = appGeneratedMessage.metadata.appData;
+        
+        // Transform files into artifact format with incomplete flags
+        const artifactFiles = appData.files.map((file: any) => ({
+          id: `file-${file.path.replace(/\//g, '-')}`,
+          name: file.path.split('/').pop(),
+          path: file.path,
+          language: file.path.split('.').pop() || 'js',
+          content: file.content,
+          isComplete: file.isComplete !== undefined ? file.isComplete : true,
+          challenges: file.challenges || []
+        }));
+        
+        // Create an artifact object with ONLY code, no explanations
+        const artifact = {
+          id: appGeneratedMessage.metadata.projectId,
+          title: appData.projectName || "Generated App",
+          description: "Generated application code with learning challenges",
+          files: artifactFiles,
+          challenges: appData.challenges || []
+        };
+        
+        // Open the artifact viewer with the incomplete code
+        openArtifact(artifact);
       }
     }
   }, [messages, projectId, openArtifact]);
@@ -98,7 +123,8 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
         name: `code-${count}.${extension}`,
         path: `code-${count}.${extension}`,
         language: language,
-        content: codeContent // Use ONLY the extracted code content
+        content: codeContent, // Use ONLY the extracted code content
+        isComplete: false // Mark as incomplete by default
       });
     }
     
@@ -116,7 +142,9 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
             name: file.path,
             path: file.path,
             language: getFileLanguage(file.path),
-            content: file.content // This is already just the code content
+            content: file.content, // This is already just the code content
+            isComplete: file.isComplete !== undefined ? file.isComplete : true,
+            challenges: file.challenges || []
           });
         });
       }
@@ -139,7 +167,13 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
           name: `${componentName}.jsx`,
           path: `${componentName}.jsx`,
           language: "javascript",
-          content: `// This is a placeholder for ${componentName}\n// The actual code was not provided in a code block format\n\nimport React from 'react';\n\nconst ${componentName} = () => {\n  return (\n    <div>\n      ${componentName} Component\n    </div>\n  );\n};\n\nexport default ${componentName};`
+          content: `// This is a placeholder for ${componentName}\n// The actual code was not provided in a code block format\n// TODO: Implement this component\n\nimport React from 'react';\n\nconst ${componentName} = () => {\n  return (\n    <div>\n      ${componentName} Component\n    </div>\n  );\n};\n\nexport default ${componentName};`,
+          isComplete: false, // Mark as incomplete to show it needs implementation
+          challenges: [{
+            description: `Implement the ${componentName} component`,
+            difficulty: 'medium',
+            hints: ['Look at the project requirements', 'Consider what this component needs to do']
+          }]
         });
       }
       
@@ -150,7 +184,13 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
           name: "App.jsx",
           path: "App.jsx",
           language: "javascript",
-          content: `// Generated App\n// Note: The AI didn't provide code in a structured format\n// This is a placeholder component\n\nimport React from 'react';\n\nfunction App() {\n  return (\n    <div className="app">\n      <h1>Generated Application</h1>\n      <p>The AI mentioned generating an app, but didn't provide code blocks.</p>\n    </div>\n  );\n}\n\nexport default App;`
+          content: `// Generated App\n// TODO: Implement core functionality\n// This is a placeholder component\n\nimport React from 'react';\n\nfunction App() {\n  return (\n    <div className="app">\n      <h1>Generated Application</h1>\n      <p>The AI mentioned generating an app, but didn't provide code blocks.</p>\n      <p>// TODO: Implement main application features</p>\n    </div>\n  );\n}\n\nexport default App;`,
+          isComplete: false, // Mark as incomplete
+          challenges: [{
+            description: 'Implement the main App functionality',
+            difficulty: 'hard',
+            hints: ['Start by adding state for key features', 'Break down into smaller components']
+          }]
         });
       }
     }
@@ -162,7 +202,7 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
         id: `message-${message.id}`,
         title: message.metadata?.projectId ? "Generated App Code" : "Code Snippets",
         files: codeBlocks,
-        description: "Code from assistant's message"
+        description: message.metadata?.projectId ? "Application with learning challenges" : "Code from assistant's message"
       };
       
       // Open the artifact viewer with the code
@@ -266,7 +306,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
                 {message.metadata?.projectId && message.role === "assistant" && (
                   <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
                     <p className="font-medium text-blue-800">
-                      App code is available in the artifact viewer. 
+                      App code with intentional learning challenges is available in the artifact viewer.
                     </p>
                   </div>
                 )}
