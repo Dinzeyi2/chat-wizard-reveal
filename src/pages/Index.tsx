@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -12,6 +13,8 @@ import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
 import { useLocation, useNavigate } from "react-router-dom";
 import { UserProfileMenu } from "@/components/UserProfileMenu";
 import { geminiAIService } from "@/utils/GeminiAIService";
+import { Button } from "@/components/ui/button";
+import { contentIncludes, getContentAsString, contentReplace } from "@/utils/contentUtils";
 import {
   Card,
   CardContent,
