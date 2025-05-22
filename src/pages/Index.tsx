@@ -6,7 +6,7 @@ import { Message, Json } from "@/types/chat";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { ArtifactProvider, ArtifactLayout } from "@/components/artifact/ArtifactSystem";
 import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -745,6 +745,37 @@ If you were trying to generate an app, this might be due to limits with our AI m
     }
   };
 
+  const handleRetry = () => {
+    // Clear the generation error
+    setGenerationError(null);
+    
+    // Check messages for the last user prompt that caused the error
+    const lastUserPrompt = [...messages].reverse().find(m => m.role === "user");
+    
+    if (lastUserPrompt) {
+      // Remove error messages
+      setMessages(messages.filter(m => 
+        !(m.role === "assistant" && 
+          contentIncludes(m.content, "error") && 
+          (contentIncludes(m.content, "Failed to access Gemini") ||
+           contentIncludes(m.content, "AI service")))
+      ));
+      
+      // Re-send the user's prompt with a simplified version
+      const simplifiedPrompt = getContentAsString(lastUserPrompt.content).substring(0, 100) + 
+        (getContentAsString(lastUserPrompt.content).length > 100 ? "..." : "");
+      
+      // Try again with the simplified prompt
+      handleSendMessage(`${simplifiedPrompt} (simplified)`);
+    } else {
+      // If no user prompt found, just clear errors
+      toast({
+        title: "Ready to try again",
+        description: "Please enter a new prompt.",
+      });
+    }
+  };
+
   // Automatic guidance system
   useEffect(() => {
     // Check if we need to send a step completion message
@@ -787,7 +818,8 @@ If you were trying to generate an app, this might be due to limits with our AI m
                 <ChatWindow 
                   messages={messages} 
                   isLoading={loading}
-                  projectId={currentProjectId} 
+                  projectId={currentProjectId}
+                  onRetry={handleRetry} 
                 />
               )}
               <div ref={messagesEndRef} />
@@ -817,6 +849,15 @@ If you were trying to generate an app, this might be due to limits with our AI m
                   <p className="text-xs text-red-600 mt-1 ml-7">
                     Try using a simpler prompt or breaking down your request into smaller parts.
                   </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleRetry} 
+                    className="mt-2 ml-7 border-red-300 text-red-700 hover:bg-red-50"
+                  >
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    Try Again with Simpler Prompt
+                  </Button>
                 </div>
               )}
             </div>

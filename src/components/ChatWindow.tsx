@@ -3,14 +3,16 @@ import React, { useEffect, useState } from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { ArtifactProvider, useArtifact } from "./artifact/ArtifactSystem";
-import { FileCode, ChevronRight } from "lucide-react";
+import { FileCode, ChevronRight, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "./ui/button";
 import AgentOrchestration from "./AgentOrchestration";
+import { contentIncludes, getContentAsString, contentReplace } from "@/utils/contentUtils";
 
 interface ChatWindowProps {
   messages: Message[];
   isLoading: boolean;
   projectId: string | null;
+  onRetry?: () => void;
 }
 
 // Create a wrapper component that uses useArtifact and handles artifact operations
@@ -25,7 +27,7 @@ const ArtifactHandler = ({ messages, projectId }: { messages: Message[], project
       const appGeneratedMessage = messages.find(message => 
         message.role === "assistant" && 
         message.metadata?.projectId === projectId &&
-        message.content.includes("I've generated")
+        contentIncludes(message.content, "I've generated")
       );
       
       if (appGeneratedMessage) {
@@ -44,23 +46,24 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
   
   // Only show for assistant messages that likely contain code
   const hasCode = message.role === "assistant" && 
-    (message.content.includes("```") || 
-     message.content.includes("<code>") ||
-     message.content.includes("function") ||
-     message.content.includes("const") ||
-     message.content.includes("class") ||
-     message.content.includes("import "));
+    (contentIncludes(message.content, "```") || 
+     contentIncludes(message.content, "<code>") ||
+     contentIncludes(message.content, "function") ||
+     contentIncludes(message.content, "const") ||
+     contentIncludes(message.content, "class") ||
+     contentIncludes(message.content, "import "));
   
   if (!hasCode) return null;
   
   const handleOpenInArtifact = () => {
     // Extract code blocks from message content
+    const messageContentStr = getContentAsString(message.content);
     const codeRegex = /```(?:[\w]*)\n([\s\S]*?)```/g;
     let match;
     const codeBlocks = [];
     let count = 0;
     
-    while ((match = codeRegex.exec(message.content)) !== null) {
+    while ((match = codeRegex.exec(messageContentStr)) !== null) {
       count++;
       codeBlocks.push({
         id: `code-block-${count}`,
@@ -78,7 +81,7 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
         name: "Message Content",
         path: "message-content.js",
         language: "javascript",
-        content: message.content.replace(/(<([^>]+)>)/gi, "") // Strip HTML tags
+        content: contentReplace(message.content, /(<([^>]+)>)/gi, "") // Strip HTML tags
       });
     }
     
@@ -108,9 +111,41 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
   );
 };
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId }) => {
+// Error component with retry functionality
+const ErrorMessage = ({ message, onRetry }: { message: string, onRetry?: () => void }) => {
+  return (
+    <div className="mb-8">
+      <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+        <div className="flex items-start">
+          <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 mr-2" />
+          <div className="flex-1">
+            <p className="text-red-800 font-medium">Error generating app</p>
+            <p className="text-sm text-red-600 mt-1">{message}</p>
+            <p className="text-xs text-red-600 mt-2">
+              Try using a simpler prompt or breaking down your request into smaller parts.
+            </p>
+            {onRetry && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onRetry} 
+                className="mt-2 border-red-300 text-red-700 hover:bg-red-50"
+              >
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Retry
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId, onRetry }) => {
   // Add state to track if an app has been generated in this conversation
   const [hasGeneratedApp, setHasGeneratedApp] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
   
   // Effect to check messages for app generation
   useEffect(() => {
@@ -118,14 +153,32 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
     const appGeneratedMessage = messages.find(message => 
       message.role === "assistant" && 
       message.metadata?.projectId && 
-      (message.content.includes("I've generated") || 
-       message.content.includes("generated a full-stack application") ||
-       message.content.includes("app generation successful"))
+      (contentIncludes(message.content, "I've generated") || 
+       contentIncludes(message.content, "generated a full-stack application") ||
+       contentIncludes(message.content, "app generation successful"))
     );
     
     // Update state if we found evidence of app generation
     if (appGeneratedMessage && !hasGeneratedApp) {
       setHasGeneratedApp(true);
+    }
+    
+    // Look for error messages
+    const errorMessage = messages.find(message => 
+      message.role === "assistant" && 
+      contentIncludes(message.content, "error") &&
+      (contentIncludes(message.content, "Failed to access Gemini") ||
+       contentIncludes(message.content, "AI service") ||
+       contentIncludes(message.content, "API key"))
+    );
+    
+    if (errorMessage) {
+      const messageContent = getContentAsString(errorMessage.content);
+      if (messageContent.includes("Failed to access Gemini AI service")) {
+        setLastError("Failed to access Gemini AI service. Please try again later.");
+      }
+    } else {
+      setLastError(null);
     }
   }, [messages, hasGeneratedApp]);
   
@@ -143,6 +196,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
       {/* Always show orchestration UI if we have a project */}
       {projectId && <AgentOrchestration projectId={projectId} />}
       
+      {/* Show error message with retry if we have one */}
+      {lastError && onRetry && (
+        <ErrorMessage message={lastError} onRetry={onRetry} />
+      )}
+      
+      {/* Display all messages */}
       {messages.map((message) => (
         <div key={message.id} className="mb-8">
           {message.role === "user" ? (
@@ -156,7 +215,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
               <div className="ml-0 bg-white border border-gray-200 rounded-3xl px-6 py-4 max-w-3xl">
                 {/* Display warning only if this is not the first app-generating message */}
                 {hasGeneratedApp && 
-                 message.content.includes("I've generated") && 
+                 contentIncludes(message.content, "I've generated") && 
                  message.metadata?.projectId && 
                  firstAppMessage && 
                  message.id !== firstAppMessage.id ? (
