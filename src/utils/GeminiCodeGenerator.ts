@@ -129,31 +129,13 @@ export class GeminiCodeGenerator {
       // Create a simple file structure based on the project
       const files = this._generateBasicFiles(generatedProject);
       
-      // Intentionally mark some files as incomplete
-      const partialFiles = files.map((file, index) => {
-        // Make every other file intentionally incomplete for the challenge
-        const isComplete = index % 2 === 0;
-        return {
-          ...file,
-          isComplete,
-          // Only add challenges to incomplete files
-          challenges: !isComplete ? file.challenges || [
-            {
-              description: `Complete the implementation for ${file.path}`,
-              difficulty: 'medium' as const,
-              hints: ["Look for TODO comments in the code", "Consider the overall architecture"]
-            }
-          ] : file.challenges
-        };
-      });
-      
       return {
         success: true,
         projectId: `local-${Date.now()}`,
         projectName: generatedProject.projectName,
         description: generatedProject.description,
         prompt: prompt,
-        files: partialFiles,
+        files: files,
         challenges: challenges,
         explanation: `This is a ${generatedProject.projectName} project with intentional gaps for learning. Complete the challenges to build your skills in React, TypeScript, and web development. Each challenge has hints to guide you.`,
         guide: guide
@@ -242,7 +224,6 @@ export class GeminiCodeGenerator {
   
   /**
    * Generate basic file structure for a local project
-   * with intentionally incomplete parts
    */
   private _generateBasicFiles(project: GeneratedProject) {
     // Generate minimal files for the project
@@ -258,20 +239,13 @@ export class GeminiCodeGenerator {
     }[] = [
       {
         path: "src/App.tsx",
-        content: `import React from 'react';\nimport { BrowserRouter, Routes, Route } from 'react-router-dom';\nimport HomePage from './pages/Home';\n\nfunction App() {\n  return (\n    <BrowserRouter>\n      <Routes>\n        <Route path="/" element={<HomePage />} />\n        {/* TODO: Add more routes here */}\n      </Routes>\n    </BrowserRouter>\n  );\n}\n\nexport default App;`,
-        isComplete: false, // Intentionally mark this as incomplete
-        challenges: [
-          {
-            description: "Add more routes to the App component",
-            difficulty: "easy",
-            hints: ["Consider what pages your app needs", "Add routes for features like profile, settings, etc."]
-          }
-        ]
+        content: `import React from 'react';\nimport { BrowserRouter, Routes, Route } from 'react-router-dom';\nimport HomePage from './pages/Home';\n\nfunction App() {\n  return (\n    <BrowserRouter>\n      <Routes>\n        <Route path="/" element={<HomePage />} />\n        {/* Add more routes here */}\n      </Routes>\n    </BrowserRouter>\n  );\n}\n\nexport default App;`,
+        isComplete: true
       },
       {
         path: "src/pages/Home.tsx",
         content: `import React from 'react';\n\nconst HomePage = () => {\n  return (\n    <div className="container mx-auto p-4">\n      <h1 className="text-2xl font-bold mb-4">${project.projectName}</h1>\n      <p>${project.description}</p>\n      \n      {/* TODO: Implement the main interface */}\n      \n    </div>\n  );\n};\n\nexport default HomePage;`,
-        isComplete: false, // Intentionally mark this as incomplete
+        isComplete: false,
         challenges: [
           {
             description: "Implement the main interface",
@@ -305,8 +279,8 @@ export class GeminiCodeGenerator {
         
         files.push({
           path,
-          content: `import React from 'react';\n\n// TODO: Implement ${challenge.description}\n// This file needs implementation for the ${challenge.featureName} feature\n\nconst ${this._getComponentName(path)} = () => {\n  // TODO: This is intentionally incomplete\n  return (\n    <div className="p-4 border border-dashed border-amber-500 rounded-md">\n      <h2 className="text-lg font-medium mb-2">${challenge.featureName}</h2>\n      <p className="text-gray-500">This component needs implementation</p>\n      {/* \n        CHALLENGE: ${challenge.description}\n        DIFFICULTY: ${challenge.difficulty}\n        HINT: ${challenge.hints[0]}\n      */}\n    </div>\n  );\n};\n\nexport default ${this._getComponentName(path)};`,
-          isComplete: false, // Intentionally mark challenge files as incomplete
+          content: `import React from 'react';\n\n// TODO: Implement ${challenge.description}\n// This file needs implementation for the ${challenge.featureName} feature\n\nconst ${this._getComponentName(path)} = () => {\n  return (\n    <div>\n      {/* TODO: Implement ${challenge.description} */}\n      <p>This component needs implementation</p>\n    </div>\n  );\n};\n\nexport default ${this._getComponentName(path)};`,
+          isComplete: false,
           challenges: [
             {
               description: challenge.description,

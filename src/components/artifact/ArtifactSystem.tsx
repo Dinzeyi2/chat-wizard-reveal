@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
@@ -16,12 +15,6 @@ interface ArtifactFile {
   path: string;
   language: string;
   content: string;
-  isComplete?: boolean; // Flag to indicate if this file is complete or intentionally partial
-  challenges?: {    // Information about what needs to be completed in this file
-    description: string;
-    difficulty: 'easy' | 'medium' | 'hard';
-    hints: string[];
-  }[];
 }
 
 interface Artifact {
@@ -29,8 +22,6 @@ interface Artifact {
   title: string;
   files: ArtifactFile[];
   description?: string;
-  isPartialProject?: boolean; // Flag to indicate this is an intentionally incomplete project
-  projectPrompt?: string;     // The original prompt used to generate this partial project
 }
 
 interface ArtifactContextType {
@@ -355,19 +346,6 @@ export const ArtifactViewer: React.FC = () => {
                     </div>
                   </div>
                   <div className="code-container flex-1 overflow-auto bg-zinc-900">
-                    {/* Show incomplete code indicator for intentionally partial files */}
-                    {currentFile.isComplete === false && (
-                      <div className="bg-amber-500/10 border-l-4 border-amber-500 p-2 text-amber-700 text-sm">
-                        <p className="font-medium">Incomplete Code</p>
-                        <p>This file is intentionally incomplete. Some parts need to be implemented.</p>
-                        {currentFile.challenges && currentFile.challenges.length > 0 && (
-                          <div className="mt-2">
-                            <p className="font-medium">Challenge ({currentFile.challenges[0].difficulty}):</p>
-                            <p>{currentFile.challenges[0].description}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
                     {isEditMode ? (
                       <Editor
                         height="100%"
@@ -409,12 +387,6 @@ export const ArtifactViewer: React.FC = () => {
             ) : (
               <div className="files-container p-4 bg-zinc-900 h-full">
                 <h3 className="text-lg font-medium text-gray-200 mb-4">All Files</h3>
-                {currentArtifact.isPartialProject && (
-                  <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-md">
-                    <h4 className="font-medium text-amber-300 mb-1">Intentionally Incomplete Project</h4>
-                    <p className="text-sm text-amber-200/70">This is a partial implementation based on the prompt: "{currentArtifact.projectPrompt}"</p>
-                  </div>
-                )}
                 <div className="grid gap-2">
                   {currentArtifact.files.map(file => (
                     <div 
@@ -428,18 +400,10 @@ export const ArtifactViewer: React.FC = () => {
                       <div className="flex items-center">
                         <File className="h-4 w-4 mr-2 text-gray-400" />
                         <span className="text-sm text-gray-300">{file.path}</span>
-                        {file.isComplete === false && (
-                          <span className="ml-2 px-1.5 py-0.5 text-xs bg-amber-500/20 text-amber-500 rounded">Incomplete</span>
-                        )}
                       </div>
                       <div className="mt-1 text-xs text-gray-500">
                         {getLanguageFromPath(file.path).toUpperCase()} · {file.content.length} characters
                       </div>
-                      {file.challenges && file.challenges.length > 0 && (
-                        <div className="mt-1.5 text-xs bg-blue-500/10 text-blue-500 px-2 py-1 rounded">
-                          Challenge: {file.challenges[0].description}
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>

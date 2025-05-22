@@ -20,15 +20,13 @@ interface MarkdownRendererProps {
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message }) => {
   // Add state to track if an app has been generated in this message
   const [hasGeneratedApp, setHasGeneratedApp] = useState(false);
-  const [hasGeneratedChallengeCode, setHasGeneratedChallengeCode] = useState(false);
   const [cleanedContent, setCleanedContent] = useState(content);
   const [activeTab, setActiveTab] = useState<string>("content");
   // Get artifact system context to open code viewer
   const { openArtifact } = useArtifact();
   
-  // Effect to check if this message indicates app generation or code challenge
+  // Effect to check if this message indicates app generation
   useEffect(() => {
-    // Check if this is a full app generation message
     if (message && 
         message.role === "assistant" && 
         message.metadata?.projectId && 
@@ -48,8 +46,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
             name: file.path.split('/').pop(),
             path: file.path,
             language: file.path.split('.').pop() || 'js',
-            content: file.content,
-            isComplete: file.isComplete !== false // Default to true unless explicitly set to false
+            content: file.content
           }));
           
           // Create an artifact object with ONLY code, no explanations
@@ -57,8 +54,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
             id: message.metadata.projectId,
             title: appData.projectName || "Generated App",
             description: "Generated application code",
-            files: artifactFiles,
-            isPartialProject: false
+            files: artifactFiles
           };
           
           // Open the artifact viewer immediately when we detect app generation
@@ -68,55 +64,11 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
         }
       }
     }
-    
-    // Check if this is a code challenge / partial project message
-    if (message && 
-        message.role === "assistant" && 
-        (content.includes("partial implementation") || 
-         content.includes("code challenge") || 
-         content.includes("coding challenges") ||
-         content.includes("incomplete project"))) {
-      
-      setHasGeneratedChallengeCode(true);
-      
-      // Check if we have challenge data in the message metadata
-      if (message.metadata?.challengeData) {
-        try {
-          const challengeData = message.metadata.challengeData;
-          
-          // Transform files into artifact format with challenge metadata
-          const artifactFiles = challengeData.files.map((file: any) => ({
-            id: `file-${file.path.replace(/\//g, '-')}`,
-            name: file.path.split('/').pop(),
-            path: file.path,
-            language: file.path.split('.').pop() || 'js',
-            content: file.content,
-            isComplete: file.isComplete !== false, // Default to true unless explicitly set to false
-            challenges: file.challenges || []
-          }));
-          
-          // Create an artifact object
-          const artifact = {
-            id: message.id || `challenge-${Date.now()}`,
-            title: challengeData.projectName || "Code Challenge",
-            description: challengeData.description || "Intentionally incomplete code",
-            files: artifactFiles,
-            isPartialProject: true,
-            projectPrompt: message.metadata.prompt || challengeData.description
-          };
-          
-          // Open the artifact viewer
-          openArtifact(artifact);
-        } catch (error) {
-          console.error("Failed to automatically open challenge code:", error);
-        }
-      }
-    }
   }, [message, content, openArtifact]);
 
   // Effect to update content display based on app generation
   useEffect(() => {
-    if (hasGeneratedApp || hasGeneratedChallengeCode) {
+    if (hasGeneratedApp) {
       // Clean the content by removing JSON and code blocks to keep only explanations
       const cleanContent = content
         .replace(/```json[\s\S]*?```/g, "[App code is available in the editor above]")
@@ -126,7 +78,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
     } else {
       setCleanedContent(content);
     }
-  }, [content, hasGeneratedApp, hasGeneratedChallengeCode]);
+  }, [content, hasGeneratedApp]);
 
   // Function to apply code updates when suggested by the AI
   const handleApplyCodeUpdate = () => {
@@ -172,22 +124,12 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
   // Check if this message has code updates
   const hasCodeUpdate = message?.metadata?.codeUpdate;
 
-  // Show a cleaner view for challenge code messages
-  if (message && message.role === "assistant" && hasGeneratedChallengeCode) {
-    return (
-      <div>
-        <div className="mb-4 p-3 bg-amber-50 border border-amber-100 rounded-lg">
-          <p className="font-medium text-amber-800">
-            I've created a partial implementation for you to complete. View the code and challenges in the editor above.
-          </p>
-        </div>
-        <div dangerouslySetInnerHTML={{ __html: processContent(cleanedContent) }} />
-      </div>
-    );
-  }
-
   // Show a cleaner view for app generation messages
-  if (message && message.role === "assistant" && hasGeneratedApp) {
+  if (message && 
+      message.role === "assistant" && 
+      message.metadata?.projectId && 
+      hasGeneratedApp) {
+    
     return (
       <div>
         <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
