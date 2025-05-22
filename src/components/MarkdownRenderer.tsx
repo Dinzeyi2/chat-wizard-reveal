@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Message } from "@/types/chat";
 import { marked } from "marked";
@@ -36,58 +35,50 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
          content.includes("app generation successful"))) {
       setHasGeneratedApp(true);
       
-      // Clean the content by removing the JSON code block
-      const cleanContent = content.replace(/```json[\s\S]*?```/g, 
-        "[App code is available in the artifact viewer above]");
+      // When we detect app generation, automatically extract and open the code files
+      if (message.metadata?.appData?.files) {
+        try {
+          const appData = message.metadata.appData;
+          
+          // Transform files into artifact format
+          const artifactFiles = appData.files.map((file: any) => ({
+            id: `file-${file.path.replace(/\//g, '-')}`,
+            name: file.path.split('/').pop(),
+            path: file.path,
+            language: file.path.split('.').pop() || 'js',
+            content: file.content
+          }));
+          
+          // Create an artifact object with ONLY code, no explanations
+          const artifact = {
+            id: message.metadata.projectId,
+            title: appData.projectName || "Generated App",
+            description: "Generated application code",
+            files: artifactFiles
+          };
+          
+          // Open the artifact viewer immediately when we detect app generation
+          openArtifact(artifact);
+        } catch (error) {
+          console.error("Failed to automatically open app code:", error);
+        }
+      }
+    }
+  }, [message, content, openArtifact]);
+
+  // Effect to update content display based on app generation
+  useEffect(() => {
+    if (hasGeneratedApp) {
+      // Clean the content by removing JSON and code blocks to keep only explanations
+      const cleanContent = content
+        .replace(/```json[\s\S]*?```/g, "[App code is available in the editor above]")
+        .replace(/```(?:js|jsx|ts|tsx|html|css)[\s\S]*?```/g, "[Code is available in the editor above]");
       
       setCleanedContent(cleanContent);
     } else {
       setCleanedContent(content);
     }
-  }, [content, message]);
-
-  // Effect to extract app data and open artifact viewer if app code is detected
-  useEffect(() => {
-    if (message?.role === "assistant" && message.metadata?.projectId) {
-      // Check if we have appData in the metadata
-      if (message.metadata.appData) {
-        try {
-          const appData = message.metadata.appData;
-          
-          // If we have files, open the artifact viewer
-          if (appData.files && Array.isArray(appData.files)) {
-            // Transform files into artifact format
-            const artifactFiles = appData.files.map((file: any) => ({
-              id: `file-${file.path.replace(/\//g, '-')}`,
-              name: file.path.split('/').pop(),
-              path: file.path,
-              language: file.path.split('.').pop() || 'js',
-              content: file.content
-            }));
-            
-            // Create an artifact object
-            const artifact = {
-              id: message.metadata.projectId,
-              title: appData.projectName || "Generated App",
-              description: appData.description || "Generated application code",
-              files: artifactFiles
-            };
-            
-            // Open the artifact viewer
-            openArtifact(artifact);
-          }
-        } catch (error) {
-          console.error("Failed to parse app data from message:", error);
-        }
-      }
-      
-      // Check for code analysis feedback messages
-      if (content.includes('AI_CODE_ANALYSIS') || content.includes('CODE_ANALYSIS_RESULT')) {
-        // Here we would handle code analysis feedback messages
-        console.log("Code analysis feedback detected in message");
-      }
-    }
-  }, [message, content, openArtifact]);
+  }, [content, hasGeneratedApp]);
 
   // Function to apply code updates when suggested by the AI
   const handleApplyCodeUpdate = () => {
@@ -119,7 +110,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
     }
   };
 
-  // Process code blocks with syntax highlighting
+  // Process content with syntax highlighting
   const processContent = (markdown: string) => {
     // Use marked's synchronous parsing to avoid TypeScript errors
     const rawHtml = marked.parse(markdown, { async: false });
@@ -133,28 +124,19 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
   // Check if this message has code updates
   const hasCodeUpdate = message?.metadata?.codeUpdate;
 
-  // We'll modify this conditional to only show the warning in specific circumstances
-  // Instead of showing on any app-generation message
+  // Show a cleaner view for app generation messages
   if (message && 
       message.role === "assistant" && 
       message.metadata?.projectId && 
       hasGeneratedApp) {
     
-    // Only show the warning if this isn't the first app-generation message in the conversation
-    // We need to check if this message is NOT the first one with a projectId
-    const isMultiAppWarningNeeded = message.content.includes("I've generated") && 
-      message.metadata?.projectId && 
-      message.id !== message.id; // Always false, meaning this condition is never met for initial generation
-    
     return (
       <div>
-        {isMultiAppWarningNeeded && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
-            <p className="text-amber-800 font-medium">
-              An app has already been generated in this conversation. If you'd like to create a new app, please start a new conversation.
-            </p>
-          </div>
-        )}
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+          <p className="font-medium text-blue-800">
+            Application code is ready! View it in the code editor above.
+          </p>
+        </div>
         <div dangerouslySetInnerHTML={{ __html: processContent(cleanedContent) }} />
       </div>
     );
@@ -201,8 +183,8 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
     );
   }
 
-  // Regular rendering with cleaned content if it's an app generation message
-  return <div dangerouslySetInnerHTML={{ __html: processContent(hasGeneratedApp ? cleanedContent : content) }} />;
+  // Regular rendering for normal content
+  return <div dangerouslySetInnerHTML={{ __html: processContent(cleanedContent) }} />;
 };
 
 export default MarkdownRenderer;

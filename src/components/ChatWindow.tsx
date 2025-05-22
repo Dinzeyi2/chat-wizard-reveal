@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";
@@ -67,27 +68,43 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
       return;
     }
     
-    // Extract all code blocks
+    // Extract all code blocks - IMPORTANT: This should ONLY extract the code inside the blocks, not explanatory text
     while ((match = codeRegex.exec(messageContentStr)) !== null) {
       count++;
-      const language = match[0].startsWith("```js") ? "javascript" : 
-                      match[0].startsWith("```ts") ? "typescript" : 
-                      match[0].startsWith("```html") ? "html" : 
-                      match[0].startsWith("```css") ? "css" : 
-                      "javascript"; // Default to JavaScript
-                      
+      const codeBlockContent = match[0];
+      const language = 
+        codeBlockContent.startsWith("```js") ? "javascript" : 
+        codeBlockContent.startsWith("```ts") ? "typescript" : 
+        codeBlockContent.startsWith("```html") ? "html" : 
+        codeBlockContent.startsWith("```css") ? "css" : 
+        codeBlockContent.startsWith("```jsx") ? "javascript" :
+        codeBlockContent.startsWith("```tsx") ? "typescript" :
+        codeBlockContent.startsWith("```json") ? "json" :
+        "javascript"; // Default to JavaScript
+      
+      // Extract ONLY the code content between the backticks, not including the backticks themselves
+      const codeContent = match[1].trim();
+      
+      // Create a proper file name based on language
+      const extension = language === "javascript" ? "js" : 
+                        language === "typescript" ? "ts" : 
+                        language === "html" ? "html" :
+                        language === "css" ? "css" :
+                        language === "json" ? "json" :
+                        "js";
+      
       codeBlocks.push({
         id: `code-block-${count}`,
-        name: `Code Block ${count}`,
-        path: `code-block-${count}.${language === "javascript" ? "js" : language === "typescript" ? "ts" : language}`,
+        name: `code-${count}.${extension}`,
+        path: `code-${count}.${extension}`,
         language: language,
-        content: match[1]
+        content: codeContent // Use ONLY the extracted code content
       });
     }
     
     // If no code blocks found with markdown syntax, check for app generation message with project info
-    if (codeBlocks.length === 0 && message.metadata?.projectId && message.content.includes("I've generated")) {
-      console.log("App generation message detected, checking for files in metadata");
+    if (codeBlocks.length === 0 && message.metadata?.projectId) {
+      console.log("Checking for app files in metadata");
       
       // Try to extract files from metadata if this is an app generation message
       if (message.metadata.appData && message.metadata.appData.files) {
@@ -99,48 +116,61 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
             name: file.path,
             path: file.path,
             language: getFileLanguage(file.path),
-            content: file.content
+            content: file.content // This is already just the code content
           });
         });
       }
     }
     
-    // If still no code blocks found, use the whole message but try to clean it
-    if (codeBlocks.length === 0) {
-      // Clean the content - try to extract just code-like parts
-      let content = messageContentStr;
+    // If still no code blocks found but message suggests there should be code
+    if (codeBlocks.length === 0 && messageContentStr.includes("I've generated")) {
+      console.log("No code blocks found, but message suggests code generation");
       
-      // Remove markdown headings
-      content = content.replace(/^#+\s+.*$/gm, '');
-      // Remove any explanatory text at the beginning
-      if (content.includes("I've generated")) {
-        const parts = content.split(/(?=```)/);
-        if (parts.length > 1) {
-          content = parts.slice(1).join('');
-        }
+      // Parse app structure from message content - look for what appears to be file paths or component names
+      const possibleComponentRegex = /(?:component|file|created):\s*['"]*([A-Z][A-Za-z]*(?:\.(?:js|jsx|ts|tsx))?)/g;
+      let componentMatch;
+      
+      while ((componentMatch = possibleComponentRegex.exec(messageContentStr)) !== null) {
+        const componentName = componentMatch[1];
+        
+        // Create a placeholder file for this component
+        codeBlocks.push({
+          id: `component-${componentName}`,
+          name: `${componentName}.jsx`,
+          path: `${componentName}.jsx`,
+          language: "javascript",
+          content: `// This is a placeholder for ${componentName}\n// The actual code was not provided in a code block format\n\nimport React from 'react';\n\nconst ${componentName} = () => {\n  return (\n    <div>\n      ${componentName} Component\n    </div>\n  );\n};\n\nexport default ${componentName};`
+        });
       }
       
-      codeBlocks.push({
-        id: `message-content-${message.id}`,
-        name: "Message Content",
-        path: "message-content.js",
-        language: "javascript",
-        content: content.replace(/(<([^>]+)>)/gi, "") // Strip HTML tags
-      });
+      // If we still don't have any code blocks, add a generic placeholder
+      if (codeBlocks.length === 0) {
+        codeBlocks.push({
+          id: `generated-app`,
+          name: "App.jsx",
+          path: "App.jsx",
+          language: "javascript",
+          content: `// Generated App\n// Note: The AI didn't provide code in a structured format\n// This is a placeholder component\n\nimport React from 'react';\n\nfunction App() {\n  return (\n    <div className="app">\n      <h1>Generated Application</h1>\n      <p>The AI mentioned generating an app, but didn't provide code blocks.</p>\n    </div>\n  );\n}\n\nexport default App;`
+        });
+      }
     }
     
-    // Create an artifact object
-    const artifact = {
-      id: `message-${message.id}`,
-      title: message.metadata?.projectId ? "Generated App Code" : "Message Code",
-      files: codeBlocks,
-      description: "Code from assistant's message"
-    };
-    
-    // Open the artifact viewer with the code
-    openArtifact(artifact);
-    
-    console.log(`Opened artifact with ${codeBlocks.length} files`);
+    // If we have code blocks, open them in the artifact viewer
+    if (codeBlocks.length > 0) {
+      // Create an artifact object
+      const artifact = {
+        id: `message-${message.id}`,
+        title: message.metadata?.projectId ? "Generated App Code" : "Code Snippets",
+        files: codeBlocks,
+        description: "Code from assistant's message"
+      };
+      
+      // Open the artifact viewer with the code
+      openArtifact(artifact);
+      console.log(`Opened artifact with ${codeBlocks.length} files`);
+    } else {
+      console.error("No code blocks found to display");
+    }
   };
   
   return (
