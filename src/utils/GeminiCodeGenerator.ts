@@ -74,8 +74,7 @@ export class GeminiCodeGenerator {
         body: { 
           prompt: request.prompt,
           completionLevel: request.completionLevel || 'intermediate',
-          challengeType: request.challengeType || 'fullstack',
-          generateIncomplete: true
+          challengeType: request.challengeType || 'fullstack'
         }
       });
       
@@ -96,20 +95,15 @@ export class GeminiCodeGenerator {
       this.log('Error generating code challenge:', error.message);
       
       // Use the local generator as a fallback
-      return this.generateLocalChallenge(request.prompt, request.completionLevel || 'intermediate', true);
+      return this.generateLocalChallenge(request.prompt, request.completionLevel || 'intermediate');
     }
   }
   
   /**
    * Generate a project directly using the local ChallengeGenerator
    * This is a fallback if the Gemini API is not available
-   * @param generateIncomplete Whether to generate intentionally incomplete code
    */
-  generateLocalChallenge(
-    prompt: string, 
-    completionLevel: 'beginner' | 'intermediate' | 'advanced',
-    generateIncomplete: boolean = true
-  ): ChallengeResult {
+  generateLocalChallenge(prompt: string, completionLevel: 'beginner' | 'intermediate' | 'advanced'): ChallengeResult {
     try {
       this.log('Generating local challenge for:', prompt);
       
@@ -132,8 +126,8 @@ export class GeminiCodeGenerator {
         filesPaths: challenge.filesPaths
       }));
       
-      // Create intentionally incomplete file structure based on the project
-      const files = this._generateBasicFiles(generatedProject, generateIncomplete);
+      // Create a simple file structure based on the project
+      const files = this._generateBasicFiles(generatedProject);
       
       return {
         success: true,
@@ -230,9 +224,8 @@ export class GeminiCodeGenerator {
   
   /**
    * Generate basic file structure for a local project
-   * @param generateIncomplete Whether to generate intentionally incomplete files
    */
-  private _generateBasicFiles(project: GeneratedProject, generateIncomplete: boolean = true) {
+  private _generateBasicFiles(project: GeneratedProject) {
     // Generate minimal files for the project
     const files: {
       path: string;
@@ -252,57 +245,52 @@ export class GeminiCodeGenerator {
       {
         path: "src/pages/Home.tsx",
         content: `import React from 'react';\n\nconst HomePage = () => {\n  return (\n    <div className="container mx-auto p-4">\n      <h1 className="text-2xl font-bold mb-4">${project.projectName}</h1>\n      <p>${project.description}</p>\n      \n      {/* TODO: Implement the main interface */}\n      \n    </div>\n  );\n};\n\nexport default HomePage;`,
-        isComplete: !generateIncomplete, // Mark as incomplete if generateIncomplete is true
-        challenges: generateIncomplete ? [
+        isComplete: false,
+        challenges: [
           {
             description: "Implement the main interface",
             difficulty: "easy",
             hints: ["Consider what components you'll need", "Look at the project structure for guidance"]
           }
-        ] : []
+        ]
       }
     ];
     
-    // Add challenge-specific files - intentionally incomplete
-    if (project.challenges && project.challenges.length > 0) {
-      project.challenges.forEach(challenge => {
-        if (challenge.filesPaths && challenge.filesPaths.length > 0) {
-          const path = challenge.filesPaths[0].replace('frontend/', 'src/').replace('.js', '.tsx');
-          
-          // Map the beginner/intermediate/advanced difficulty to easy/medium/hard
-          let mappedDifficulty: 'easy' | 'medium' | 'hard';
-          switch (challenge.difficulty) {
-            case 'beginner':
-              mappedDifficulty = 'easy';
-              break;
-            case 'intermediate':
-              mappedDifficulty = 'medium';
-              break;
-            case 'advanced':
-              mappedDifficulty = 'hard';
-              break;
-            default:
-              mappedDifficulty = 'medium';
-          }
-          
-          // Only make the file incomplete if generateIncomplete is true
-          const isIncomplete = generateIncomplete;
-          
-          files.push({
-            path,
-            content: `import React from 'react';\n\n${isIncomplete ? `// TODO: Implement ${challenge.description}\n// This file needs implementation for the ${challenge.featureName} feature\n` : ''}\n\nconst ${this._getComponentName(path)} = () => {\n  ${isIncomplete ? '// TODO: Add state and props as needed\n  ' : ''}\n  return (\n    <div>\n      ${isIncomplete ? `{/* TODO: Implement ${challenge.description} */}\n      <p>This component needs implementation</p>` : `<h2>${challenge.featureName}</h2>\n      <p>Component implementation</p>`}\n    </div>\n  );\n};\n\nexport default ${this._getComponentName(path)};`,
-            isComplete: !isIncomplete,
-            challenges: isIncomplete ? [
-              {
-                description: challenge.description,
-                difficulty: mappedDifficulty,
-                hints: challenge.hints
-              }
-            ] : []
-          });
+    // Add challenge-specific files
+    project.challenges.forEach(challenge => {
+      if (challenge.filesPaths && challenge.filesPaths.length > 0) {
+        const path = challenge.filesPaths[0].replace('frontend/', 'src/').replace('.js', '.tsx');
+        
+        // Map the beginner/intermediate/advanced difficulty to easy/medium/hard
+        let mappedDifficulty: 'easy' | 'medium' | 'hard';
+        switch (challenge.difficulty) {
+          case 'beginner':
+            mappedDifficulty = 'easy';
+            break;
+          case 'intermediate':
+            mappedDifficulty = 'medium';
+            break;
+          case 'advanced':
+            mappedDifficulty = 'hard';
+            break;
+          default:
+            mappedDifficulty = 'medium';
         }
-      });
-    }
+        
+        files.push({
+          path,
+          content: `import React from 'react';\n\n// TODO: Implement ${challenge.description}\n// This file needs implementation for the ${challenge.featureName} feature\n\nconst ${this._getComponentName(path)} = () => {\n  return (\n    <div>\n      {/* TODO: Implement ${challenge.description} */}\n      <p>This component needs implementation</p>\n    </div>\n  );\n};\n\nexport default ${this._getComponentName(path)};`,
+          isComplete: false,
+          challenges: [
+            {
+              description: challenge.description,
+              difficulty: mappedDifficulty,
+              hints: challenge.hints
+            }
+          ]
+        });
+      }
+    });
     
     return files;
   }

@@ -215,7 +215,7 @@ function createMockAppResponse(prompt, projectId, appDesign) {
   const cleanPrompt = prompt.replace(/[^a-zA-Z0-9 ]/g, '').trim();
   const appName = appDesign?.projectName || `${cleanPrompt.split(' ')[0]}App`;
   
-  // Create some mock files - with intentionally incomplete parts
+  // Create some mock files
   const files = [
     {
       path: "src/App.jsx",
@@ -248,72 +248,31 @@ function ${appName.replace(/[^a-zA-Z0-9]/g, '')}() {
   );
 }
 
-export default ${appName.replace(/[^a-zA-Z0-9]/g, '')};`,
-      isComplete: true
-    },
-    {
-      path: "src/components/ThemeSwitcher.jsx",
-      content: `// TODO: Implement a theme switcher component
-import React from 'react';
-
-const ThemeSwitcher = () => {
-  // TODO: Add state to track current theme (light/dark)
-  
-  // TODO: Implement toggle function
-  
-  return (
-    <div className="theme-switcher">
-      {/* TODO: Add toggle button with appropriate styling */}
-      <button className="p-2 border rounded">
-        Toggle Theme (Not Implemented)
-      </button>
-    </div>
-  );
-};
-
-export default ThemeSwitcher;`,
-      isComplete: false,
-      challenges: [
-        {
-          description: "Implement the theme switcher functionality",
-          difficulty: "easy",
-          hints: [
-            "Use useState to track the current theme",
-            "Create a toggle function that switches between themes",
-            "Add appropriate styles for the toggle button"
-          ]
-        }
-      ]
+export default ${appName.replace(/[^a-zA-Z0-9]/g, '')};`
     }
   ];
 
-  // Create mock challenges - explicitly mark some as incomplete
+  // Create mock challenges
   const challenges = [
     {
       id: "challenge-1",
       title: "Add a Theme Switcher",
       description: "Add a button that toggles between light and dark theme.",
-      filesPaths: ["src/components/ThemeSwitcher.jsx"]
-    },
-    {
-      id: "challenge-2", 
-      title: "Implement Feature Component",
-      description: "Create a new component that showcases the main feature of this app.",
-      filesPaths: ["src/components/Feature.jsx"]
+      filesPaths: ["src/App.jsx"]
     }
   ];
 
   // Create mock explanation
-  const explanation = `I've generated a simple React application with intentionally incomplete parts for you to implement. Some components have TODO comments highlighting what needs to be done. This is based on your prompt "${prompt}".`;
+  const explanation = `I've generated a simple React application with basic functionality based on your prompt "${prompt}". Since the AI model is currently unavailable, I've created a starter template for you to build upon.`;
 
   return {
     projectId,
     projectName: appName,
-    description: `A simple app based on the prompt: "${prompt}" with intentional challenges for you to solve`,
+    description: `A simple app based on the prompt: "${prompt}"`,
     files: files,
     challenges: challenges,
     explanation: explanation,
-    firstStepGuidance: "Let's start by implementing the ThemeSwitcher component, which is intentionally incomplete. Look for the TODO comments to guide your implementation.",
+    firstStepGuidance: "Let's start by exploring this simple app template and expanding it based on your specific needs.",
     isMock: true
   };
 }

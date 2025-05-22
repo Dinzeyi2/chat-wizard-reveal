@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Message } from "@/types/chat";
 import { marked } from "marked";
@@ -47,16 +46,14 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
             name: file.path.split('/').pop(),
             path: file.path,
             language: file.path.split('.').pop() || 'js',
-            content: file.content,
-            isComplete: file.isComplete !== undefined ? file.isComplete : true, // Mark if file is incomplete
-            challenges: file.challenges || [] // Include any challenges associated with the file
+            content: file.content
           }));
           
           // Create an artifact object with ONLY code, no explanations
           const artifact = {
             id: message.metadata.projectId,
             title: appData.projectName || "Generated App",
-            description: "Generated application code with intentional gaps to complete",
+            description: "Generated application code",
             files: artifactFiles
           };
           
@@ -93,8 +90,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
           name: 'updated-code.js', // Default name
           path: 'updated-code.js',
           language: 'javascript', // Default language
-          content: message.metadata.codeUpdate,
-          isComplete: false // Mark this as incomplete for the user to work on
+          content: message.metadata.codeUpdate
         }
       ];
       
@@ -102,7 +98,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
       const artifact = {
         id: `code-update-${Date.now()}`,
         title: "Code Update",
-        description: "Suggested code update with intentional gaps",
+        description: "Suggested code update",
         files: artifactFiles
       };
       
@@ -134,23 +130,12 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
       message.metadata?.projectId && 
       hasGeneratedApp) {
     
-    // Check if this project has intentional challenges
-    const hasChallenges = message.metadata?.appData?.challenges && 
-                          message.metadata.appData.challenges.length > 0;
-    
     return (
       <div>
         <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
           <p className="font-medium text-blue-800">
-            {hasChallenges 
-              ? "Application code is ready! Some files are intentionally incomplete for you to implement."
-              : "Application code is ready! View it in the code editor above."}
+            Application code is ready! View it in the code editor above.
           </p>
-          {hasChallenges && (
-            <p className="text-blue-700 mt-2">
-              The AI has created challenges for you to implement. Check the files marked as "incomplete" in the editor.
-            </p>
-          )}
         </div>
         <div dangerouslySetInnerHTML={{ __html: processContent(cleanedContent) }} />
       </div>

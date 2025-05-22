@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";
-import { ArtifactProvider, useArtifact, ArtifactLayout } from "./artifact/ArtifactSystem";
+import { ArtifactProvider, useArtifact } from "./artifact/ArtifactSystem";
 import { FileCode, ChevronRight } from "lucide-react";
 import { Button } from "./ui/button";
 import AgentOrchestration from "./AgentOrchestration";
@@ -32,37 +32,6 @@ const ArtifactHandler = ({ messages, projectId }: { messages: Message[], project
       if (appGeneratedMessage) {
         // Logic to extract app data and open in artifact viewer
         console.log("Found app generation message for project:", projectId);
-        
-        // If the message has appData with files, automatically open it in the artifact viewer
-        if (appGeneratedMessage.metadata?.appData?.files) {
-          const files = appGeneratedMessage.metadata.appData.files;
-          
-          // Create an artifact object with intentionally incomplete files
-          const codeBlocks = files.map((file: any, index: number) => ({
-            id: `app-file-${index}`,
-            name: file.path,
-            path: file.path,
-            language: getFileLanguage(file.path),
-            content: file.content,
-            isComplete: file.isComplete !== undefined ? file.isComplete : true,
-            challenges: file.challenges || []
-          }));
-          
-          // If we have code blocks, open them in the artifact viewer
-          if (codeBlocks.length > 0) {
-            // Create an artifact object
-            const artifact = {
-              id: `message-${appGeneratedMessage.id}`,
-              title: "Generated App Code (Incomplete)",
-              files: codeBlocks,
-              description: "Code from assistant's message with intentional challenges"
-            };
-            
-            // Open the artifact viewer with the code
-            openArtifact(artifact);
-            console.log(`Auto-opened artifact with ${codeBlocks.length} files`);
-          }
-        }
       }
     }
   }, [messages, projectId, openArtifact]);
@@ -124,30 +93,12 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
                         language === "json" ? "json" :
                         "js";
       
-      // Determine if the code is intentionally incomplete
-      const isIncomplete = 
-        codeContent.includes("TODO:") || 
-        codeContent.includes("FIXME:") || 
-        codeContent.includes("// Implement") ||
-        codeContent.includes("/* Needs implementation */");
-      
-      // Add challenges for incomplete files
-      const challenges = isIncomplete ? [
-        {
-          description: "Complete this implementation",
-          difficulty: "medium" as const,
-          hints: ["Look for TODO or FIXME comments"]
-        }
-      ] : [];
-      
       codeBlocks.push({
         id: `code-block-${count}`,
         name: `code-${count}.${extension}`,
         path: `code-${count}.${extension}`,
         language: language,
-        content: codeContent, // Use ONLY the extracted code content
-        isComplete: !isIncomplete,
-        challenges: challenges
+        content: codeContent // Use ONLY the extracted code content
       });
     }
     
@@ -160,21 +111,12 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
         const appFiles = message.metadata.appData.files;
         
         appFiles.forEach((file: any, index: number) => {
-          // Determine if the file is intentionally incomplete
-          const isIncomplete = file.isComplete === false ||
-            file.content.includes("TODO:") || 
-            file.content.includes("FIXME:") || 
-            file.content.includes("// Implement") ||
-            file.content.includes("/* Needs implementation */");
-            
           codeBlocks.push({
             id: `app-file-${index}`,
             name: file.path,
             path: file.path,
             language: getFileLanguage(file.path),
-            content: file.content, // This is already just the code content
-            isComplete: !isIncomplete,
-            challenges: file.challenges || []
+            content: file.content // This is already just the code content
           });
         });
       }
@@ -191,40 +133,24 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
       while ((componentMatch = possibleComponentRegex.exec(messageContentStr)) !== null) {
         const componentName = componentMatch[1];
         
-        // Create a placeholder file for this component - mark it as intentionally incomplete
+        // Create a placeholder file for this component
         codeBlocks.push({
           id: `component-${componentName}`,
           name: `${componentName}.jsx`,
           path: `${componentName}.jsx`,
           language: "javascript",
-          content: `// This is an intentionally incomplete implementation for ${componentName}\n// TODO: Implement this component\n\nimport React from 'react';\n\nconst ${componentName} = () => {\n  return (\n    <div>\n      {/* TODO: Implement the ${componentName} component */}\n      <p>This component needs implementation</p>\n    </div>\n  );\n};\n\nexport default ${componentName};`,
-          isComplete: false,
-          challenges: [
-            {
-              description: `Implement the ${componentName} component`,
-              difficulty: "medium",
-              hints: ["Start by identifying the component's purpose", "Add the necessary props and state"]
-            }
-          ]
+          content: `// This is a placeholder for ${componentName}\n// The actual code was not provided in a code block format\n\nimport React from 'react';\n\nconst ${componentName} = () => {\n  return (\n    <div>\n      ${componentName} Component\n    </div>\n  );\n};\n\nexport default ${componentName};`
         });
       }
       
-      // If we still don't have any code blocks, add a generic placeholder - intentionally incomplete
+      // If we still don't have any code blocks, add a generic placeholder
       if (codeBlocks.length === 0) {
         codeBlocks.push({
           id: `generated-app`,
           name: "App.jsx",
           path: "App.jsx",
           language: "javascript",
-          content: `// TODO: Implement the main App component\n// This is an intentionally incomplete implementation\n\nimport React from 'react';\n\nfunction App() {\n  // TODO: Add necessary state and logic\n  \n  return (\n    <div className="app">\n      <h1>Generated Application</h1>\n      {/* TODO: Implement the main UI components */}\n      <p>This application needs implementation based on the requirements.</p>\n    </div>\n  );\n}\n\nexport default App;`,
-          isComplete: false,
-          challenges: [
-            {
-              description: "Implement the main application structure",
-              difficulty: "medium",
-              hints: ["Start by adding any necessary state", "Break down the UI into smaller components"]
-            }
-          ]
+          content: `// Generated App\n// Note: The AI didn't provide code in a structured format\n// This is a placeholder component\n\nimport React from 'react';\n\nfunction App() {\n  return (\n    <div className="app">\n      <h1>Generated Application</h1>\n      <p>The AI mentioned generating an app, but didn't provide code blocks.</p>\n    </div>\n  );\n}\n\nexport default App;`
         });
       }
     }
@@ -234,9 +160,9 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
       // Create an artifact object
       const artifact = {
         id: `message-${message.id}`,
-        title: message.metadata?.projectId ? "Generated App Code (Incomplete)" : "Code Snippets",
+        title: message.metadata?.projectId ? "Generated App Code" : "Code Snippets",
         files: codeBlocks,
-        description: "Code from assistant's message with intentional challenges"
+        description: "Code from assistant's message"
       };
       
       // Open the artifact viewer with the code
@@ -305,110 +231,70 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
   );
   
   return (
-    <ArtifactLayout>
-      <div className="px-4 py-5 md:px-8 lg:px-12">
-        {/* Use the ArtifactHandler to manage artifacts */}
-        {projectId && (
-          <ArtifactProvider>
-            <ArtifactHandler messages={messages} projectId={projectId} />
-            
-            {/* Always show orchestration UI if we have a project */}
-            <AgentOrchestration projectId={projectId} />
-            
-            {messages.map((message) => (
-              <div key={message.id} className="mb-8">
-                {message.role === "user" ? (
-                  <div className="flex flex-col items-end">
-                    <div className="bg-gray-100 rounded-3xl px-6 py-4 max-w-3xl">
-                      <MarkdownRenderer content={message.content} />
-                    </div>
+    <div className="px-4 py-5 md:px-8 lg:px-12">
+      {/* Use the ArtifactHandler to manage artifacts */}
+      {projectId && <ArtifactHandler messages={messages} projectId={projectId} />}
+      
+      {/* Always show orchestration UI if we have a project */}
+      {projectId && <AgentOrchestration projectId={projectId} />}
+      
+      {messages.map((message) => (
+        <div key={message.id} className="mb-8">
+          {message.role === "user" ? (
+            <div className="flex flex-col items-end">
+              <div className="bg-gray-100 rounded-3xl px-6 py-4 max-w-3xl">
+                <MarkdownRenderer content={message.content} />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="ml-0 bg-white border border-gray-200 rounded-3xl px-6 py-4 max-w-3xl">
+                {/* Display warning only if this is not the first app-generating message */}
+                {hasGeneratedApp && 
+                 message.content.includes("I've generated") && 
+                 message.metadata?.projectId && 
+                 firstAppMessage && 
+                 message.id !== firstAppMessage.id ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+                    <p className="text-amber-800 font-medium">
+                      An app has already been generated in this conversation. If you'd like to create a new app, please start a new conversation.
+                    </p>
                   </div>
-                ) : (
-                  <div>
-                    <div className="ml-0 bg-white border border-gray-200 rounded-3xl px-6 py-4 max-w-3xl">
-                      {/* Display warning only if this is not the first app-generating message */}
-                      {hasGeneratedApp && 
-                      message.content.includes("I've generated") && 
-                      message.metadata?.projectId && 
-                      firstAppMessage && 
-                      message.id !== firstAppMessage.id ? (
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
-                          <p className="text-amber-800 font-medium">
-                            An app has already been generated in this conversation. If you'd like to create a new app, please start a new conversation.
-                          </p>
-                        </div>
-                      ) : null}
-                      
-                      {/* If this is an app-generating message, add a button to view code */}
-                      {message.metadata?.projectId && message.role === "assistant" && (
-                        <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
-                          <p className="font-medium text-blue-800">
-                            App code is available in the artifact viewer. Some parts are intentionally incomplete as challenges for you to implement.
-                          </p>
-                        </div>
-                      )}
-                      
-                      <MarkdownRenderer content={message.content} message={message} />
-                      
-                      {/* Add the code viewer button */}
-                      <div className="mt-3 flex justify-end">
-                        <CodeViewerButton message={message} projectId={projectId} />
-                      </div>
-                    </div>
+                ) : null}
+                
+                {/* If this is an app-generating message, add a button to view code */}
+                {message.metadata?.projectId && message.role === "assistant" && (
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                    <p className="font-medium text-blue-800">
+                      App code is available in the artifact viewer. 
+                    </p>
                   </div>
                 )}
-              </div>
-            ))}
-            
-            {isLoading && (
-              <div className="mb-8">
-                <div className="ml-0 bg-white border border-gray-200 rounded-3xl px-6 py-4">
-                  <div className="flex space-x-2">
-                    <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "0ms" }}></div>
-                    <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "150ms" }}></div>
-                    <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "300ms" }}></div>
-                  </div>
+                
+                <MarkdownRenderer content={message.content} message={message} />
+                
+                {/* Add the code viewer button */}
+                <div className="mt-3 flex justify-end">
+                  <CodeViewerButton message={message} projectId={projectId} />
                 </div>
               </div>
-            )}
-          </ArtifactProvider>
-        )}
-
-        {!projectId && (
-          <>
-            {messages.map((message) => (
-              <div key={message.id} className="mb-8">
-                {message.role === "user" ? (
-                  <div className="flex flex-col items-end">
-                    <div className="bg-gray-100 rounded-3xl px-6 py-4 max-w-3xl">
-                      <MarkdownRenderer content={message.content} />
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="ml-0 bg-white border border-gray-200 rounded-3xl px-6 py-4 max-w-3xl">
-                      <MarkdownRenderer content={message.content} message={message} />
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-            
-            {isLoading && (
-              <div className="mb-8">
-                <div className="ml-0 bg-white border border-gray-200 rounded-3xl px-6 py-4">
-                  <div className="flex space-x-2">
-                    <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "0ms" }}></div>
-                    <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "150ms" }}></div>
-                    <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "300ms" }}></div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </ArtifactLayout>
+            </div>
+          )}
+        </div>
+      ))}
+      
+      {isLoading && (
+        <div className="mb-8">
+          <div className="ml-0 bg-white border border-gray-200 rounded-3xl px-6 py-4">
+            <div className="flex space-x-2">
+              <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "0ms" }}></div>
+              <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "150ms" }}></div>
+              <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "300ms" }}></div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
