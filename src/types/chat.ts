@@ -1,8 +1,9 @@
+import { ReactNode } from 'react';
 
 export interface Message {
   id: string;
   role: "user" | "assistant";
-  content: string;
+  content: string | ReactNode;
   timestamp: Date;
   metadata?: {
     projectId?: string;

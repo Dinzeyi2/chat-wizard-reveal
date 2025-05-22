@@ -1,11 +1,11 @@
+
 import { useState, useEffect, useRef } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
 import { v4 as uuidv4 } from "uuid";
 import { Message } from "@/types/chat";
 import { useLocation, useNavigate } from 'react-router-dom';
-import { getWelcomeMessageBlocks } from "@/components/WelcomeScreen";
-import { useClerk } from "@clerk/clerk-react";
+import WelcomeScreen from "@/components/WelcomeScreen";
 import { ArtifactProvider } from "@/components/artifact/ArtifactSystem";
 import { UICodeGenerator } from "@/utils/UICodeGenerator";
 import { geminiAIService } from "@/utils/GeminiAIService";
@@ -21,7 +21,6 @@ const Index = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useClerk();
 
   // Function to handle retrying failed requests
   const handleRetry = () => {
@@ -63,8 +62,8 @@ const Index = () => {
       const welcomeMessage: Message = {
         id: uuidv4(),
         role: "assistant",
-        content: getWelcomeMessageBlocks(),
-        timestamp: new Date().toISOString()
+        content: <WelcomeScreen onSendMessage={handleSendMessage} />,
+        timestamp: new Date(),
       };
       setMessages([welcomeMessage]);
       setIsFirstLoad(false);
@@ -89,7 +88,7 @@ const Index = () => {
       id: uuidv4(),
       role: "user",
       content: message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date(),
     };
     
     // Always add the user message to the chat first
@@ -117,7 +116,7 @@ const Index = () => {
             id: uuidv4(),
             role: "assistant",
             content: result.assistantMessage,
-            timestamp: new Date().toISOString(),
+            timestamp: new Date(),
             metadata: {
               projectId: result.projectId,
               orchestrationEnabled: true
@@ -132,7 +131,7 @@ const Index = () => {
           id: uuidv4(),
           role: "assistant",
           content: "This is a placeholder response. I'm still under development!",
-          timestamp: new Date().toISOString()
+          timestamp: new Date(),
         };
         setMessages(prevMessages => [...prevMessages, assistantMessage]);
       }
@@ -143,7 +142,7 @@ const Index = () => {
         id: uuidv4(),
         role: "assistant",
         content: `I'm sorry, but I encountered an error: ${error.message || "Unknown error"}. Please try again with a simpler prompt or try again later.`,
-        timestamp: new Date().toISOString()
+        timestamp: new Date(),
       };
       
       setMessages(prevMessages => [...prevMessages, errorMessage]);
@@ -151,11 +150,6 @@ const Index = () => {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    // Scroll to bottom on new messages
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   return (
     <ArtifactProvider>
