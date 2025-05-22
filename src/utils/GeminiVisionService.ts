@@ -1,4 +1,3 @@
-
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { toast } from '@/hooks/use-toast';
 
@@ -36,7 +35,7 @@ export class GeminiVisionService {
   private initialize() {
     try {
       this.genAI = new GoogleGenerativeAI(this.apiKey!);
-      this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
+      this.model = this.genAI.getGenerativeModel({ model: "gemini-pro" });
       this.log('Gemini Vision Service initialized');
       this.isEnabled = true;
     } catch (error) {

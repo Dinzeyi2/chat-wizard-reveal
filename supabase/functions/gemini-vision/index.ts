@@ -44,7 +44,7 @@ serve(async (req) => {
     console.log("User question:", userQuestion || "None provided");
 
     // Prepare the request to Gemini API
-    const apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent';
+    const apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
     
     // Create a more intelligent prompt based on user's question
     let effectivePrompt = prompt || 'Analyze this code and provide feedback:';
