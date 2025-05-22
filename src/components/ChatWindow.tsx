@@ -234,7 +234,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
     <ArtifactLayout>
       <div className="px-4 py-5 md:px-8 lg:px-12">
         {/* Use the ArtifactHandler to manage artifacts */}
-        {projectId && 
+        {projectId && (
           <ArtifactProvider>
             <ArtifactHandler messages={messages} projectId={projectId} />
             
