@@ -6,11 +6,14 @@ import { ArtifactProvider, useArtifact } from "./artifact/ArtifactSystem";
 import { FileCode, ChevronRight } from "lucide-react";
 import { Button } from "./ui/button";
 import AgentOrchestration from "./AgentOrchestration";
+import { Alert, AlertTitle, AlertDescription } from "./ui/alert";
+import { AlertCircle, RefreshCcw } from "lucide-react";
 
 interface ChatWindowProps {
   messages: Message[];
   isLoading: boolean;
   projectId: string | null;
+  onRetry?: () => void;
 }
 
 // Create a wrapper component that uses useArtifact and handles artifact operations
@@ -108,11 +111,40 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
   );
 };
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId }) => {
+// New component to display error messages
+const ErrorAlert = ({ message, onRetry }: { message: string, onRetry?: () => void }) => {
+  return (
+    <Alert variant="destructive" className="mb-4">
+      <AlertCircle className="h-4 w-4" />
+      <AlertTitle>Error</AlertTitle>
+      <AlertDescription>
+        <div className="flex flex-col gap-2">
+          <p>{message}</p>
+          {onRetry && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onRetry} 
+              className="self-start flex items-center gap-1"
+            >
+              <RefreshCcw className="h-4 w-4" /> Try Again
+            </Button>
+          )}
+          <p className="text-sm">
+            Try using a simpler prompt or breaking down your request into smaller parts.
+          </p>
+        </div>
+      </AlertDescription>
+    </Alert>
+  );
+};
+
+const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId, onRetry }) => {
   // Add state to track if an app has been generated in this conversation
   const [hasGeneratedApp, setHasGeneratedApp] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
-  // Effect to check messages for app generation
+  // Effect to check messages for app generation and errors
   useEffect(() => {
     // Look for messages that indicate an app was generated
     const appGeneratedMessage = messages.find(message => 
@@ -127,6 +159,20 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
     if (appGeneratedMessage && !hasGeneratedApp) {
       setHasGeneratedApp(true);
     }
+    
+    // Check for error messages
+    const errorMessage = messages.find(message =>
+      message.role === "assistant" &&
+      (message.content.includes("Failed to access Gemini AI service") ||
+       message.content.includes("Error generating app"))
+    );
+    
+    if (errorMessage) {
+      setError("Failed to access Gemini AI service. Please try again later.");
+    } else {
+      setError(null);
+    }
+    
   }, [messages, hasGeneratedApp]);
   
   // Find the first message with a projectId
@@ -143,6 +189,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
       {/* Always show orchestration UI if we have a project */}
       {projectId && <AgentOrchestration projectId={projectId} />}
       
+      {/* Show error message if there's an error */}
+      {error && <ErrorAlert message={error} onRetry={onRetry} />}
+      
+      {/* Display all messages */}
       {messages.map((message) => (
         <div key={message.id} className="mb-8">
           {message.role === "user" ? (
