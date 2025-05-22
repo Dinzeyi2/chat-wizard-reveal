@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -211,6 +210,73 @@ When you've completed this task, let me know and I'll guide you to the next chal
   return guidance;
 }
 
+// Function to create a mock app response when Gemini API isn't available
+function createMockAppResponse(prompt, projectId, appDesign) {
+  const cleanPrompt = prompt.replace(/[^a-zA-Z0-9 ]/g, '').trim();
+  const appName = appDesign?.projectName || `${cleanPrompt.split(' ')[0]}App`;
+  
+  // Create some mock files
+  const files = [
+    {
+      path: "src/App.jsx",
+      content: `import React, { useState } from 'react';
+
+function ${appName.replace(/[^a-zA-Z0-9]/g, '')}() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">${appName}</h1>
+      <p className="mb-4">This is a basic app based on your prompt: "${prompt}"</p>
+      
+      <div className="border p-4 rounded-lg shadow-md">
+        <p className="mb-2">Counter: {count}</p>
+        <button 
+          onClick={() => setCount(count + 1)}
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded mr-2"
+        >
+          Increment
+        </button>
+        <button 
+          onClick={() => setCount(Math.max(0, count - 1))}
+          className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
+        >
+          Decrement
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default ${appName.replace(/[^a-zA-Z0-9]/g, '')};`
+    }
+  ];
+
+  // Create mock challenges
+  const challenges = [
+    {
+      id: "challenge-1",
+      title: "Add a Theme Switcher",
+      description: "Add a button that toggles between light and dark theme.",
+      filesPaths: ["src/App.jsx"]
+    }
+  ];
+
+  // Create mock explanation
+  const explanation = `I've generated a simple React application with basic functionality based on your prompt "${prompt}". Since the AI model is currently unavailable, I've created a starter template for you to build upon.`;
+
+  return {
+    projectId,
+    projectName: appName,
+    description: `A simple app based on the prompt: "${prompt}"`,
+    files: files,
+    challenges: challenges,
+    explanation: explanation,
+    firstStepGuidance: "Let's start by exploring this simple app template and expanding it based on your specific needs.",
+    isMock: true
+  };
+}
+
 serve(async (req) => {
   console.log("Generate app function called");
   
@@ -265,9 +331,13 @@ serve(async (req) => {
     // Get the Gemini API key from environment variables
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
     if (!geminiApiKey) {
-      console.error("Gemini API key not configured");
-      return new Response(JSON.stringify({ error: "Gemini API key not configured" }), {
-        status: 500,
+      console.error("Gemini API key not configured - returning mock app instead");
+      
+      // Create a mock app response when Gemini API key is not available
+      const mockAppData = createMockAppResponse(prompt, projectId, appDesign);
+      
+      return new Response(JSON.stringify(mockAppData), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
@@ -618,9 +688,13 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Error in generate-app function:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      errorType: error.name,
+      mockMode: true
+    }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

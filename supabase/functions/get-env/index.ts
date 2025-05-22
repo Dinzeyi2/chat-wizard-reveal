@@ -22,7 +22,11 @@ serve(async (req) => {
     }
     
     // Only allow specific environment variables to be accessed
-    const allowedKeys = ["GITHUB_CLIENT_ID"];
+    const allowedKeys = [
+      "GITHUB_CLIENT_ID",
+      "GEMINI_API_KEY",  // Added Gemini API key to allowed keys
+      "OPENAI_API_KEY"   // Added OpenAI API key for fallback
+    ];
     
     if (!allowedKeys.includes(key)) {
       return new Response(

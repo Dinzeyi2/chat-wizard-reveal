@@ -12,6 +12,7 @@ import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
 import { useLocation, useNavigate } from "react-router-dom";
 import { UserProfileMenu } from "@/components/UserProfileMenu";
 import { geminiAIService } from "@/utils/GeminiAIService";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -20,6 +21,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { TabsContent } from "@/components/ui/tabs";
+import { contentIncludes, getContentAsString, contentReplace } from "@/utils/contentUtils";
 
 // Interface for chat history items
 interface ChatHistoryItem {
