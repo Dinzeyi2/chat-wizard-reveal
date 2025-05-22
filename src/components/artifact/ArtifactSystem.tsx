@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
@@ -139,7 +138,7 @@ export const ArtifactViewer: React.FC = () => {
   const { currentArtifact, closeArtifact, isOpen, updateFileContent } = useArtifact();
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
-  const [activeTab, setActiveTab] = useState<'code' | 'preview'>('code');
+  const [activeTab, setActiveTab] = useState<'code' | 'preview' | 'files'>('code');
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedContent, setEditedContent] = useState<string>('');
   const [isEditorReady, setIsEditorReady] = useState(false);
@@ -195,7 +194,7 @@ export const ArtifactViewer: React.FC = () => {
     console.log("Active tab changed to:", activeTab);
   }, [activeTab]);
 
-  const handleTabChange = (tab: 'code' | 'preview') => {
+  const handleTabChange = (tab: 'code' | 'preview' | 'files') => {
     console.log("Changing tab to:", tab);
     setActiveTab(tab);
     // Force reflow when switching to preview tab to ensure Sandpack renders properly
@@ -405,6 +404,15 @@ export const ArtifactViewer: React.FC = () => {
               <Code size={18} />
               Code
             </Button>
+            <Button 
+              variant="ghost"
+              size="sm"
+              className={`file-viewer-tab ${activeTab === 'files' ? 'active' : ''}`}
+              onClick={() => handleTabChange('files')}
+            >
+              <File size={18} />
+              Files
+            </Button>
           </div>
           <div className="file-viewer-actions">
             <Button 
@@ -434,7 +442,7 @@ export const ArtifactViewer: React.FC = () => {
         </div>
         
         <div className={`artifact-viewer-content flex flex-1 overflow-hidden ${activeTab === 'preview' ? 'preview-mode' : ''}`}>
-          {activeTab === 'code' && (
+          {(activeTab === 'code' || activeTab === 'files') && (
             <div className="file-explorer w-1/4 min-w-[220px] border-r border-zinc-800 bg-black overflow-y-auto">
               <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 px-3 py-2">
                 <h4 className="text-sm font-medium text-gray-400">Files</h4>
@@ -508,9 +516,33 @@ export const ArtifactViewer: React.FC = () => {
                   Select a file to view its content
                 </div>
               )
-            ) : (
+            ) : activeTab === 'preview' ? (
               <div className="preview-container h-full w-full flex-1">
                 <ArtifactPreview files={currentArtifact.files} />
+              </div>
+            ) : (
+              <div className="files-container p-4 bg-zinc-900 h-full">
+                <h3 className="text-lg font-medium text-gray-200 mb-4">All Files</h3>
+                <div className="grid gap-2">
+                  {currentArtifact.files.map(file => (
+                    <div 
+                      key={file.id} 
+                      className="p-3 border border-zinc-700 rounded-md hover:bg-zinc-800 cursor-pointer"
+                      onClick={() => {
+                        setActiveFile(file.id);
+                        setActiveTab('code');
+                      }}
+                    >
+                      <div className="flex items-center">
+                        <File className="h-4 w-4 mr-2 text-gray-400" />
+                        <span className="text-sm text-gray-300">{file.path}</span>
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        {getLanguageFromPath(file.path).toUpperCase()} · {file.content.length} characters
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
