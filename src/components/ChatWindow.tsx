@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";
@@ -6,6 +5,7 @@ import { ArtifactProvider, useArtifact } from "./artifact/ArtifactSystem";
 import { FileCode, ChevronRight } from "lucide-react";
 import { Button } from "./ui/button";
 import AgentOrchestration from "./AgentOrchestration";
+import { contentIncludes, getContentAsString } from "@/utils/contentUtils";
 
 interface ChatWindowProps {
   messages: Message[];
@@ -38,18 +38,18 @@ const ArtifactHandler = ({ messages, projectId }: { messages: Message[], project
   return null; // This component doesn't render anything, it just handles artifacts
 };
 
-// New component to handle opening message content in artifact viewer
+// Improved component to handle opening message content in artifact viewer
 const CodeViewerButton = ({ message, projectId }: { message: Message, projectId: string | null }) => {
   const { openArtifact } = useArtifact();
   
-  // Only show for assistant messages that likely contain code
+  // Check more explicitly for content that likely contains code
   const hasCode = message.role === "assistant" && 
-    (message.content.includes("```") || 
-     message.content.includes("<code>") ||
-     message.content.includes("function") ||
-     message.content.includes("const") ||
-     message.content.includes("class") ||
-     message.content.includes("import "));
+    (contentIncludes(message.content, "```") || 
+     contentIncludes(message.content, "<code>") ||
+     contentIncludes(message.content, "function") ||
+     contentIncludes(message.content, "const") ||
+     contentIncludes(message.content, "class") ||
+     contentIncludes(message.content, "import "));
   
   if (!hasCode) return null;
   
@@ -60,38 +60,87 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
     const codeBlocks = [];
     let count = 0;
     
-    while ((match = codeRegex.exec(message.content)) !== null) {
+    // Get full content as string
+    const messageContentStr = getContentAsString(message.content);
+    if (!messageContentStr) {
+      console.error("Failed to get message content as string");
+      return;
+    }
+    
+    // Extract all code blocks
+    while ((match = codeRegex.exec(messageContentStr)) !== null) {
       count++;
+      const language = match[0].startsWith("```js") ? "javascript" : 
+                      match[0].startsWith("```ts") ? "typescript" : 
+                      match[0].startsWith("```html") ? "html" : 
+                      match[0].startsWith("```css") ? "css" : 
+                      "javascript"; // Default to JavaScript
+                      
       codeBlocks.push({
         id: `code-block-${count}`,
         name: `Code Block ${count}`,
-        path: `code-block-${count}.js`,
-        language: "javascript",
+        path: `code-block-${count}.${language === "javascript" ? "js" : language === "typescript" ? "ts" : language}`,
+        language: language,
         content: match[1]
       });
     }
     
-    // If no code blocks found with markdown syntax, use the whole message
+    // If no code blocks found with markdown syntax, check for app generation message with project info
+    if (codeBlocks.length === 0 && message.metadata?.projectId && message.content.includes("I've generated")) {
+      console.log("App generation message detected, checking for files in metadata");
+      
+      // Try to extract files from metadata if this is an app generation message
+      if (message.metadata.appData && message.metadata.appData.files) {
+        const appFiles = message.metadata.appData.files;
+        
+        appFiles.forEach((file: any, index: number) => {
+          codeBlocks.push({
+            id: `app-file-${index}`,
+            name: file.path,
+            path: file.path,
+            language: getFileLanguage(file.path),
+            content: file.content
+          });
+        });
+      }
+    }
+    
+    // If still no code blocks found, use the whole message but try to clean it
     if (codeBlocks.length === 0) {
+      // Clean the content - try to extract just code-like parts
+      let content = messageContentStr;
+      
+      // Remove markdown headings
+      content = content.replace(/^#+\s+.*$/gm, '');
+      // Remove any explanatory text at the beginning
+      if (content.includes("I've generated")) {
+        const parts = content.split(/(?=```)/);
+        if (parts.length > 1) {
+          content = parts.slice(1).join('');
+        }
+      }
+      
       codeBlocks.push({
         id: `message-content-${message.id}`,
         name: "Message Content",
         path: "message-content.js",
         language: "javascript",
-        content: message.content.replace(/(<([^>]+)>)/gi, "") // Strip HTML tags
+        content: content.replace(/(<([^>]+)>)/gi, "") // Strip HTML tags
       });
     }
     
     // Create an artifact object
     const artifact = {
       id: `message-${message.id}`,
-      title: "Message Code",
+      title: message.metadata?.projectId ? "Generated App Code" : "Message Code",
       files: codeBlocks,
       description: "Code from assistant's message"
     };
     
     // Open the artifact viewer with the code
     openArtifact(artifact);
+    
+    console.log(`Opened artifact with ${codeBlocks.length} files`);
   };
   
   return (
@@ -106,6 +155,22 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
       <span>View in Editor</span>
     </Button>
   );
+};
+
+// Helper function to determine file language from file path
+const getFileLanguage = (path: string): string => {
+  const extension = path.split('.').pop()?.toLowerCase() || '';
+  switch (extension) {
+    case 'js': return 'javascript';
+    case 'jsx': return 'javascript';
+    case 'ts': return 'typescript';
+    case 'tsx': return 'typescript';
+    case 'html': return 'html';
+    case 'css': return 'css';
+    case 'json': return 'json';
+    case 'md': return 'markdown';
+    default: return 'javascript';
+  }
 };
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId }) => {
