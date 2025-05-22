@@ -19,7 +19,6 @@ import { UICodeGenerator } from "@/utils/UICodeGenerator";
 import { ImplementationStep } from "@/utils/StructuredAIGuide";
 import StepProgressDisplay from "./StepProgressDisplay";
 import { Card } from "@/components/ui/card";
-import { contentIncludes, getContentAsString } from "@/utils/messageUtils";
 
 // Implementation enhancement options
 const enhancementOptions = [
@@ -102,8 +101,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
       try {
         // Primary extraction method: Try to find JSON data
         const jsonRegex = /```json([\s\S]*?)```/;
-        const contentStr = getContentAsString(message.content);
-        const appDataMatch = contentStr.match(jsonRegex);
+        const appDataMatch = message.content.match(jsonRegex);
         
         if (appDataMatch && appDataMatch[1]) {
           const jsonText = appDataMatch[1].trim();
@@ -163,7 +161,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
         
         // Fallback method: try to find any JSON in the content
         const anyJsonRegex = /{[\s\S]*?"files"[\s\S]*?}/;
-        const anyJsonMatch = contentStr.match(anyJsonRegex);
+        const anyJsonMatch = message.content.match(anyJsonRegex);
         
         if (anyJsonMatch) {
           try {
@@ -304,12 +302,11 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
   // Improved and simplified function to extract code blocks from message content
   const extractCodeBlocks = () => {
     const codeBlockRegex = /```(\w+)?\n([\s\S]*?)\n```/g;
-    const contentStr = getContentAsString(message.content);
     const codeFiles = [];
     let match;
     let index = 0;
     
-    while ((match = codeBlockRegex.exec(contentStr)) !== null) {
+    while ((match = codeBlockRegex.exec(message.content)) !== null) {
       const language = match[1] || 'plaintext';
       const content = match[2].trim();
       
@@ -436,8 +433,7 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
   // Modified function to handle viewing the full project
   const handleViewFullProject = () => {
     try {
-      console.log("Opening artifact viewer with message content:", 
-        getContentAsString(message.content).substring(0, 100) + "...");
+      console.log("Opening artifact viewer with message content:", message.content.substring(0, 100) + "...");
       
       // Create a guaranteed artifact ID
       const artifactId = `artifact-${Date.now()}`;
@@ -734,11 +730,10 @@ const AppGeneratorDisplay: React.FC<AppGeneratorDisplayProps> = ({ message, proj
   }
 
   // Detect if this is a modified app or an original generation
-  const isModification = 
-    contentIncludes(message.content, 'modified') || 
-    contentIncludes(message.content, 'updated') || 
-    contentIncludes(message.content, 'changed') ||
-    contentIncludes(message.content, "i've updated your app");
+  const isModification = message.content.toLowerCase().includes('modified') || 
+                        message.content.toLowerCase().includes('updated') || 
+                        message.content.toLowerCase().includes('changed') ||
+                        message.content.toLowerCase().includes("i've updated your app");
 
   return (
     <div className="my-6 space-y-6">
