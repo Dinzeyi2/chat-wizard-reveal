@@ -1,7 +1,6 @@
 
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { ChevronRight, Activity, Code, Database, Lock, Layers, Rocket } from "lucide-react";
@@ -19,14 +18,10 @@ interface Step {
 
 interface AgentOrchestrationProps {
   projectId: string | null;
-  onToggleOrchestration: () => void;
-  isEnabled: boolean;
 }
 
 const AgentOrchestration: React.FC<AgentOrchestrationProps> = ({
-  projectId,
-  onToggleOrchestration,
-  isEnabled
+  projectId
 }) => {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [totalSteps, setTotalSteps] = useState<number>(7);
@@ -54,40 +49,11 @@ const AgentOrchestration: React.FC<AgentOrchestrationProps> = ({
     }
   };
 
-  if (!isEnabled) {
-    return (
-      <Card className="mb-6">
-        <CardHeader className="pb-3">
-          <div className="flex justify-between items-center">
-            <CardTitle className="text-lg font-medium">Agent Orchestration</CardTitle>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={onToggleOrchestration}
-            >
-              Enable
-            </Button>
-          </div>
-          <CardDescription>
-            Break down complex projects into manageable steps with specialized AI agents
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
-
   return (
     <Card className="mb-6">
       <CardHeader className="pb-3">
         <div className="flex justify-between items-center">
           <CardTitle className="text-lg font-medium">Agent Orchestration</CardTitle>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={onToggleOrchestration}
-          >
-            Disable
-          </Button>
         </div>
         <CardDescription>
           Building your project step-by-step with specialized AI agents

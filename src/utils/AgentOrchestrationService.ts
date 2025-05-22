@@ -77,7 +77,7 @@ export class AgentOrchestrationService {
         orchestrationPlan: data.orchestrationPlan,
         currentStep: data.currentStep,
         assistantMessage,
-        orchestrationEnabled: true
+        orchestrationEnabled: true // Always true now, no toggle needed
       };
     } catch (error: any) {
       console.error('Error initializing project with orchestration:', error);

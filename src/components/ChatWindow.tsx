@@ -111,8 +111,6 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
 const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId }) => {
   // Add state to track if an app has been generated in this conversation
   const [hasGeneratedApp, setHasGeneratedApp] = useState(false);
-  // Add state for agent orchestration
-  const [isOrchestrationEnabled, setIsOrchestrationEnabled] = useState(false);
   
   // Effect to check messages for app generation
   useEffect(() => {
@@ -129,18 +127,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
     if (appGeneratedMessage && !hasGeneratedApp) {
       setHasGeneratedApp(true);
     }
-    
-    // Check if any message has orchestration metadata
-    const orchestrationMessage = messages.find(message => 
-      message.role === "assistant" && 
-      message.metadata?.orchestrationEnabled
-    );
-    
-    // Update orchestration state if found
-    if (orchestrationMessage && !isOrchestrationEnabled) {
-      setIsOrchestrationEnabled(true);
-    }
-  }, [messages, hasGeneratedApp, isOrchestrationEnabled]);
+  }, [messages, hasGeneratedApp]);
   
   // Find the first message with a projectId
   const firstAppMessage = messages.find(message => 
@@ -148,24 +135,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
     message.metadata?.projectId
   );
   
-  // Toggle orchestration mode
-  const handleToggleOrchestration = () => {
-    setIsOrchestrationEnabled(!isOrchestrationEnabled);
-  };
-  
   return (
     <div className="px-4 py-5 md:px-8 lg:px-12">
       {/* Use the ArtifactHandler to manage artifacts */}
       {projectId && <ArtifactHandler messages={messages} projectId={projectId} />}
       
-      {/* Only show orchestration UI if we have a project */}
-      {projectId && (
-        <AgentOrchestration 
-          projectId={projectId} 
-          onToggleOrchestration={handleToggleOrchestration}
-          isEnabled={isOrchestrationEnabled}
-        />
-      )}
+      {/* Always show orchestration UI if we have a project */}
+      {projectId && <AgentOrchestration projectId={projectId} />}
       
       {messages.map((message) => (
         <div key={message.id} className="mb-8">
