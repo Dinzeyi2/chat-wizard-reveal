@@ -39,3 +39,19 @@ export function contentSubstring(content: ReactNode, start: number, end?: number
   const contentStr = getContentAsString(content);
   return contentStr.substring(start, end);
 }
+
+/**
+ * Check if content is empty
+ */
+export function isContentEmpty(content: ReactNode): boolean {
+  const contentStr = getContentAsString(content);
+  return contentStr.trim() === '';
+}
+
+/**
+ * Convert content to lowercase
+ */
+export function contentToLowerCase(content: ReactNode): string {
+  const contentStr = getContentAsString(content);
+  return contentStr.toLowerCase();
+}
