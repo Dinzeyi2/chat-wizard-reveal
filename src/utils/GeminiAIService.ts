@@ -1,11 +1,12 @@
-
 import { supabase } from "@/integrations/supabase/client";
+import { agentOrchestrationService } from "./AgentOrchestrationService";
 
 class GeminiAIService {
   private apiKey: string | null = null;
   private maxRetries = 3;
   private baseBackoffMs = 2000;
   private fallbackEnabled = true;
+  private useOrchestration = false;
 
   constructor() {
     console.log("GeminiAIService initialized");
@@ -16,14 +17,24 @@ class GeminiAIService {
    */
   setApiKey(apiKey: string) {
     this.apiKey = apiKey;
+    // Pass the API key to the orchestration service
+    agentOrchestrationService.setApiKey(apiKey);
+  }
+
+  /**
+   * Toggle agent orchestration mode
+   */
+  toggleOrchestration(enabled: boolean) {
+    this.useOrchestration = enabled;
   }
 
   /**
    * Initialize a project with Gemini AI
    * @param prompt User prompt for project generation
    * @param projectName Name for the project
+   * @param useOrchestration Whether to use agent orchestration
    */
-  async initializeProject(prompt: string, projectName: string) {
+  async initializeProject(prompt: string, projectName: string, useOrchestration = false) {
     console.log(`Initializing project with prompt: ${prompt.substring(0, 50)}...`);
     
     if (!this.apiKey) {
@@ -39,9 +50,39 @@ class GeminiAIService {
         }
         
         this.apiKey = data.value;
+        // Pass the API key to the orchestration service
+        agentOrchestrationService.setApiKey(data.value);
       } catch (error) {
         console.error("Error retrieving Gemini API key:", error);
         throw new Error("Failed to access Gemini AI service. Please try again later.");
+      }
+    }
+    
+    // Use agent orchestration if specified
+    if (useOrchestration || this.useOrchestration) {
+      try {
+        const orchestrationResult = await agentOrchestrationService.initializeProject(prompt, projectName);
+        
+        return {
+          projectId: orchestrationResult.projectId,
+          projectContext: {
+            projectName: orchestrationResult.orchestrationPlan.projectName,
+            description: orchestrationResult.orchestrationPlan.description,
+            orchestrationPlan: orchestrationResult.orchestrationPlan,
+            currentStep: orchestrationResult.currentStep
+          },
+          assistantMessage: orchestrationResult.assistantMessage,
+          orchestrationEnabled: true,
+          appData: {
+            projectId: orchestrationResult.projectId,
+            orchestrationPlan: orchestrationResult.orchestrationPlan,
+            currentStep: orchestrationResult.currentStep
+          }
+        };
+      } catch (error) {
+        console.error("Error using agent orchestration:", error);
+        // Fallback to standard project generation
+        console.log("Falling back to standard project generation");
       }
     }
     
