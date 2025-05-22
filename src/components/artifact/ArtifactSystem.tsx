@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs';
-import { FileCode, X, ExternalLink, ChevronRight, Download, File, Code, Save } from 'lucide-react';
+import { FileCode, X, ExternalLink, ChevronRight, Download, File, Code, Save, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import './ArtifactSystem.css';
@@ -15,6 +16,12 @@ interface ArtifactFile {
   path: string;
   language: string;
   content: string;
+  isComplete?: boolean;  // Flag to indicate if file is complete or needs implementation
+  challenges?: {
+    description: string;
+    difficulty: 'easy' | 'medium' | 'hard';
+    hints: string[];
+  }[];
 }
 
 interface Artifact {
@@ -107,7 +114,11 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
       if (!prev) return prev;
       
       const updatedFiles = prev.files.map(file => 
-        file.id === fileId ? {...file, content: newContent} : file
+        file.id === fileId ? {
+          ...file, 
+          content: newContent,
+          isComplete: true // Mark as complete when the user updates it
+        } : file
       );
       
       return {...prev, files: updatedFiles};
@@ -320,7 +331,15 @@ export const ArtifactViewer: React.FC = () => {
               currentFile ? (
                 <>
                   <div className="file-path px-4 py-2 text-xs text-gray-400 bg-zinc-900 border-b border-zinc-800 flex justify-between items-center">
-                    <span>{currentFile.path}</span>
+                    <div className="flex items-center">
+                      <span>{currentFile.path}</span>
+                      {currentFile.isComplete === false && (
+                        <div className="ml-2 px-2 py-0.5 bg-amber-200 text-amber-800 rounded-md text-xs flex items-center">
+                          <AlertTriangle size={12} className="mr-1" />
+                          Incomplete
+                        </div>
+                      )}
+                    </div>
                     <div className="flex items-center">
                       <span className="text-gray-500 mr-3">{getLanguageFromPath(currentFile.path).toUpperCase()}</span>
                       {!isEditMode ? (
@@ -345,6 +364,30 @@ export const ArtifactViewer: React.FC = () => {
                       )}
                     </div>
                   </div>
+                  
+                  {/* Display challenges for this file if they exist */}
+                  {currentFile.isComplete === false && currentFile.challenges && currentFile.challenges.length > 0 && (
+                    <div className="bg-amber-50 p-3 border-b border-amber-200">
+                      <div className="font-medium text-amber-800 mb-2">Implementation Challenge:</div>
+                      {currentFile.challenges.map((challenge, idx) => (
+                        <div key={idx} className="mb-2">
+                          <div className="text-sm text-amber-900">{challenge.description}</div>
+                          <div className="text-xs text-amber-800 mt-1">Difficulty: {challenge.difficulty}</div>
+                          {challenge.hints.length > 0 && (
+                            <details className="mt-2">
+                              <summary className="text-xs text-blue-600 cursor-pointer">Show hints</summary>
+                              <ul className="mt-1 ml-4 list-disc">
+                                {challenge.hints.map((hint, hintIdx) => (
+                                  <li key={hintIdx} className="text-xs text-gray-700">{hint}</li>
+                                ))}
+                              </ul>
+                            </details>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
                   <div className="code-container flex-1 overflow-auto bg-zinc-900">
                     {isEditMode ? (
                       <Editor
@@ -391,18 +434,35 @@ export const ArtifactViewer: React.FC = () => {
                   {currentArtifact.files.map(file => (
                     <div 
                       key={file.id} 
-                      className="p-3 border border-zinc-700 rounded-md hover:bg-zinc-800 cursor-pointer"
+                      className={`p-3 border rounded-md hover:bg-zinc-800 cursor-pointer ${
+                        file.isComplete === false ? 'border-amber-500 bg-zinc-900' : 'border-zinc-700'
+                      }`}
                       onClick={() => {
                         setActiveFile(file.id);
                         setActiveTab('code');
                       }}
                     >
-                      <div className="flex items-center">
-                        <File className="h-4 w-4 mr-2 text-gray-400" />
-                        <span className="text-sm text-gray-300">{file.path}</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <File className="h-4 w-4 mr-2 text-gray-400" />
+                          <span className="text-sm text-gray-300">{file.path}</span>
+                        </div>
+                        {file.isComplete === false && (
+                          <div className="px-2 py-0.5 bg-amber-200 text-amber-800 rounded-md text-xs flex items-center">
+                            <AlertTriangle size={12} className="mr-1" />
+                            Incomplete
+                          </div>
+                        )}
                       </div>
-                      <div className="mt-1 text-xs text-gray-500">
-                        {getLanguageFromPath(file.path).toUpperCase()} · {file.content.length} characters
+                      <div className="mt-1 flex justify-between">
+                        <span className="text-xs text-gray-500">
+                          {getLanguageFromPath(file.path).toUpperCase()} · {file.content.length} characters
+                        </span>
+                        {file.challenges && file.challenges.length > 0 && (
+                          <span className="text-xs text-blue-400">
+                            {file.challenges.length} challenge{file.challenges.length !== 1 ? 's' : ''}
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}

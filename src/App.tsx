@@ -1,66 +1,40 @@
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useState } from "react";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import ChatHistory from "./pages/ChatHistory";
-import GitHubCallback from "./pages/GitHubCallback";
-import Auth from "./pages/Auth";
-import Landing from "./pages/Landing";
-import ChallengeGenerator from "./pages/ChallengeGenerator";
-import ChallengeWorkspace from "./pages/ChallengeWorkspace";
-import "./components/artifact/ArtifactSystem.css";
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Dashboard from './components/Dashboard';
+import NotFound from './pages/NotFound';
+import Landing from './pages/Landing';
+import ChallengeWorkspace from './pages/ChallengeWorkspace';
+import ChallengeGenerator from './pages/ChallengeGenerator';
+import GitHubCallback from './pages/GitHubCallback';
+import Index from './pages/Index';
+import Auth from './pages/Auth';
+import ChatHistory from './pages/ChatHistory';
+import { Toaster } from './components/ui/toaster';
+import { ArtifactProvider } from './components/artifact/ArtifactSystem';
 
-const App = () => {
-  // Create a client
-  const [queryClient] = useState(() => new QueryClient({
-    defaultOptions: {
-      queries: {
-        refetchOnWindowFocus: false,
-        retry: false,
-      },
-    },
-  }));
+import './App.css';
 
+const App: React.FC = () => {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+    <div className="app">
+      <ArtifactProvider>
+        <Router>
           <Routes>
-            {/* New landing page as the default route */}
-            <Route path="/" element={<Landing />} />
-            
-            {/* Original Index page now at /app route with chat parameter support */}
-            <Route path="/app" element={<Index />} />
-            
-            {/* All other existing routes preserved */}
+            <Route path="/chat/:chatId?" element={<Index />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/history" element={<ChatHistory />} />
-            
-            {/* GitHub callback routes with both path styles */}
+            <Route path="/challenge-workspace/:challengeId?" element={<ChallengeWorkspace />} />
+            <Route path="/challenge-generator" element={<ChallengeGenerator />} />
             <Route path="/github-callback" element={<GitHubCallback />} />
-            <Route path="github-callback" element={<GitHubCallback />} />
-            <Route path="/callback/github" element={<GitHubCallback />} />
-            <Route path="callback/github" element={<GitHubCallback />} />
-            
-            {/* CodeCraft Challenge routes */}
-            <Route path="/challenges" element={<ChallengeGenerator />} />
-            <Route path="/challenge/:projectId" element={<ChallengeWorkspace />} />
-            <Route path="/challenge/:projectId/:challengeId" element={<ChallengeWorkspace />} />
-            <Route path="/implementation-steps/:stepId" element={<ChallengeWorkspace />} />
-            
-            {/* Catch-all route for 404s */}
+            <Route path="/" element={<Landing />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+        </Router>
+        <Toaster />
+      </ArtifactProvider>
+    </div>
   );
 };
 
