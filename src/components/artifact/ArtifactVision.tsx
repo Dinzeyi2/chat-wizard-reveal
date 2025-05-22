@@ -22,6 +22,8 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
 
   // Initialize the Gemini Vision service
   useEffect(() => {
+    console.log("Initializing Gemini Vision service");
+    
     const service = getGeminiVisionService({
       debug: true,
       onVisionResponse: (response) => {
@@ -80,6 +82,16 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
       const content = getActiveFileContent(activeFile.id);
       if (content) {
         visionService.processEditorContent(content);
+        
+        // Also broadcast content directly
+        window.postMessage({
+          type: 'GEMINI_VISION_UPDATE',
+          data: {
+            timestamp: new Date().toISOString(),
+            activeFile: activeFile?.name,
+            editorContent: content
+          }
+        }, '*');
       }
     }
   }, [activeFile, isVisionActive, visionService]);
@@ -87,6 +99,8 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
   // Capture callback function to get active file content
   const captureEditorContent = () => {
     if (!activeFile) return null;
+    
+    console.log("Capturing editor content for:", activeFile.name);
     const content = getActiveFileContent(activeFile.id);
     
     // Broadcast content to chat window via window messaging
@@ -108,6 +122,8 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
   const toggleVision = () => {
     if (!visionService) return;
     
+    console.log("Toggling vision, current state:", isVisionActive);
+    
     if (!isVisionActive) {
       if (!isKeySet) {
         setShowApiKeyInput(true);
@@ -116,6 +132,12 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
       
       visionService.startCapturing(captureEditorContent);
       setIsVisionActive(true);
+      
+      // Immediately capture current content
+      const content = captureEditorContent();
+      if (content) {
+        console.log("Initial content captured, length:", content.length);
+      }
       
       // Broadcast activation to chat window
       window.postMessage({

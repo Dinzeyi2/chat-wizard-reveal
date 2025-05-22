@@ -73,9 +73,16 @@ export class GeminiVisionService {
     // Set up interval to capture editor content every 5 seconds
     this.captureInterval = window.setInterval(() => {
       const content = captureCallback();
-      if (content && content !== this.lastProcessedContent && !this.isProcessing) {
-        this.lastContent = content; // Store the current content
-        this.processEditorContent(content);
+      if (content) {
+        this.lastContent = content; // Always store the current content
+        
+        // Broadcast content even if we're not processing it
+        this.broadcastContentUpdate(content);
+        
+        // Only process if content has changed and we're not already processing
+        if (content !== this.lastProcessedContent && !this.isProcessing) {
+          this.processEditorContent(content);
+        }
       }
     }, 5000);
 
@@ -91,6 +98,20 @@ export class GeminiVisionService {
         timestamp: new Date().toISOString()
       }
     }, '*');
+  }
+  
+  private broadcastContentUpdate(content: string): void {
+    // Send the editor content to the chat window via Window messaging
+    window.postMessage({
+      type: 'GEMINI_VISION_UPDATE',
+      data: {
+        timestamp: new Date().toISOString(),
+        contentLength: content.length,
+        editorContent: content // Include the editor content in the update
+      }
+    }, '*');
+    
+    this.log('Broadcasted content update, length:', content.length);
   }
 
   public stopCapturing(): void {
@@ -158,16 +179,8 @@ export class GeminiVisionService {
         this.onVisionResponse(responseText);
       }
 
-      // Send the editor content to the chat window via Window messaging
-      window.postMessage({
-        type: 'GEMINI_VISION_UPDATE',
-        data: {
-          timestamp: new Date().toISOString(),
-          contentLength: content.length,
-          responseReceived: true,
-          editorContent: content // Include the editor content in the update
-        }
-      }, '*');
+      // Broadcast the content update with successful response
+      this.broadcastContentUpdate(content);
 
     } catch (error: any) {
       console.error('Error in Gemini Vision processing:', error);

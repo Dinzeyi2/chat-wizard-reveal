@@ -239,6 +239,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
   const [hasGeneratedApp, setHasGeneratedApp] = useState(false);
   const [visionEnabled, setVisionEnabled] = useState(false);
   const [editorContent, setEditorContent] = useState<string>("");
+  const [lastVisionUpdate, setLastVisionUpdate] = useState<string | null>(null);
   
   // Check if Gemini Vision is available
   useEffect(() => {
@@ -246,16 +247,29 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
     const visionService = getGeminiVisionService();
     setVisionEnabled(visionService.isVisionEnabled());
     
+    // Get initial editor content if available
+    const initialContent = visionService.getLastContent();
+    if (initialContent) {
+      setEditorContent(initialContent);
+    }
+    
     // Listen for window messages from Gemini Vision
     const handleMessage = (event: MessageEvent) => {
       if (event.data && typeof event.data === 'object') {
+        console.log("Received message event in ChatWindow:", event.data.type);
+        
         if (event.data.type === 'GEMINI_VISION_ACTIVATED') {
+          console.log("Vision activated event received");
           setVisionEnabled(true);
         } else if (event.data.type === 'GEMINI_VISION_DEACTIVATED') {
+          console.log("Vision deactivated event received");
           setVisionEnabled(false);
+          setEditorContent("");
         } else if (event.data.type === 'GEMINI_VISION_UPDATE') {
+          console.log("Vision update event received with content");
           if (event.data.data && event.data.data.editorContent) {
             setEditorContent(event.data.data.editorContent);
+            setLastVisionUpdate(new Date().toLocaleTimeString());
           }
         }
       }
@@ -304,9 +318,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
     return content.toLowerCase().includes("code") ||
            content.toLowerCase().includes("editor") ||
            content.toLowerCase().includes("what do you see") ||
-           content.toLowerCase().includes("tell me") ||
+           content.toLowerCase().includes("tell me about") ||
            content.toLowerCase().includes("what is in the editor") ||
-           content.toLowerCase().includes("what's in the editor");
+           content.toLowerCase().includes("what's in the editor") ||
+           content.toLowerCase().includes("in the file") ||
+           content.toLowerCase().includes("explain");
   };
   
   return (
@@ -324,6 +340,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
           <div className="flex flex-col">
             <p className="text-xs text-blue-800 font-medium">
               Gemini Vision is active and monitoring your code editor
+              {lastVisionUpdate && ` (Last update: ${lastVisionUpdate})`}
             </p>
             <p className="text-xs text-blue-600">
               Ask me questions about the code you're writing, and I'll analyze it for you

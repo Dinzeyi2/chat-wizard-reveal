@@ -69,14 +69,21 @@ serve(async (req) => {
           message.toLowerCase().includes("see") || 
           message.toLowerCase().includes("what's in") || 
           message.toLowerCase().includes("code") || 
-          message.toLowerCase().includes("in the file");
+          message.toLowerCase().includes("in the file") || 
+          message.toLowerCase().includes("gemini") ||
+          message.toLowerCase().includes("vision") ||
+          message.toLowerCase().includes("what do you see");
+        
+        console.log("Is asking about code:", isAskingAboutCode);
+        console.log("Editor content available:", editorContent ? "Yes (" + editorContent.length + " chars)" : "No");
         
         if (editorContent && isAskingAboutCode) {
+          console.log("Including editor content in prompt");
           promptContext += `The user is asking about code in the editor. Here is the current editor content: 
 \`\`\`
 ${editorContent}
 \`\`\`
-Please respond to their question about this code.`;
+The code above is what's currently in the editor that the user is asking about. Please respond to their question about this code.`;
         }
         else if (projectId && code) {
           promptContext += `The user is working on a project with ID: ${projectId}. Here is the code context: ${code.substring(0, 5000)}...`;
@@ -164,6 +171,11 @@ Please respond to their question about this code.`;
                 role: "system", 
                 content: "You are a helpful AI assistant. Respond concisely and accurately to user queries."
               },
+              // If we have editor content, include it for code-related questions
+              ...(editorContent ? [{
+                role: "system",
+                content: `Here is the code from the user's editor:\n\`\`\`\n${editorContent}\n\`\`\``
+              }] : []),
               {
                 role: "user",
                 content: message
@@ -182,7 +194,8 @@ Please respond to their question about this code.`;
               response: `${fallbackResponse}\n\n(Note: This response was provided by a fallback AI system due to temporary issues with the primary system.)`,
               projectId: projectId || null,
               codeUpdate: null,
-              usedFallback: true
+              usedFallback: true,
+              editorContent: editorContent || null
             }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
