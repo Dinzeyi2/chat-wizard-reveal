@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";
@@ -26,12 +25,14 @@ const ArtifactHandler = ({ messages, projectId }: { messages: Message[], project
       const appGeneratedMessage = messages.find(message => 
         message.role === "assistant" && 
         message.metadata?.projectId === projectId &&
-        message.content.includes("I've generated")
+        (message.content.includes("I've generated") ||
+         message.content.includes("partial implementation") ||
+         message.content.includes("code challenge"))
       );
       
       if (appGeneratedMessage) {
         // Logic to extract app data and open in artifact viewer
-        console.log("Found app generation message for project:", projectId);
+        console.log("Found app generation or challenge message for project:", projectId);
       }
     }
   }, [messages, projectId, openArtifact]);
@@ -55,6 +56,11 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
   if (!hasCode) return null;
   
   const handleOpenInArtifact = () => {
+    // Check if this is a partial code challenge message
+    const isPartialChallenge = message.content.includes("partial implementation") || 
+                               message.content.includes("code challenge") ||
+                               message.content.includes("incomplete project");
+    
     // Extract code blocks from message content
     const codeRegex = /```(?:[\w]*)\n([\s\S]*?)```/g;
     let match;
@@ -93,12 +99,25 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
                         language === "json" ? "json" :
                         "js";
       
+      // For partial code challenges, mark files as intentionally incomplete
+      const isComplete = !isPartialChallenge;
+      
       codeBlocks.push({
         id: `code-block-${count}`,
         name: `code-${count}.${extension}`,
         path: `code-${count}.${extension}`,
         language: language,
-        content: codeContent // Use ONLY the extracted code content
+        content: codeContent, // Use ONLY the extracted code content
+        isComplete: isComplete, // Mark as incomplete for code challenges
+        ...(isPartialChallenge && {
+          challenges: [
+            {
+              description: "Complete this code implementation",
+              difficulty: "medium",
+              hints: ["Look for TODO comments in the code"]
+            }
+          ]
+        })
       });
     }
     
@@ -116,41 +135,9 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
             name: file.path,
             path: file.path,
             language: getFileLanguage(file.path),
-            content: file.content // This is already just the code content
+            content: file.content, // This is already just the code content
+            isComplete: file.isComplete !== false // Mark as complete unless explicitly marked incomplete
           });
-        });
-      }
-    }
-    
-    // If still no code blocks found but message suggests there should be code
-    if (codeBlocks.length === 0 && messageContentStr.includes("I've generated")) {
-      console.log("No code blocks found, but message suggests code generation");
-      
-      // Parse app structure from message content - look for what appears to be file paths or component names
-      const possibleComponentRegex = /(?:component|file|created):\s*['"]*([A-Z][A-Za-z]*(?:\.(?:js|jsx|ts|tsx))?)/g;
-      let componentMatch;
-      
-      while ((componentMatch = possibleComponentRegex.exec(messageContentStr)) !== null) {
-        const componentName = componentMatch[1];
-        
-        // Create a placeholder file for this component
-        codeBlocks.push({
-          id: `component-${componentName}`,
-          name: `${componentName}.jsx`,
-          path: `${componentName}.jsx`,
-          language: "javascript",
-          content: `// This is a placeholder for ${componentName}\n// The actual code was not provided in a code block format\n\nimport React from 'react';\n\nconst ${componentName} = () => {\n  return (\n    <div>\n      ${componentName} Component\n    </div>\n  );\n};\n\nexport default ${componentName};`
-        });
-      }
-      
-      // If we still don't have any code blocks, add a generic placeholder
-      if (codeBlocks.length === 0) {
-        codeBlocks.push({
-          id: `generated-app`,
-          name: "App.jsx",
-          path: "App.jsx",
-          language: "javascript",
-          content: `// Generated App\n// Note: The AI didn't provide code in a structured format\n// This is a placeholder component\n\nimport React from 'react';\n\nfunction App() {\n  return (\n    <div className="app">\n      <h1>Generated Application</h1>\n      <p>The AI mentioned generating an app, but didn't provide code blocks.</p>\n    </div>\n  );\n}\n\nexport default App;`
         });
       }
     }
@@ -160,9 +147,11 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
       // Create an artifact object
       const artifact = {
         id: `message-${message.id}`,
-        title: message.metadata?.projectId ? "Generated App Code" : "Code Snippets",
+        title: isPartialChallenge ? "Partial Code Challenge" : (message.metadata?.projectId ? "Generated App Code" : "Code Snippets"),
         files: codeBlocks,
-        description: "Code from assistant's message"
+        description: isPartialChallenge ? "Intentionally incomplete code for you to complete" : "Code from assistant's message",
+        isPartialProject: isPartialChallenge,
+        projectPrompt: isPartialChallenge ? "Complete the code implementation" : undefined
       };
       
       // Open the artifact viewer with the code
