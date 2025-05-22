@@ -1,679 +1,856 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/router';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Card } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToast } from '@/hooks/use-toast';
-import { geminiAIService } from '@/utils/GeminiAIService';
-import { contentIncludes, getContentAsString } from '@/utils/contentUtils';
-import { useGeminiCode } from '@/hooks/use-gemini-code';
-import { useUiScraper } from '@/hooks/use-ui-scraper';
-import ChatWindow from '@/components/ChatWindow';
-import CodeEditor from '@/components/challenge/CodeEditor';
-import FileExplorer from '@/components/challenge/FileExplorer';
-import ProjectHeader from '@/components/challenge/ProjectHeader';
-import ChallengeList from '@/components/challenge/ChallengeList';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useRef, useEffect } from "react";
+import ChatWindow from "@/components/ChatWindow";
+import InputArea from "@/components/InputArea";
+import WelcomeScreen from "@/components/WelcomeScreen";
+import { Message, Json } from "@/types/chat";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Loader2, AlertCircle } from "lucide-react";
+import { ArtifactProvider, ArtifactLayout } from "@/components/artifact/ArtifactSystem";
+import { HamburgerMenuButton } from "@/components/HamburgerMenuButton";
+import { useLocation, useNavigate } from "react-router-dom";
+import { UserProfileMenu } from "@/components/UserProfileMenu";
+import { geminiAIService } from "@/utils/GeminiAIService";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { TabsContent } from "@/components/ui/tabs";
 
-// Updated message handling for errors
-function enhanceErrorMessage(message: string): string {
-  // Check if this is a Gemini API error
-  if (message.includes("Gemini API key not configured") || message.includes("Failed to access Gemini AI service")) {
-    return `I'm sorry, but I encountered an error while processing your request: Gemini API key not configured.
-Please contact support or check your environment settings.
-If you were trying to generate an app, this might be due to limits with our AI model or connectivity issues. You can try:
-- Using a shorter, more focused prompt (e.g., "Create a simple Twitter clone with basic tweet functionality")
-- Breaking down your request into smaller parts
-- Trying again in a few minutes`;
-  }
-  
-  return message;
+// Interface for chat history items
+interface ChatHistoryItem {
+  id: string;
+  title: string;
+  last_message?: string;
+  timestamp: string;
+  messages?: Message[]; // Add messages array to store full conversation
 }
 
-export default function IndexPage() {
-  const [messages, setMessages] = useState<any[]>([]);
-  const [inputValue, setInputValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+// Define interface for project context
+interface ProjectContext {
+  projectName?: string;
+  description?: string;
+  specification?: string;
+  components?: Array<{name: string, description: string}>;
+  dependencies?: string[];
+  nextSteps?: string[];
+  [key: string]: any; // Allow for other properties
+}
+
+const Index = () => {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
   const [isGeneratingApp, setIsGeneratingApp] = useState(false);
-  const [activeTab, setActiveTab] = useState('chat');
-  const [projectContext, setProjectContext] = useState<any>(null);
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [fileContent, setFileContent] = useState<string>('');
-  const [lastPromptText, setLastPromptText] = useState<string>('');
-  const [messageCallout, setMessageCallout] = useState<any>(null);
+  const [generationDialog, setGenerationDialog] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
-  const [currentChallenge, setCurrentChallenge] = useState<any>(null);
-  const [completedChallenges, setCompletedChallenges] = useState<string[]>([]);
-  const [isLoadingProject, setIsLoadingProject] = useState(false);
-  const [isModifyingApp, setIsModifyingApp] = useState(false);
-  const [modificationPrompt, setModificationPrompt] = useState('');
-  const [showModifyPrompt, setShowModifyPrompt] = useState(false);
-  
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [firstStepGuidanceSent, setFirstStepGuidanceSent] = useState<boolean>(false);
+  const [hasGeneratedApp, setHasGeneratedApp] = useState<boolean>(false); 
+  const [chatLoadingError, setChatLoadingError] = useState<string | null>(null);
+  const [currentCode, setCurrentCode] = useState<string>(''); 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-  const router = useRouter();
-  
-  const { generateChallenge } = useGeminiCode({
-    onSuccess: (data) => {
-      console.log("Challenge generated:", data);
-    },
-    onError: (error) => {
-      console.error("Error generating challenge:", error);
-    }
-  });
-  
-  const { generateCodeFromPrompt } = useUiScraper();
-  
-  // Scroll to bottom of messages
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [projectContext, setProjectContext] = useState<ProjectContext | null>(null);
+
+  // Check for initial prompt from landing page
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    const initialPrompt = localStorage.getItem("initialPrompt");
+    if (initialPrompt) {
+      // Clear the stored prompt to prevent reusing it on page refresh
+      localStorage.removeItem("initialPrompt");
+      // Send the initial prompt
+      handleSendMessage(initialPrompt);
+    }
+  }, []);
+  
+  // Check for existing app generation in messages
+  useEffect(() => {
+    // Look for messages that indicate an app was generated
+    const appGeneratedMessage = messages.find(message => 
+      message.role === "assistant" && 
+      message.metadata?.projectId && 
+      (message.content.includes("I've generated") || 
+       message.content.includes("generated a full-stack application") ||
+       message.content.includes("app generation successful"))
+    );
+    
+    // Update state if we found evidence of app generation
+    if (appGeneratedMessage) {
+      setHasGeneratedApp(true);
+      setCurrentProjectId(appGeneratedMessage.metadata?.projectId || null);
     }
   }, [messages]);
   
-  // Load project from URL if projectId is present
+  // Check authentication status
   useEffect(() => {
-    const { projectId } = router.query;
-    
-    if (projectId && typeof projectId === 'string' && projectId !== currentProjectId) {
-      loadProject(projectId);
-    }
-  }, [router.query]);
-  
-  // Load project data from Supabase
-  const loadProject = async (projectId: string) => {
-    try {
-      setIsLoadingProject(true);
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getSession();
+      setIsAuthenticated(!!data.session);
       
+      // Set up auth state change listener
+      const { data: { subscription } } = await supabase.auth.onAuthStateChange(
+        (_, session) => {
+          setIsAuthenticated(!!session);
+        }
+      );
+      
+      return () => {
+        subscription.unsubscribe();
+      };
+    };
+    
+    checkAuth();
+    
+    // Initialize Gemini AI Service with API key from environment if available
+    const initGeminiAPI = async () => {
+      try {
+        const { data } = await supabase.functions.invoke('get-env', {
+          body: { key: 'GEMINI_API_KEY' }
+        });
+        
+        if (data && data.value) {
+          geminiAIService.setApiKey(data.value);
+          console.log('Gemini API key loaded from environment');
+        }
+      } catch (error) {
+        console.error('Error getting Gemini API key:', error);
+      }
+    };
+    
+    initGeminiAPI();
+  }, []);
+
+  useEffect(() => {
+    // Parse chat ID from URL if present
+    const searchParams = new URLSearchParams(location.search);
+    const chatId = searchParams.get('chat');
+    
+    if (chatId) {
+      console.log("Loading chat history for chat ID:", chatId);
+      setCurrentChatId(chatId);
+      // Load the specific chat history
+      loadChatHistory(chatId);
+    } else {
+      // Clear messages if starting a new chat
+      setMessages([]);
+      setCurrentChatId(null);
+      setCurrentProjectId(null);
+      setHasGeneratedApp(false);
+      // Clear any previous errors
+      setChatLoadingError(null);
+    }
+  }, [location.search]); // Changed from [location] to [location.search] to avoid unnecessary rerenders
+
+  const loadChatHistory = async (chatId: string) => {
+    console.log(`Loading chat history for chat ID: ${chatId}`);
+    setChatLoadingError(null);
+    setLoading(true);
+    
+    try {
+      // Try to load from Supabase first
       const { data, error } = await supabase
-        .from('app_projects')
+        .from('chat_history')
         .select('*')
-        .eq('id', projectId)
-        .single();
+        .eq('id', chatId)
+        .maybeSingle(); // Use maybeSingle to avoid errors when the chat isn't found
       
       if (error) {
-        throw error;
+        console.error("Error fetching chat from Supabase:", error);
+        throw new Error(`Supabase error: ${error.message}`);
       }
       
-      if (!data) {
-        throw new Error('Project not found');
-      }
-      
-      // Set project context from app_data
-      const appData = data.app_data;
-      
-      setProjectContext({
-        projectName: appData.projectName,
-        description: appData.description,
-        files: appData.files || [],
-        challenges: appData.challenges || []
-      });
-      
-      setCurrentProjectId(projectId);
-      
-      // Select first file by default
-      if (appData.files && appData.files.length > 0) {
-        setSelectedFile(appData.files[0].path);
-        setFileContent(appData.files[0].content);
-      }
-      
-      // Add welcome message
-      const welcomeMessage = {
-        role: 'assistant',
-        content: `Welcome to your project: **${appData.projectName}**!\n\n${appData.description}\n\nI've loaded your project with ${appData.files?.length || 0} files and ${appData.challenges?.length || 0} challenges. You can explore the files in the sidebar and work on the challenges.`,
-        timestamp: new Date().toISOString()
-      };
-      
-      setMessages([welcomeMessage]);
-      
-      // Switch to project tab
-      setActiveTab('project');
-      
-    } catch (error: any) {
-      console.error('Error loading project:', error);
-      toast({
-        title: 'Error loading project',
-        description: error.message,
-        variant: 'destructive'
-      });
-    } finally {
-      setIsLoadingProject(false);
-    }
-  };
-  
-  // Handle file selection
-  const handleFileSelect = (filePath: string) => {
-    if (!projectContext) return;
-    
-    const file = projectContext.files.find((f: any) => f.path === filePath);
-    
-    if (file) {
-      setSelectedFile(filePath);
-      setFileContent(file.content);
-    }
-  };
-  
-  // Handle file content change
-  const handleFileContentChange = (newContent: string) => {
-    setFileContent(newContent);
-    
-    // Update the file in project context
-    if (selectedFile && projectContext) {
-      const updatedFiles = projectContext.files.map((file: any) => {
-        if (file.path === selectedFile) {
-          return { ...file, content: newContent };
+      if (data) {
+        console.log("Found chat in Supabase:", data);
+        if (data.messages && Array.isArray(data.messages)) {
+          // Format dates in the messages
+          const formattedMessages = data.messages.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp)
+          }));
+          
+          setMessages(formattedMessages);
+          
+          // If this chat had a project ID, restore it
+          const projectMsg = formattedMessages.find((msg: Message) => msg.metadata?.projectId);
+          if (projectMsg && projectMsg.metadata?.projectId) {
+            setCurrentProjectId(projectMsg.metadata.projectId);
+            setHasGeneratedApp(true);
+          
+            // Try to load the code from the project
+            try {
+              const { data: projects } = await supabase
+                .from('app_projects')
+                .select('app_data')
+                .eq('id', projectMsg.metadata.projectId)
+                .order('version', { ascending: false })
+                .limit(1);
+                
+              if (projects && projects.length > 0 && projects[0].app_data) {
+                // Extract code from the app data - properly type cast app_data as ProjectContext
+                const appData = projects[0].app_data as ProjectContext;
+                if (appData.files && Array.isArray(appData.files)) {
+                  setCurrentCode(appData.files[0].content);
+                }
+              }
+            } catch (err) {
+              console.error("Error loading project code:", err);
+            }
+          }
+          
+          toast({
+            title: "Chat loaded",
+            description: `Loaded "${data.title}"`,
+          });
+          
+          setLoading(false);
+          return; // Successfully loaded from Supabase, exit the function
+        } else {
+          throw new Error("Chat found but has no messages");
         }
-        return file;
-      });
-      
-      setProjectContext({ ...projectContext, files: updatedFiles });
-    }
-  };
-  
-  // Handle challenge selection
-  const handleChallengeSelect = (challenge: any) => {
-    setCurrentChallenge(challenge);
-    
-    // If the challenge has associated files, select the first one
-    if (challenge.filesPaths && challenge.filesPaths.length > 0) {
-      handleFileSelect(challenge.filesPaths[0]);
-    }
-  };
-  
-  // Mark challenge as completed
-  const handleChallengeComplete = (challengeId: string) => {
-    if (completedChallenges.includes(challengeId)) return;
-    
-    setCompletedChallenges([...completedChallenges, challengeId]);
-    
-    toast({
-      title: 'Challenge completed!',
-      description: 'Great job! You\'ve completed this challenge.',
-    });
-    
-    // Find the next challenge
-    if (projectContext && projectContext.challenges) {
-      const currentIndex = projectContext.challenges.findIndex((c: any) => c.id === challengeId);
-      if (currentIndex >= 0 && currentIndex < projectContext.challenges.length - 1) {
-        const nextChallenge = projectContext.challenges[currentIndex + 1];
-        
-        // Add a message about the next challenge
-        const nextChallengeMessage = {
-          role: 'assistant',
-          content: `🎉 **Challenge completed!**\n\nReady for the next one? Let's tackle: **${nextChallenge.title}**\n\n${nextChallenge.description}`,
-          timestamp: new Date().toISOString()
-        };
-        
-        setMessages(prevMessages => [...prevMessages, nextChallengeMessage]);
-        
-        // Select the next challenge
-        handleChallengeSelect(nextChallenge);
-      } else if (currentIndex === projectContext.challenges.length - 1) {
-        // All challenges completed
-        const completionMessage = {
-          role: 'assistant',
-          content: `🎉 **Congratulations!** You've completed all the challenges for this project!\n\nFeel free to continue exploring and enhancing the code, or you can start a new project.`,
-          timestamp: new Date().toISOString()
-        };
-        
-        setMessages(prevMessages => [...prevMessages, completionMessage]);
+      } else {
+        throw new Error("Chat not found in Supabase");
       }
-    }
-  };
-  
-  // Handle app modification
-  const handleModifyApp = async () => {
-    if (!currentProjectId || !modificationPrompt.trim()) {
+    } catch (error) {
+      console.error("Error loading chat history:", error);
+      setChatLoadingError("The requested conversation could not be found.");
+      
+      // Show toast notification
       toast({
-        title: 'Error',
-        description: 'Please enter a modification prompt',
-        variant: 'destructive'
-      });
-      return;
-    }
-    
-    try {
-      setIsModifyingApp(true);
-      
-      // Call the modify-app function
-      const { data, error } = await supabase.functions.invoke('modify-app', {
-        body: {
-          prompt: modificationPrompt,
-          projectId: currentProjectId
-        }
+        variant: "destructive",
+        title: "Chat not found",
+        description: "The requested conversation could not be found.",
       });
       
-      if (error) {
-        throw new Error(error.message);
-      }
-      
-      if (!data) {
-        throw new Error('No response from modification service');
-      }
-      
-      // Load the modified project
-      await loadProject(currentProjectId);
-      
-      // Add a message about the modification
-      const modificationMessage = {
-        role: 'assistant',
-        content: `✅ **App Modified Successfully!**\n\n${data.summary || 'Your requested changes have been applied to the application.'}`,
-        timestamp: new Date().toISOString()
-      };
-      
-      setMessages(prevMessages => [...prevMessages, modificationMessage]);
-      
-      // Reset the modification prompt
-      setModificationPrompt('');
-      setShowModifyPrompt(false);
-      
-    } catch (error: any) {
-      console.error('Error modifying app:', error);
-      toast({
-        title: 'Error modifying app',
-        description: error.message,
-        variant: 'destructive'
-      });
-      
-      // Add error message
-      const errorMessage = {
-        role: 'assistant',
-        content: `❌ **Error Modifying App**\n\n${error.message}`,
-        timestamp: new Date().toISOString()
-      };
-      
-      setMessages(prevMessages => [...prevMessages, errorMessage]);
+      // Navigate back to home with a short delay to allow the toast to be seen
+      setTimeout(() => {
+        navigate('/app', { replace: true });
+      }, 1000); // Reduced delay to 1 second for better user experience
     } finally {
-      setIsModifyingApp(false);
+      setLoading(false);
     }
   };
 
-  const handleSendMessage = async (newMessage: string) => {
+  // Function to save the current conversation to chat history
+  const saveToHistory = async (content: string, responseContent: string) => {
+    // Only save if there's actual content
+    if (!content.trim()) return;
+    
     try {
-      if (!newMessage.trim()) return;
+      // Generate a chat title based on the first user message
+      const chatTitle = content.length > 50 
+        ? content.substring(0, 50) + "..." 
+        : content;
       
-      // Add user message to chat
-      const userMessage = {
-        role: 'user',
-        content: newMessage,
-        timestamp: new Date().toISOString()
+      const now = new Date();
+      const timeString = "Just now";
+      
+      // Add new messages to the history
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        role: "user",
+        content,
+        timestamp: now
       };
       
-      setMessages(prevMessages => [...prevMessages, userMessage]);
-      setInputValue('');
-      setIsLoading(true);
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: responseContent,
+        timestamp: now,
+        metadata: currentProjectId ? { projectId: currentProjectId } : undefined
+      };
       
-      // Clear any previous message callout
-      setMessageCallout(null);
+      // Update messages state with the new messages
+      const updatedMessages = [...messages, userMessage, assistantMessage];
+      setMessages(updatedMessages);
       
-      // Update message processing with enhanced error handling
-      if (contentIncludes(newMessage, 'create') || 
-          contentIncludes(newMessage, 'generate') || 
-          contentIncludes(newMessage, 'make me')) {
-        try {
-          setLastPromptText(getContentAsString(newMessage));
-          setIsGeneratingApp(true);
+      if (isAuthenticated) {
+        // Save to Supabase if authenticated
+        const { data: session } = await supabase.auth.getSession();
+        
+        if (session.session) {
+          // Convert Message[] to a JSON-compatible structure for Supabase
+          const serializableMessages = updatedMessages.map(msg => ({
+            ...msg,
+            timestamp: msg.timestamp.toISOString()
+          }));
           
-          setTimeout(() => {
-            // Enable mocked responses for development if needed
-            geminiAIService.enableMockedResponse(true);
-          }, 100);
-          
-          const result = await geminiAIService.initializeProject(getContentAsString(newMessage), "App");
-          
-          if (result) {
-            // Set project context
-            setProjectContext(result.projectContext);
-            setCurrentProjectId(result.projectId);
+          if (currentChatId) {
+            // Update existing chat
+            const { error } = await supabase
+              .from('chat_history')
+              .update({
+                last_message: `Last message ${timeString}`,
+                messages: serializableMessages as unknown as Json,
+                updated_at: now.toISOString()
+              })
+              .eq('id', currentChatId);
             
-            // Select first file by default
-            if (result.projectContext.files && result.projectContext.files.length > 0) {
-              setSelectedFile(result.projectContext.files[0].path);
-              setFileContent(result.projectContext.files[0].content);
+            if (error) {
+              console.error("Error updating chat in Supabase:", error);
+              throw error;
+            }
+          } else {
+            // Create new chat
+            const { data, error } = await supabase
+              .from('chat_history')
+              .insert({
+                user_id: session.session.user.id,
+                title: chatTitle,
+                last_message: `Last message ${timeString}`,
+                messages: serializableMessages as unknown as Json
+              })
+              .select();
+            
+            if (error) {
+              console.error("Error creating chat in Supabase:", error);
+              throw error;
             }
             
-            // Add assistant message
-            const assistantMessage = {
-              role: 'assistant',
-              content: result.assistantMessage,
-              timestamp: new Date().toISOString()
-            };
-            
-            setMessages(prevMessages => [...prevMessages, assistantMessage]);
-            
-            // Switch to project tab
-            setActiveTab('project');
-            
-            // Update URL with project ID
-            router.push({
-              pathname: router.pathname,
-              query: { projectId: result.projectId }
-            }, undefined, { shallow: true });
-          }
-        } catch (error: any) {
-          console.error("App generation attempt failed:", error);
-          
-          // Send an assistant message with the enhanced error message
-          const errorMessage = enhanceErrorMessage(error.message || "Unknown error generating app");
-          
-          // Add retry logic
-          let retries = 0;
-          const maxRetries = 2;
-          const waitTime = 1000;
-          
-          while (retries < maxRetries) {
-            console.error(`Error initializing project: ${error}`);
-            setMessageCallout({
-              type: "error",
-              title: "Error generating app:",
-              message: `${error.message}. Try using a simpler prompt or breaking down your request into smaller parts.`,
-              actionLabel: "Try Again with Simpler Prompt"
-            });
-            
-            retries++;
-            if (retries < maxRetries) {
-              console.info(`Waiting ${waitTime}ms before retry...`);
-              await new Promise(resolve => setTimeout(resolve, waitTime * retries));
-              
-              try {
-                // Enable mocked responses for development
-                geminiAIService.enableMockedResponse(true);
-                const result = await geminiAIService.initializeProject(getContentAsString(newMessage), "App");
-                
-                // If successful on retry, handle the result
-                if (result) {
-                  // Set project context
-                  setProjectContext(result.projectContext);
-                  setCurrentProjectId(result.projectId);
-                  
-                  // Select first file by default
-                  if (result.projectContext.files && result.projectContext.files.length > 0) {
-                    setSelectedFile(result.projectContext.files[0].path);
-                    setFileContent(result.projectContext.files[0].content);
-                  }
-                  
-                  // Add assistant message
-                  const assistantMessage = {
-                    role: 'assistant',
-                    content: result.assistantMessage,
-                    timestamp: new Date().toISOString()
-                  };
-                  
-                  setMessages(prevMessages => [...prevMessages, assistantMessage]);
-                  
-                  // Switch to project tab
-                  setActiveTab('project');
-                  
-                  // Update URL with project ID
-                  router.push({
-                    pathname: router.pathname,
-                    query: { projectId: result.projectId }
-                  }, undefined, { shallow: true });
-                  
-                  break;
-                }
-              } catch (retryError: any) {
-                console.error(`Retry ${retries} failed:`, retryError);
-                error = retryError;
-              }
+            if (data && data[0]) {
+              setCurrentChatId(data[0].id);
             }
           }
-          
-          // If all retries failed, send the final error message
-          const assistantMessage = {
-            role: "assistant",
-            content: errorMessage,
-            timestamp: new Date().toISOString()
-          };
-          
-          setMessages(prevMessages => [...prevMessages, assistantMessage]);
-        } finally {
-          setIsGeneratingApp(false);
         }
-        return;
-      }
-      
-      // Handle UI component generation
-      if (contentIncludes(newMessage, 'ui component') || 
-          contentIncludes(newMessage, 'create component') || 
-          contentIncludes(newMessage, 'design component')) {
+      } else {
+        // Save to localStorage if not authenticated
+        // Create new chat history item
+        const newChat: ChatHistoryItem = {
+          id: currentChatId || Date.now().toString(),
+          title: chatTitle,
+          last_message: `Last message ${timeString}`,
+          timestamp: timeString,
+          messages: updatedMessages
+        };
+        
+        // Get existing history or initialize empty array
+        const storedHistory = localStorage.getItem('chatHistory');
+        let chatHistoryArray: ChatHistoryItem[] = [];
+        
         try {
-          const result = await generateCodeFromPrompt(getContentAsString(newMessage));
-          
-          if (result && result.success) {
-            const assistantMessage = {
-              role: 'assistant',
-              content: `Here's the UI component I've created for you:\n\n\`\`\`jsx\n${result.result?.code.frontend}\n\`\`\`\n\n${result.result?.explanation || ''}`,
-              timestamp: new Date().toISOString()
-            };
-            
-            setMessages(prevMessages => [...prevMessages, assistantMessage]);
-          } else {
-            throw new Error(result?.error || 'Failed to generate UI component');
+          if (storedHistory) {
+            chatHistoryArray = JSON.parse(storedHistory);
           }
-        } catch (error: any) {
-          console.error('Error generating UI component:', error);
-          
-          const assistantMessage = {
-            role: 'assistant',
-            content: `I'm sorry, I couldn't generate that UI component. ${error.message}`,
-            timestamp: new Date().toISOString()
-          };
-          
-          setMessages(prevMessages => [...prevMessages, assistantMessage]);
-        }
-        setIsLoading(false);
-        return;
-      }
-      
-      // Handle coding challenge generation
-      if (contentIncludes(newMessage, 'coding challenge') || 
-          contentIncludes(newMessage, 'code challenge') || 
-          contentIncludes(newMessage, 'programming challenge')) {
-        try {
-          const result = await generateChallenge(getContentAsString(newMessage));
-          
-          if (result && result.success) {
-            const assistantMessage = {
-              role: 'assistant',
-              content: `I've created a coding challenge for you:\n\n**${result.projectName}**\n\n${result.challenges.map((c: any, i: number) => `${i+1}. **${c.title}**: ${c.description}`).join('\n\n')}`,
-              timestamp: new Date().toISOString()
-            };
-            
-            setMessages(prevMessages => [...prevMessages, assistantMessage]);
-          } else {
-            throw new Error('Failed to generate coding challenge');
-          }
-        } catch (error: any) {
-          console.error('Error generating coding challenge:', error);
-          
-          const assistantMessage = {
-            role: 'assistant',
-            content: `I'm sorry, I couldn't generate that coding challenge. ${error.message}`,
-            timestamp: new Date().toISOString()
-          };
-          
-          setMessages(prevMessages => [...prevMessages, assistantMessage]);
-        }
-        setIsLoading(false);
-        return;
-      }
-      
-      // Handle project-related commands when in project mode
-      if (projectContext && currentProjectId) {
-        // Handle challenge completion
-        if (contentIncludes(newMessage, 'completed') || 
-            contentIncludes(newMessage, 'finished') || 
-            contentIncludes(newMessage, 'done with challenge')) {
-          if (currentChallenge) {
-            handleChallengeComplete(currentChallenge.id);
-            setIsLoading(false);
-            return;
-          }
+        } catch (error) {
+          console.error("Error parsing chat history:", error);
         }
         
-        // Handle app modification request
-        if (contentIncludes(newMessage, 'modify') || 
-            contentIncludes(newMessage, 'change') || 
-            contentIncludes(newMessage, 'update app')) {
-          setShowModifyPrompt(true);
-          setModificationPrompt(getContentAsString(newMessage));
+        // If we have a current chat ID, update that chat
+        if (currentChatId) {
+          const existingIndex = chatHistoryArray.findIndex(chat => chat.id === currentChatId);
+          if (existingIndex >= 0) {
+            chatHistoryArray[existingIndex].last_message = `Last message ${timeString}`;
+            chatHistoryArray[existingIndex].timestamp = timeString;
+            chatHistoryArray[existingIndex].messages = updatedMessages;
+          } else {
+            chatHistoryArray.unshift(newChat);
+          }
+        } else {
+          // Set the current chat ID to the new chat's ID
+          const newChatId = Date.now().toString();
+          setCurrentChatId(newChatId);
+          newChat.id = newChatId;
           
-          const assistantMessage = {
-            role: 'assistant',
-            content: `I'll help you modify the app. Please confirm your modification request in the form that appeared.`,
-            timestamp: new Date().toISOString()
-          };
-          
-          setMessages(prevMessages => [...prevMessages, assistantMessage]);
-          setIsLoading(false);
-          return;
+          // Add new chat to beginning of array
+          chatHistoryArray.unshift(newChat);
         }
+        
+        // Save updated history back to localStorage
+        localStorage.setItem('chatHistory', JSON.stringify(chatHistoryArray));
       }
-      
-      // Default response for other messages
-      const assistantMessage = {
-        role: 'assistant',
-        content: `I'm here to help you build and learn! You can ask me to:\n\n- Create a new app or project\n- Generate UI components\n- Create coding challenges\n- Help with your current project\n\nWhat would you like to do?`,
-        timestamp: new Date().toISOString()
-      };
-      
-      setMessages(prevMessages => [...prevMessages, assistantMessage]);
-      setIsLoading(false);
-    } catch (error: any) {
-      console.error("Error in handleSendMessage:", error);
-      
-      // Enhanced error handling for the overall function
-      const errorMessage = enhanceErrorMessage(error.message || "An error occurred while processing your message");
-      
-      setMessages(prevMessages => [
-        ...prevMessages,
-        {
-          role: "assistant",
-          content: errorMessage,
-          timestamp: new Date().toISOString()
-        }
-      ]);
-      
-      setMessageCallout({
-        type: "error",
+    } catch (error) {
+      console.error("Error saving chat history:", error);
+      toast({
+        variant: "destructive", 
         title: "Error",
-        message: errorMessage
+        description: "Failed to save chat history."
       });
     }
   };
+
+  useEffect(() => {
+    // Scroll to bottom when messages change
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  const handleSendMessage = async (content: string) => {
+    if (!content.trim()) return;
+    
+    setGenerationError(null);
+    
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content,
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    
+    // Check if this is a standard app generation request
+    const isAppGeneration = 
+      (content.toLowerCase().includes("create") || 
+       content.toLowerCase().includes("build") || 
+       content.toLowerCase().includes("generate") ||
+       content.toLowerCase().includes("make") || 
+       content.toLowerCase().includes("develop") ||
+       content.toLowerCase().includes("code")) && 
+      (content.toLowerCase().includes("app") || 
+       content.toLowerCase().includes("website") || 
+       content.toLowerCase().includes("dashboard") || 
+       content.toLowerCase().includes("application") ||
+       content.toLowerCase().includes("platform") ||
+       content.toLowerCase().includes("clone") ||
+       content.toLowerCase().includes("system") ||
+       content.toLowerCase().includes("project") ||
+       content.toLowerCase().includes("site"));
+
+    // Check if this is a modification request for an existing app
+    const isModificationRequest = 
+      currentProjectId && // We have a current project ID
+      (content.toLowerCase().includes("change") ||
+       content.toLowerCase().includes("modify") ||
+       content.toLowerCase().includes("update") ||
+       content.toLowerCase().includes("add") ||
+       content.toLowerCase().includes("fix"));
+    
+    if (isAppGeneration) {
+      // Check if an app has already been generated in this conversation
+      if (hasGeneratedApp) {
+        console.log("Preventing generation of new app - one already exists in this conversation");
+        
+        // Instead of generating a new app, send a message to the user
+        const appExistsMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `I notice you're asking me to create a new application, but I've already generated an app in this conversation. 
+
+To create a new app, please start a new conversation by clicking the "New Chat" button in the sidebar, or by visiting the homepage.
+
+Would you like me to help you modify the existing app instead? I can add features, fix issues, or make other changes to the current application.`,
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => [...prev, appExistsMessage]);
+        return;
+      }
+
+      console.log("Initializing project with prompt:", content);
+      
+      setGenerationDialog(true);
+      setIsGeneratingApp(true);
+      setLoading(true);
+      
+      const processingMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "I'm working on generating your application. This may take a minute or two...",
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, processingMessage]);
+      
+      try {
+        // Use new Gemini AI service to initialize project with retry logic
+        const maxRetries = 3;
+        let attempt = 0;
+        let projectResult = null;
+        let lastError = null;
+
+        while (attempt < maxRetries && !projectResult) {
+          try {
+            const projectName = content.length > 20 ? content.substring(0, 20) + "..." : content;
+            projectResult = await geminiAIService.initializeProject(content, projectName);
+            break; // Success! Exit the loop
+          } catch (error) {
+            console.error(`App generation attempt ${attempt + 1} failed:`, error);
+            lastError = error;
+            attempt++;
+            
+            // If we still have retries left, wait before trying again
+            if (attempt < maxRetries) {
+              const backoffTime = 1000 * Math.pow(2, attempt - 1); // Exponential backoff
+              console.log(`Waiting ${backoffTime}ms before retry...`);
+              await new Promise(resolve => setTimeout(resolve, backoffTime));
+            }
+          }
+        }
+        
+        // If we exhausted all retries and still failed, throw the last error
+        if (!projectResult) {
+          throw lastError || new Error("Failed to initialize project after multiple attempts");
+        }
+        
+        console.log("Project initialization successful:", projectResult);
+        setCurrentProjectId(projectResult.projectId);
+        setHasGeneratedApp(true); // Mark that we've generated an app
+        setCurrentCode(projectResult.initialCode); // Store the code for future modification
+        
+        setGenerationDialog(false);
+        
+        setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
+
+        // Create a formatted response similar to the original app generation
+        const formattedResponse = `I've generated a full-stack application based on your request. Here's what I created:
+
+${projectResult.assistantMessage}
+
+You can explore the code structure and files in the panel above. This is a starting point that you can further customize and expand.`;
+
+        const aiMessage: Message = {
+          id: (Date.now() + 2).toString(),
+          role: "assistant",
+          content: formattedResponse,
+          metadata: {
+            projectId: projectResult.projectId,
+            appData: projectResult.appData // Store app data in the metadata for ArtifactHandler to use
+          },
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => [...prev, aiMessage]);
+        
+        // Store project context
+        if (projectResult.projectContext) {
+          setProjectContext(projectResult.projectContext);
+        }
+        
+        toast({
+          title: "App Generated Successfully",
+          description: `${projectResult.projectContext.projectName} has been generated.`,
+        });
+        
+        // Save this conversation to chat history
+        saveToHistory(content, formattedResponse);
+
+        // Send first step guidance if available
+        if (projectResult.projectContext.nextSteps && projectResult.projectContext.nextSteps.length > 0) {
+          setTimeout(() => {
+            const guidance = `## Next Steps\n\nHere are some suggestions to help you get started:\n\n${
+              projectResult.projectContext.nextSteps.map((step: string, i: number) => `${i+1}. ${step}`).join('\n\n')
+            }\n\nLet me know if you need help with any of these steps!`;
+            
+            const guidanceMessage: Message = {
+              id: (Date.now() + 3).toString(),
+              role: "assistant",
+              content: guidance,
+              metadata: {
+                projectId: projectResult.projectId,
+                isGuidance: true
+              },
+              timestamp: new Date()
+            };
+            
+            setMessages(prev => [...prev, guidanceMessage]);
+            setFirstStepGuidanceSent(true);
+          }, 1500);
+        }
+      } catch (error: any) {
+        console.error('Error initializing project:', error);
+        setGenerationDialog(false);
+        setGenerationError(error.message || "An unexpected error occurred");
+        
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: error.message || "An unexpected error occurred",
+        });
+        
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `I'm sorry, but I encountered an error while processing your request: ${error.message || 'Please try again later.'}
+          
+If you were trying to generate an app, this might be due to limits with our AI model or connectivity issues. You can try:
+1. Using a shorter, more focused prompt (e.g., "Create a simple Twitter clone with basic tweet functionality")
+2. Breaking down your request into smaller parts
+3. Trying again in a few minutes`,
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
+        setMessages(prev => [...prev, errorMessage]);
+      } finally {
+        setLoading(false);
+        setIsGeneratingApp(false);
+      }
+    } else if (isModificationRequest || (currentProjectId && currentCode)) {
+      console.log("Processing modification or analysis request for project:", currentProjectId);
+      
+      setLoading(true);
+      
+      const processingMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "I'm analyzing your code and working on a response...",
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, processingMessage]);
+      
+      try {
+        // Get project context from service if available
+        let projectContext = null;
+        try {
+          // Try to get from Supabase
+          const { data: projects } = await supabase
+            .from('app_projects')
+            .select('*')
+            .eq('id', currentProjectId)
+            .order('version', { ascending: false })
+            .limit(1);
+            
+          if (projects && projects.length > 0) {
+            // Properly type cast the app_data as ProjectContext
+            const appData = projects[0].app_data as ProjectContext;
+            
+            projectContext = {
+              projectId: currentProjectId,
+              projectName: appData?.projectName || "Unnamed Project",
+              specification: content,
+              description: appData?.description || "Project based on user specification",
+            };
+          }
+        } catch (error) {
+          console.error("Error fetching project context:", error);
+        }
+        
+        // Send to Edge Function for chat with code context
+        const { data, error } = await supabase.functions.invoke('chat', {
+          body: { 
+            message: content,
+            projectId: currentProjectId,
+            code: currentCode
+          }
+        });
+
+        if (error) throw error;
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.response,
+          metadata: {
+            projectId: data.projectId || currentProjectId,
+            codeUpdate: data.codeUpdate // Include any code update suggestions
+          },
+          timestamp: new Date()
+        };
+        
+        // Update code if we have code updates
+        if (data.codeUpdate) {
+          setCurrentCode(data.codeUpdate);
+        }
+        
+        setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
+        setMessages(prev => [...prev, aiMessage]);
+        
+        // Update current project ID if we got a new one from the modification
+        if (data.projectId && data.projectId !== currentProjectId) {
+          setCurrentProjectId(data.projectId);
+        }
+        
+        toast({
+          title: "Analysis Complete",
+          description: "Your code has been analyzed and I've provided a response.",
+        });
+        
+        // Save this conversation to chat history
+        saveToHistory(content, data.response);
+      } catch (error: any) {
+        console.error('Error calling function:', error);
+        setGenerationError(error.message || "An unexpected error occurred");
+        
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: error.message || "An unexpected error occurred",
+        });
+        
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `I'm sorry, but I encountered an error while analyzing your code: ${error.message || 'Please try again later.'}`,
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
+        setMessages(prev => [...prev, errorMessage]);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      setLoading(true);
+      
+      const processingMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant", 
+        content: "Processing your request...",
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, processingMessage]);
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('chat', {
+          body: { message: content }
+        });
+
+        if (error) throw error;
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: data.response,
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
+        setMessages(prev => [...prev, aiMessage]);
+        
+        // Save this conversation to chat history
+        saveToHistory(content, data.response);
+      } catch (error: any) {
+        console.error('Error calling function:', error);
+        setGenerationError(error.message || "An unexpected error occurred");
+        
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: error.message || "An unexpected error occurred",
+        });
+        
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `I'm sorry, but I encountered an error while processing your request: ${error.message || 'Please try again later.'}`,
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
+        setMessages(prev => [...prev, errorMessage]);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  // Automatic guidance system
+  useEffect(() => {
+    // Check if we need to send a step completion message
+    const hasStepCompletionMessage = messages.some(msg => 
+      msg.content && msg.content.includes("I've completed this") && 
+      msg.role === "user"
+    );
+    
+    // If the user has completed a step, make sure firstStepGuidanceSent is true
+    if (hasStepCompletionMessage) {
+      setFirstStepGuidanceSent(true);
+    }
+  }, [messages]);
 
   return (
-    <div className="container mx-auto p-4">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="chat">Chat</TabsTrigger>
-          <TabsTrigger value="project" disabled={!projectContext}>Project</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="chat" className="mt-4">
-          <Card className="w-full h-[80vh] flex flex-col">
-            <ChatWindow 
-              messages={messages}
-              isLoading={isLoading || isGeneratingApp}
-              onSendMessage={handleSendMessage}
-              inputValue={inputValue}
-              setInputValue={setInputValue}
-              messageCallout={messageCallout}
-              setMessageCallout={setMessageCallout}
-            />
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="project" className="mt-4">
-          {projectContext ? (
-            <div className="grid grid-cols-12 gap-4 h-[80vh]">
-              <div className="col-span-3 flex flex-col gap-4">
-                <ProjectHeader 
-                  projectName={projectContext.projectName} 
-                  description={projectContext.description}
+    <ArtifactProvider>
+      <div className="h-screen flex overflow-hidden bg-white">
+        <ArtifactLayout>
+          <div className="flex-1 flex flex-col h-full overflow-hidden">
+            <div className="h-14 border-b flex items-center px-4 justify-between">
+              <div className="flex items-center">
+                <HamburgerMenuButton />
+              </div>
+              <div className="flex items-center text-sm text-gray-600">
+                <span className="mr-2">Saved memory full</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                <div className="ml-5 px-3 py-1 rounded-full bg-gray-100 flex items-center">
+                  <span>Temporary</span>
+                </div>
+                <UserProfileMenu />
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto">
+              {messages.length === 0 && !loading && !chatLoadingError ? (
+                <WelcomeScreen onSendMessage={handleSendMessage} />
+              ) : (
+                <ChatWindow 
+                  messages={messages} 
+                  isLoading={loading}
+                  projectId={currentProjectId} 
                 />
-                
-                <Card className="flex-1 overflow-auto">
-                  <div className="p-4 font-semibold border-b">Files</div>
-                  <FileExplorer 
-                    files={projectContext.files || []} 
-                    selectedFile={selectedFile}
-                    onSelectFile={handleFileSelect}
-                  />
-                </Card>
-                
-                <Card className="flex-1 overflow-auto">
-                  <div className="p-4 font-semibold border-b">Challenges</div>
-                  <ChallengeList 
-                    challenges={projectContext.challenges || []}
-                    selectedChallenge={currentChallenge}
-                    completedChallenges={completedChallenges}
-                    onSelectChallenge={handleChallengeSelect}
-                    onCompleteChallenge={handleChallengeComplete}
-                  />
-                </Card>
-                
-                <Button 
-                  onClick={() => setShowModifyPrompt(true)}
-                  className="w-full"
-                >
-                  Modify App
-                </Button>
-              </div>
+              )}
+              <div ref={messagesEndRef} />
               
-              <div className="col-span-9">
-                <Card className="h-full">
-                  <CodeEditor 
-                    content={fileContent}
-                    onChange={handleFileContentChange}
-                    filename={selectedFile}
-                    projectId={currentProjectId}
-                  />
-                </Card>
+              {chatLoadingError && (
+                <div className="px-4 py-3 mx-auto my-4 max-w-3xl bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-center">
+                    <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
+                    <p className="text-sm text-red-700">
+                      <strong>Error loading chat:</strong> {chatLoadingError}
+                    </p>
+                  </div>
+                  <p className="text-xs text-red-600 mt-1 ml-7">
+                    You'll be redirected to the home page.
+                  </p>
+                </div>
+              )}
+              
+              {generationError && (
+                <div className="px-4 py-3 mx-auto my-4 max-w-3xl bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-center">
+                    <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
+                    <p className="text-sm text-red-700">
+                      <strong>Error generating app:</strong> {generationError}
+                    </p>
+                  </div>
+                  <p className="text-xs text-red-600 mt-1 ml-7">
+                    Try using a simpler prompt or breaking down your request into smaller parts.
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-4 pb-8">
+              <InputArea onSendMessage={handleSendMessage} loading={loading} />
+            </div>
+          </div>
+        </ArtifactLayout>
+
+        <Dialog open={generationDialog} onOpenChange={setGenerationDialog}>
+          <DialogContent className="sm:max-w-md" onInteractOutside={e => {
+            if (isGeneratingApp) {
+              e.preventDefault();
+            }
+          }}>
+            <DialogHeader>
+              <DialogTitle>Generating Your Application</DialogTitle>
+              <DialogDescription>
+                Please wait while we generate your application. This may take a minute or two.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col items-center justify-center py-6">
+              <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+              <div className="text-center">
+                <p className="font-medium">Building app architecture...</p>
+                <p className="text-sm text-muted-foreground mt-1">This may take up to 2 minutes.</p>
               </div>
             </div>
-          ) : (
-            <div className="flex items-center justify-center h-[80vh]">
-              <p>No project loaded. Start a chat to create a new project.</p>
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
-      
-      {/* Modify App Modal */}
-      {showModifyPrompt && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="w-1/2 p-6">
-            <h2 className="text-xl font-bold mb-4">Modify Your App</h2>
-            <p className="mb-4">Describe the changes you want to make to your app:</p>
-            
-            <Textarea
-              value={modificationPrompt}
-              onChange={(e) => setModificationPrompt(e.target.value)}
-              placeholder="E.g., Add a dark mode toggle to the navbar"
-              className="mb-4 h-32"
-            />
-            
-            <div className="flex justify-end gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowModifyPrompt(false)}
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleModifyApp}
-                disabled={isModifyingApp || !modificationPrompt.trim()}
-              >
-                {isModifyingApp ? 'Modifying...' : 'Apply Changes'}
-              </Button>
-            </div>
-          </Card>
-        </div>
-      )}
-    </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </ArtifactProvider>
   );
-}
+};
+
+export default Index;

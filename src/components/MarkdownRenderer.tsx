@@ -7,7 +7,6 @@ import { useArtifact } from "./artifact/ArtifactSystem";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { contentIncludes, getContentAsString, contentReplace } from "@/utils/contentUtils";
 
 // Ensure marked uses synchronous mode for type safety
 marked.setOptions({
@@ -32,13 +31,13 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
     if (message && 
         message.role === "assistant" && 
         message.metadata?.projectId && 
-        (contentIncludes(content, "I've generated") || 
-         contentIncludes(content, "generated a full-stack application") ||
-         contentIncludes(content, "app generation successful"))) {
+        (content.includes("I've generated") || 
+         content.includes("generated a full-stack application") ||
+         content.includes("app generation successful"))) {
       setHasGeneratedApp(true);
       
       // Clean the content by removing the JSON code block
-      const cleanContent = contentReplace(content, /```json[\s\S]*?```/g, 
+      const cleanContent = content.replace(/```json[\s\S]*?```/g, 
         "[App code is available in the artifact viewer above]");
       
       setCleanedContent(cleanContent);
@@ -83,7 +82,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
       }
       
       // Check for code analysis feedback messages
-      if (contentIncludes(content, 'AI_CODE_ANALYSIS') || contentIncludes(content, 'CODE_ANALYSIS_RESULT')) {
+      if (content.includes('AI_CODE_ANALYSIS') || content.includes('CODE_ANALYSIS_RESULT')) {
         // Here we would handle code analysis feedback messages
         console.log("Code analysis feedback detected in message");
       }
@@ -143,7 +142,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
     
     // Only show the warning if this isn't the first app-generation message in the conversation
     // We need to check if this message is NOT the first one with a projectId
-    const isMultiAppWarningNeeded = contentIncludes(message.content, "I've generated") && 
+    const isMultiAppWarningNeeded = message.content.includes("I've generated") && 
       message.metadata?.projectId && 
       message.id !== message.id; // Always false, meaning this condition is never met for initial generation
     
