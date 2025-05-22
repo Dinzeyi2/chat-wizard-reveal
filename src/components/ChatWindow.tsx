@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";
@@ -7,12 +6,7 @@ import { FileCode, ChevronRight } from "lucide-react";
 import { Button } from "./ui/button";
 import AgentOrchestration from "./AgentOrchestration";
 import { contentIncludes, getContentAsString } from "@/utils/contentUtils";
-
-interface ChatWindowProps {
-  messages: Message[];
-  isLoading: boolean;
-  projectId: string | null;
-}
+import { getGeminiVisionService } from "@/utils/GeminiVisionService";
 
 // Create a wrapper component that uses useArtifact and handles artifact operations
 const ArtifactHandler = ({ messages, projectId }: { messages: Message[], projectId: string | null }) => {
@@ -246,6 +240,33 @@ const getFileLanguage = (path: string): string => {
 const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId }) => {
   // Add state to track if an app has been generated in this conversation
   const [hasGeneratedApp, setHasGeneratedApp] = useState(false);
+  const [visionEnabled, setVisionEnabled] = useState(false);
+  
+  // Check if Gemini Vision is available
+  useEffect(() => {
+    // Initialize Gemini Vision service if not already initialized
+    const visionService = getGeminiVisionService();
+    setVisionEnabled(visionService.isVisionEnabled());
+    
+    // Listen for console logs that might indicate vision status changes
+    const handleConsoleLog = (event: any) => {
+      if (event.args && event.args[0] && typeof event.args[0] === 'string') {
+        const logMessage = event.args[0];
+        if (logMessage.includes('GEMINI_VISION_ACTIVATED')) {
+          setVisionEnabled(true);
+        } else if (logMessage.includes('GEMINI_VISION_DEACTIVATED')) {
+          setVisionEnabled(false);
+        }
+      }
+    };
+    
+    // This is just for demonstration - in a real app, you'd use a proper event system
+    console.addEventListener?.('log', handleConsoleLog);
+    
+    return () => {
+      console.removeEventListener?.('log', handleConsoleLog);
+    };
+  }, []);
   
   // Effect to check messages for app generation
   useEffect(() => {
@@ -277,6 +298,16 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
       
       {/* Always show orchestration UI if we have a project */}
       {projectId && <AgentOrchestration projectId={projectId} />}
+      
+      {/* Display Gemini Vision status */}
+      {visionEnabled && (
+        <div className="mb-4 p-2 bg-blue-50 border border-blue-100 rounded-lg flex items-center">
+          <div className="animate-pulse mr-2 h-2 w-2 rounded-full bg-blue-500"></div>
+          <p className="text-xs text-blue-800">
+            Gemini Vision is active and monitoring your code editor
+          </p>
+        </div>
+      )}
       
       {messages.map((message) => (
         <div key={message.id} className="mb-8">

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
+import { getGeminiVisionService } from '@/utils/GeminiVisionService';
 
 interface CodeEditorProps {
   content: string;
@@ -22,8 +23,39 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
 }) => {
   const [analyzing, setAnalyzing] = useState(false);
   const [sentGuidanceMessage, setSentGuidanceMessage] = useState(false);
+  const [isVisionEnabled, setIsVisionEnabled] = useState(false);
   const lastAnalysisRef = useRef<string>(content);
   const analysisTimerRef = useRef<number | null>(null);
+  const contentChangeTimerRef = useRef<number | null>(null);
+  const visionService = useRef(getGeminiVisionService());
+  
+  // Initialize and check Gemini Vision status
+  useEffect(() => {
+    setIsVisionEnabled(visionService.current.isVisionEnabled());
+    
+    // Capture content changes for Gemini Vision
+    const handleContentChange = () => {
+      if (isVisionEnabled && filename && content) {
+        visionService.current.processEditorContent(content);
+      }
+    };
+    
+    // Set up content change detector
+    if (isVisionEnabled && filename && !readOnly) {
+      // When user starts typing, process content after a delay
+      if (contentChangeTimerRef.current) {
+        clearTimeout(contentChangeTimerRef.current);
+      }
+      
+      contentChangeTimerRef.current = window.setTimeout(handleContentChange, 2000);
+    }
+    
+    return () => {
+      if (contentChangeTimerRef.current) {
+        clearTimeout(contentChangeTimerRef.current);
+      }
+    };
+  }, [content, isVisionEnabled, filename, readOnly]);
   
   // Gemini AI integration - Auto code analysis
   useEffect(() => {
@@ -152,6 +184,11 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
         filename,
         action: "check_progress"
       }));
+      
+      // If Vision is enabled, also process the saved content
+      if (isVisionEnabled) {
+        visionService.current.processEditorContent(content);
+      }
     }
   };
 
@@ -181,6 +218,12 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
       <div className="flex justify-between items-center p-4 border-b">
         <div className="font-mono text-sm">
           {filename || 'No file selected'}
+          {isVisionEnabled && (
+            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              <span className="animate-pulse mr-1 h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+              Vision
+            </span>
+          )}
         </div>
         <div className="flex gap-2">
           <Button 
