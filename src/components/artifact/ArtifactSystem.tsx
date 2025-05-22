@@ -137,7 +137,6 @@ export const ArtifactProvider: React.FC<{children: React.ReactNode}> = ({ childr
 export const ArtifactViewer: React.FC = () => {
   const { currentArtifact, closeArtifact, isOpen, updateFileContent } = useArtifact();
   const [activeFile, setActiveFile] = useState<string | null>(null);
-  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<'code' | 'preview' | 'files'>('code');
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedContent, setEditedContent] = useState<string>('');
@@ -149,20 +148,6 @@ export const ArtifactViewer: React.FC = () => {
     
     if (currentArtifact && currentArtifact.files.length > 0) {
       setActiveFile(currentArtifact.files[0].id);
-      
-      // Auto-expand all folders by default
-      const folders: Record<string, boolean> = {};
-      currentArtifact.files.forEach(file => {
-        const parts = file.path.split('/');
-        if (parts.length > 1) {
-          let currentPath = '';
-          parts.slice(0, -1).forEach(part => {
-            currentPath = currentPath ? `${currentPath}/${part}` : part;
-            folders[currentPath] = true;
-          });
-        }
-      });
-      setExpandedFolders(folders);
     } else {
       setActiveFile(null);
     }
@@ -265,118 +250,6 @@ export const ArtifactViewer: React.FC = () => {
     return languageMap[extension] || 'plaintext';
   };
 
-  const getFileTree = () => {
-    const tree: Record<string, ArtifactFile[]> = {};
-    const rootFiles: ArtifactFile[] = [];
-    
-    currentArtifact.files.forEach(file => {
-      const parts = file.path.split('/');
-      if (parts.length === 1) {
-        rootFiles.push(file);
-      } else {
-        const folderPath = parts.slice(0, -1).join('/');
-        if (!tree[folderPath]) {
-          tree[folderPath] = [];
-        }
-        tree[folderPath].push(file);
-      }
-    });
-    
-    return { tree, rootFiles };
-  };
-  
-  const toggleFolder = (folderPath: string) => {
-    setExpandedFolders(prev => ({
-      ...prev,
-      [folderPath]: !prev[folderPath]
-    }));
-  };
-  
-  const renderFileTree = () => {
-    const { tree, rootFiles } = getFileTree();
-    const allFolders = Object.keys(tree).sort();
-    const topLevelFolders = allFolders.filter(folder => !folder.includes('/'));
-    
-    const renderFolder = (folderPath: string, indent: number = 0) => {
-      const isExpanded = expandedFolders[folderPath] || false;
-      const folderName = folderPath.split('/').pop();
-      
-      const childFolders = allFolders.filter(folder => {
-        const parts = folder.split('/');
-        return folder !== folderPath && folder.startsWith(folderPath) && parts.length === folderPath.split('/').length + 1;
-      });
-      
-      const files = tree[folderPath] || [];
-      
-      return (
-        <React.Fragment key={folderPath}>
-          <li 
-            className="flex items-center py-1 cursor-pointer text-gray-300 hover:bg-zinc-800"
-            style={{ paddingLeft: `${indent * 12 + 12}px` }}
-            onClick={() => toggleFolder(folderPath)}
-          >
-            <span className="mr-1 text-gray-400">
-              {isExpanded ? (
-                <ChevronRight className="h-3.5 w-3.5 transform rotate-90" />
-              ) : (
-                <ChevronRight className="h-3.5 w-3.5" />
-              )}
-            </span>
-            <span className="font-medium">{folderName}/</span>
-          </li>
-          
-          {isExpanded && (
-            <>
-              {childFolders.map(childFolder => renderFolder(childFolder, indent + 1))}
-              
-              {files.map(file => {
-                const fileName = file.path.split('/').pop();
-                return (
-                  <li 
-                    key={file.id}
-                    className={`py-1 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400' : 'text-gray-300'}`}
-                    style={{ paddingLeft: `${indent * 12 + 28}px` }}
-                    onClick={() => setActiveFile(file.id)}
-                  >
-                    <div className="flex items-center">
-                      <File className="h-4 w-4 mr-2 text-gray-500" />
-                      {fileName}
-                      {activeFile === file.id && 
-                        <span className="text-green-400 ml-2 text-xs">+31</span>
-                      }
-                    </div>
-                  </li>
-                );
-              })}
-            </>
-          )}
-        </React.Fragment>
-      );
-    };
-    
-    return (
-      <ul className="file-tree">
-        {topLevelFolders.map(folder => renderFolder(folder))}
-        
-        {rootFiles.map(file => (
-          <li 
-            key={file.id}
-            className={`py-1 pl-3 cursor-pointer text-sm hover:bg-zinc-800 ${activeFile === file.id ? 'text-green-400' : 'text-gray-300'}`}
-            onClick={() => setActiveFile(file.id)}
-          >
-            <div className="flex items-center px-2 py-1">
-              <File className="h-4 w-4 mr-2 text-gray-500" />
-              {file.path}
-              {activeFile === file.id && 
-                <span className="text-green-400 ml-2 text-xs">+31</span>
-              }
-            </div>
-          </li>
-        ))}
-      </ul>
-    );
-  };
-
   return (
     <div className="artifact-expanded-view">
       <div className="artifact-viewer h-full flex flex-col">
@@ -442,15 +315,6 @@ export const ArtifactViewer: React.FC = () => {
         </div>
         
         <div className={`artifact-viewer-content flex flex-1 overflow-hidden ${activeTab === 'preview' ? 'preview-mode' : ''}`}>
-          {(activeTab === 'code' || activeTab === 'files') && (
-            <div className="file-explorer w-1/4 min-w-[220px] border-r border-zinc-800 bg-black overflow-y-auto">
-              <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 px-3 py-2">
-                <h4 className="text-sm font-medium text-gray-400">Files</h4>
-              </div>
-              {renderFileTree()}
-            </div>
-          )}
-          
           <div className="file-content flex-1 overflow-auto flex flex-col">
             {activeTab === 'code' ? (
               currentFile ? (
