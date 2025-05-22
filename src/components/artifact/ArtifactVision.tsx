@@ -18,6 +18,7 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
   const [isKeySet, setIsKeySet] = useState<boolean>(false);
   const [isVisionActive, setIsVisionActive] = useState<boolean>(false);
   const [showApiKeyInput, setShowApiKeyInput] = useState<boolean>(false);
+  const [lastProcessedTime, setLastProcessedTime] = useState<string | null>(null);
 
   // Initialize the Gemini Vision service
   useEffect(() => {
@@ -25,6 +26,8 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
       debug: true,
       onVisionResponse: (response) => {
         console.log("Gemini Vision response received:", response.substring(0, 100) + "...");
+        // Update last processed time
+        setLastProcessedTime(new Date().toLocaleTimeString());
       },
       onError: (error) => {
         console.error("Gemini Vision error:", error);
@@ -40,6 +43,24 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
     setVisionService(service);
     setIsKeySet(service.isVisionEnabled());
     
+    // Check if vision was previously active and restore state
+    const checkVisionStatus = () => {
+      const isActive = service.isVisionEnabled();
+      setIsVisionActive(isActive);
+      if (isActive && activeFile) {
+        // If vision is active and we have an active file, start capturing
+        service.startCapturing(captureEditorContent);
+        
+        // Broadcast status to chat window
+        window.postMessage('GEMINI_VISION_ACTIVATED:' + JSON.stringify({
+          timestamp: new Date().toISOString(),
+          activeFile: activeFile?.name
+        }), '*');
+      }
+    };
+    
+    checkVisionStatus();
+    
     // Clean up on unmount
     return () => {
       if (service && isVisionActive) {
@@ -49,10 +70,32 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
     };
   }, []);
 
+  // Monitor active file changes
+  useEffect(() => {
+    if (isVisionActive && activeFile && visionService) {
+      // When the active file changes, capture the new content
+      const content = getActiveFileContent(activeFile.id);
+      if (content) {
+        visionService.processEditorContent(content);
+      }
+    }
+  }, [activeFile, isVisionActive, visionService]);
+
   // Capture callback function to get active file content
   const captureEditorContent = () => {
     if (!activeFile) return null;
-    return getActiveFileContent(activeFile.id);
+    const content = getActiveFileContent(activeFile.id);
+    
+    // Broadcast content to chat window via window messaging
+    if (content) {
+      window.postMessage("GEMINI_VISION_UPDATE:" + JSON.stringify({
+        timestamp: new Date().toISOString(),
+        activeFile: activeFile?.name,
+        editorContent: content
+      }), '*');
+    }
+    
+    return content;
   };
 
   // Toggle vision monitoring
@@ -68,18 +111,20 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
       visionService.startCapturing(captureEditorContent);
       setIsVisionActive(true);
       
-      console.log("GEMINI_VISION_ACTIVATED:", JSON.stringify({
+      // Broadcast activation to chat window
+      window.postMessage('GEMINI_VISION_ACTIVATED:' + JSON.stringify({
         timestamp: new Date().toISOString(),
         projectId,
         activeFile: activeFile?.name
-      }));
+      }), '*');
     } else {
       visionService.stopCapturing();
       setIsVisionActive(false);
       
-      console.log("GEMINI_VISION_DEACTIVATED:", JSON.stringify({
+      // Broadcast deactivation to chat window
+      window.postMessage('GEMINI_VISION_DEACTIVATED:' + JSON.stringify({
         timestamp: new Date().toISOString()
-      }));
+      }), '*');
     }
   };
 
@@ -124,25 +169,33 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
           </Button>
         </div>
       ) : (
-        <Button
-          size="sm"
-          variant={isVisionActive ? "default" : "outline"}
-          onClick={toggleVision}
-          className="text-xs flex items-center gap-1 h-8"
-          disabled={!activeFile}
-        >
-          {isVisionActive ? (
-            <>
-              <Eye className="h-3.5 w-3.5" />
-              <span>Vision Active</span>
-            </>
-          ) : (
-            <>
-              <EyeOff className="h-3.5 w-3.5" />
-              <span>Enable Vision</span>
-            </>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant={isVisionActive ? "default" : "outline"}
+            onClick={toggleVision}
+            className="text-xs flex items-center gap-1 h-8"
+            disabled={!activeFile}
+          >
+            {isVisionActive ? (
+              <>
+                <Eye className="h-3.5 w-3.5" />
+                <span>Vision Active</span>
+              </>
+            ) : (
+              <>
+                <EyeOff className="h-3.5 w-3.5" />
+                <span>Enable Vision</span>
+              </>
+            )}
+          </Button>
+          
+          {isVisionActive && lastProcessedTime && (
+            <span className="text-xs text-gray-500">
+              Last scan: {lastProcessedTime}
+            </span>
           )}
-        </Button>
+        </div>
       )}
     </div>
   );

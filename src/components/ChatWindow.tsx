@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";
@@ -237,6 +238,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
   // Add state to track if an app has been generated in this conversation
   const [hasGeneratedApp, setHasGeneratedApp] = useState(false);
   const [visionEnabled, setVisionEnabled] = useState(false);
+  const [editorContent, setEditorContent] = useState<string>("");
   
   // Check if Gemini Vision is available
   useEffect(() => {
@@ -245,22 +247,36 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
     setVisionEnabled(visionService.isVisionEnabled());
     
     // Use a safer approach for console monitoring
-    const handleConsoleLog = (event: MessageEvent) => {
+    const handleMessage = (event: MessageEvent) => {
       if (event.data && typeof event.data === 'string') {
         const logMessage = event.data;
         if (logMessage.includes('GEMINI_VISION_ACTIVATED')) {
           setVisionEnabled(true);
         } else if (logMessage.includes('GEMINI_VISION_DEACTIVATED')) {
           setVisionEnabled(false);
+        } else if (logMessage.includes('GEMINI_VISION_UPDATE')) {
+          try {
+            // Try to extract content information if available
+            const startIndex = logMessage.indexOf('{');
+            if (startIndex !== -1) {
+              const jsonStr = logMessage.substring(startIndex);
+              const data = JSON.parse(jsonStr);
+              if (data.editorContent) {
+                setEditorContent(data.editorContent);
+              }
+            }
+          } catch (err) {
+            console.error("Failed to parse vision update:", err);
+          }
         }
       }
     };
     
-    // Use window event listener instead of console event listener
-    window.addEventListener('message', handleConsoleLog);
+    // Use window event listener to capture vision updates
+    window.addEventListener('message', handleMessage);
     
     return () => {
-      window.removeEventListener('message', handleConsoleLog);
+      window.removeEventListener('message', handleMessage);
     };
   }, []);
   
@@ -286,6 +302,22 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
     message.role === "assistant" && 
     message.metadata?.projectId
   );
+
+  // Check if the last message is asking about code in the editor
+  const isAskingAboutCode = () => {
+    const userMessages = messages.filter(msg => msg.role === "user");
+    if (userMessages.length === 0) return false;
+    
+    const lastUserMessage = userMessages[userMessages.length - 1];
+    const content = getContentAsString(lastUserMessage.content) || "";
+    
+    // Look for phrases that suggest the user is asking about code
+    return content.toLowerCase().includes("code") ||
+           content.toLowerCase().includes("editor") ||
+           content.toLowerCase().includes("what do you see") ||
+           content.toLowerCase().includes("what is in the editor") ||
+           content.toLowerCase().includes("tell me about") && visionEnabled;
+  };
   
   return (
     <div className="px-4 py-5 md:px-8 lg:px-12">
@@ -295,12 +327,27 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
       {/* Always show orchestration UI if we have a project */}
       {projectId && <AgentOrchestration projectId={projectId} />}
       
-      {/* Display Gemini Vision status */}
+      {/* Display Gemini Vision status - Enhanced with more details */}
       {visionEnabled && (
         <div className="mb-4 p-2 bg-blue-50 border border-blue-100 rounded-lg flex items-center">
           <div className="animate-pulse mr-2 h-2 w-2 rounded-full bg-blue-500"></div>
-          <p className="text-xs text-blue-800">
-            Gemini Vision is active and monitoring your code editor
+          <div className="flex flex-col">
+            <p className="text-xs text-blue-800 font-medium">
+              Gemini Vision is active and monitoring your code editor
+            </p>
+            <p className="text-xs text-blue-600">
+              Ask me questions about the code you're writing, and I'll analyze it for you
+            </p>
+          </div>
+        </div>
+      )}
+      
+      {/* Alert for when user asks about code but vision is disabled */}
+      {!visionEnabled && isAskingAboutCode() && (
+        <div className="mb-4 p-2 bg-amber-50 border border-amber-100 rounded-lg">
+          <p className="text-xs text-amber-800">
+            It looks like you're asking about code in the editor, but Gemini Vision is not enabled. 
+            Enable Vision in the artifact toolbar to let me see and analyze your code.
           </p>
         </div>
       )}

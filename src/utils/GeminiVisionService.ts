@@ -20,6 +20,7 @@ export class GeminiVisionService {
   private isProcessing: boolean = false;
   private lastProcessedContent: string = '';
   private captureInterval: number | null = null;
+  private lastContent: string = '';
 
   constructor(config: VisionServiceConfig = {}) {
     this.apiKey = config.apiKey;
@@ -73,6 +74,7 @@ export class GeminiVisionService {
     this.captureInterval = window.setInterval(() => {
       const content = captureCallback();
       if (content && content !== this.lastProcessedContent && !this.isProcessing) {
+        this.lastContent = content; // Store the current content
         this.processEditorContent(content);
       }
     }, 5000);
@@ -103,6 +105,9 @@ export class GeminiVisionService {
       window.postMessage('GEMINI_VISION_DEACTIVATED:' + JSON.stringify({
         timestamp: new Date().toISOString()
       }), '*');
+      
+      // Clear last content
+      this.lastContent = '';
     }
   }
 
@@ -151,7 +156,8 @@ export class GeminiVisionService {
       window.postMessage("GEMINI_VISION_UPDATE:" + JSON.stringify({
         timestamp: new Date().toISOString(),
         contentLength: content.length,
-        responseReceived: true
+        responseReceived: true,
+        editorContent: content // Include the editor content in the update
       }), '*');
 
     } catch (error: any) {
@@ -162,6 +168,11 @@ export class GeminiVisionService {
     } finally {
       this.isProcessing = false;
     }
+  }
+
+  // Get the last processed content (useful for the chat to know what's in the editor)
+  public getLastContent(): string {
+    return this.lastContent;
   }
 
   private log(...args: any[]): void {

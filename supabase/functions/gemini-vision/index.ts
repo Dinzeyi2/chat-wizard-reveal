@@ -31,7 +31,7 @@ serve(async (req) => {
     }
 
     // Parse the request body
-    const { content, prompt } = await req.json();
+    const { content, prompt, userQuestion } = await req.json();
     
     if (!content) {
       return new Response(
@@ -43,8 +43,16 @@ serve(async (req) => {
     // Prepare the request to Gemini API
     const apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent';
     
-    // Create a prompt that includes instructions and the code content
-    const effectivePrompt = prompt || 'Analyze this code and provide feedback:';
+    // Create a more intelligent prompt based on user's question
+    let effectivePrompt = prompt || 'Analyze this code and provide feedback:';
+    
+    // If we have a user question, format a more specific prompt
+    if (userQuestion) {
+      effectivePrompt = `The user is asking: "${userQuestion}" about the following code. 
+      Please provide a detailed response addressing their question specifically. 
+      Explain any relevant parts of the code that answer their question, and if appropriate, 
+      suggest improvements or point out issues in the code.`;
+    }
     
     // Build the request payload
     const payload = {
@@ -94,7 +102,9 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         analysis: generatedText,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        userQuestion: userQuestion || null,
+        contentPreview: content.substring(0, 50) + '...' // Include a preview of what was analyzed
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
