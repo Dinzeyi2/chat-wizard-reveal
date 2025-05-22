@@ -8,6 +8,7 @@ import { Button } from "./ui/button";
 import AgentOrchestration from "./AgentOrchestration";
 import { Alert, AlertTitle, AlertDescription } from "./ui/alert";
 import { AlertCircle, RefreshCcw } from "lucide-react";
+import { contentIncludes, getContentAsString, contentReplace } from "@/utils/messageUtils";
 
 interface ChatWindowProps {
   messages: Message[];
@@ -28,7 +29,7 @@ const ArtifactHandler = ({ messages, projectId }: { messages: Message[], project
       const appGeneratedMessage = messages.find(message => 
         message.role === "assistant" && 
         message.metadata?.projectId === projectId &&
-        message.content.includes("I've generated")
+        contentIncludes(message.content, "I've generated")
       );
       
       if (appGeneratedMessage) {
@@ -47,23 +48,24 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
   
   // Only show for assistant messages that likely contain code
   const hasCode = message.role === "assistant" && 
-    (message.content.includes("```") || 
-     message.content.includes("<code>") ||
-     message.content.includes("function") ||
-     message.content.includes("const") ||
-     message.content.includes("class") ||
-     message.content.includes("import "));
+    (contentIncludes(message.content, "```") || 
+     contentIncludes(message.content, "<code>") ||
+     contentIncludes(message.content, "function") ||
+     contentIncludes(message.content, "const") ||
+     contentIncludes(message.content, "class") ||
+     contentIncludes(message.content, "import "));
   
   if (!hasCode) return null;
   
   const handleOpenInArtifact = () => {
     // Extract code blocks from message content
+    const contentStr = getContentAsString(message.content);
     const codeRegex = /```(?:[\w]*)\n([\s\S]*?)```/g;
     let match;
     const codeBlocks = [];
     let count = 0;
     
-    while ((match = codeRegex.exec(message.content)) !== null) {
+    while ((match = codeRegex.exec(contentStr)) !== null) {
       count++;
       codeBlocks.push({
         id: `code-block-${count}`,
@@ -81,7 +83,7 @@ const CodeViewerButton = ({ message, projectId }: { message: Message, projectId:
         name: "Message Content",
         path: "message-content.js",
         language: "javascript",
-        content: message.content.replace(/(<([^>]+)>)/gi, "") // Strip HTML tags
+        content: contentReplace(getContentAsString(message.content), /(<([^>]+)>)/gi, "") // Strip HTML tags
       });
     }
     
@@ -150,9 +152,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId,
     const appGeneratedMessage = messages.find(message => 
       message.role === "assistant" && 
       message.metadata?.projectId && 
-      (message.content.includes("I've generated") || 
-       message.content.includes("generated a full-stack application") ||
-       message.content.includes("app generation successful"))
+      (contentIncludes(message.content, "I've generated") || 
+       contentIncludes(message.content, "generated a full-stack application") ||
+       contentIncludes(message.content, "app generation successful"))
     );
     
     // Update state if we found evidence of app generation
@@ -163,8 +165,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId,
     // Check for error messages
     const errorMessage = messages.find(message =>
       message.role === "assistant" &&
-      (message.content.includes("Failed to access Gemini AI service") ||
-       message.content.includes("Error generating app"))
+      (contentIncludes(message.content, "Failed to access Gemini AI service") ||
+       contentIncludes(message.content, "Error generating app"))
     );
     
     if (errorMessage) {
@@ -198,7 +200,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId,
           {message.role === "user" ? (
             <div className="flex flex-col items-end">
               <div className="bg-gray-100 rounded-3xl px-6 py-4 max-w-3xl">
-                <MarkdownRenderer content={message.content} />
+                {typeof message.content === 'string' ? (
+                  <MarkdownRenderer content={message.content} />
+                ) : (
+                  message.content
+                )}
               </div>
             </div>
           ) : (
@@ -206,7 +212,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId,
               <div className="ml-0 bg-white border border-gray-200 rounded-3xl px-6 py-4 max-w-3xl">
                 {/* Display warning only if this is not the first app-generating message */}
                 {hasGeneratedApp && 
-                 message.content.includes("I've generated") && 
+                 contentIncludes(message.content, "I've generated") && 
                  message.metadata?.projectId && 
                  firstAppMessage && 
                  message.id !== firstAppMessage.id ? (
@@ -226,7 +232,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId,
                   </div>
                 )}
                 
-                <MarkdownRenderer content={message.content} message={message} />
+                {typeof message.content === 'string' ? (
+                  <MarkdownRenderer content={message.content} message={message} />
+                ) : (
+                  message.content
+                )}
                 
                 {/* Add the code viewer button */}
                 <div className="mt-3 flex justify-end">

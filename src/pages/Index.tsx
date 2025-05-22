@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import ChatWindow from "@/components/ChatWindow";
 import InputArea from "@/components/InputArea";
@@ -10,6 +9,7 @@ import { ArtifactProvider } from "@/components/artifact/ArtifactSystem";
 import { UICodeGenerator } from "@/utils/UICodeGenerator";
 import { geminiAIService } from "@/utils/GeminiAIService";
 import { supabase } from "@/integrations/supabase/client";
+import { contentIncludes } from "@/utils/messageUtils";
 
 const uiCodeGenerator = new UICodeGenerator({ debug: true });
 
@@ -33,14 +33,16 @@ const Index = () => {
       // Remove any error message
       const updatedMessages = messages.filter(m => 
         !(m.role === "assistant" && 
-          (m.content.includes("Failed to access Gemini AI") || 
-           m.content.includes("Error generating app")))
+          (contentIncludes(m.content, "Failed to access Gemini AI") || 
+           contentIncludes(m.content, "Error generating app")))
       );
       
       setMessages(updatedMessages);
       
       // Re-send the last user message
-      handleSendMessage(lastUserMessage.content);
+      if (typeof lastUserMessage.content === 'string') {
+        handleSendMessage(lastUserMessage.content);
+      }
     }
   };
 

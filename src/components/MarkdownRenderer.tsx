@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Message } from "@/types/chat";
 import { marked } from "marked";
@@ -7,6 +6,7 @@ import { useArtifact } from "./artifact/ArtifactSystem";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { contentIncludes, getContentAsString } from "@/utils/messageUtils";
 
 // Ensure marked uses synchronous mode for type safety
 marked.setOptions({
@@ -31,9 +31,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
     if (message && 
         message.role === "assistant" && 
         message.metadata?.projectId && 
-        (content.includes("I've generated") || 
-         content.includes("generated a full-stack application") ||
-         content.includes("app generation successful"))) {
+        (contentIncludes(message.content, "I've generated") || 
+         contentIncludes(message.content, "generated a full-stack application") ||
+         contentIncludes(message.content, "app generation successful"))) {
       setHasGeneratedApp(true);
       
       // Clean the content by removing the JSON code block
@@ -122,12 +122,17 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, message })
   // Process code blocks with syntax highlighting
   const processContent = (markdown: string) => {
     // Use marked's synchronous parsing to avoid TypeScript errors
-    const rawHtml = marked.parse(markdown, { async: false });
-    
-    // Sanitize HTML to prevent XSS attacks
-    const sanitizedHtml = DOMPurify.sanitize(rawHtml);
-    
-    return sanitizedHtml;
+    try {
+      const rawHtml = marked.parse(markdown, { async: false });
+      
+      // Sanitize HTML to prevent XSS attacks
+      const sanitizedHtml = DOMPurify.sanitize(rawHtml);
+      
+      return sanitizedHtml;
+    } catch (error) {
+      console.error("Error parsing markdown:", error);
+      return `<p>Error rendering content: ${error instanceof Error ? error.message : "Unknown error"}</p>`;
+    }
   };
 
   // Check if this message has code updates
