@@ -40,6 +40,9 @@ serve(async (req) => {
       );
     }
 
+    console.log("Processing code content with Gemini API, length:", content.length);
+    console.log("User question:", userQuestion || "None provided");
+
     // Prepare the request to Gemini API
     const apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent';
     
@@ -92,9 +95,12 @@ serve(async (req) => {
         data.candidates[0].content.parts && 
         data.candidates[0].content.parts.length > 0) {
       generatedText = data.candidates[0].content.parts[0].text;
+      console.log("Successfully received Gemini response");
     } else if (data.error) {
+      console.error("Gemini API error:", data.error);
       throw new Error(data.error.message || 'Error from Gemini API');
     } else {
+      console.error("Unexpected response format:", data);
       throw new Error('Unexpected response format from Gemini API');
     }
 

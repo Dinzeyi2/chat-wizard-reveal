@@ -49,7 +49,10 @@ serve(async (req) => {
       );
     }
     
-    console.log("Processing with Gemini API");
+    console.log("Processing chat request");
+    if (editorContent) {
+      console.log("Editor content provided, length:", editorContent.length);
+    }
     
     // Get the API key from environment
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
@@ -61,33 +64,22 @@ serve(async (req) => {
     try {
       // Process the user query with the Gemini API
       const response = await callWithRetries(async () => {
-        let promptContext = "You are a helpful AI assistant. ";
+        let promptContext = "You are a helpful AI assistant specialized in helping with code. ";
         
-        // If we have editor content and it's a question about the editor, include it
-        const isAskingAboutCode = 
-          message.toLowerCase().includes("editor") || 
-          message.toLowerCase().includes("see") || 
-          message.toLowerCase().includes("what's in") || 
-          message.toLowerCase().includes("code") || 
-          message.toLowerCase().includes("in the file") || 
-          message.toLowerCase().includes("gemini") ||
-          message.toLowerCase().includes("vision") ||
-          message.toLowerCase().includes("what do you see");
-        
-        console.log("Is asking about code:", isAskingAboutCode);
-        console.log("Editor content available:", editorContent ? "Yes (" + editorContent.length + " chars)" : "No");
-        
-        if (editorContent && isAskingAboutCode) {
+        // Always include editor content if it exists
+        if (editorContent) {
           console.log("Including editor content in prompt");
-          promptContext += `The user is asking about code in the editor. Here is the current editor content: 
+          promptContext += `I can see the following code in your editor:
 \`\`\`
 ${editorContent}
 \`\`\`
-The code above is what's currently in the editor that the user is asking about. Please respond to their question about this code.`;
+The code above is what's currently in your editor. `;
         }
         else if (projectId && code) {
           promptContext += `The user is working on a project with ID: ${projectId}. Here is the code context: ${code.substring(0, 5000)}...`;
         }
+        
+        console.log("Calling Gemini API...");
         
         const geminiResponse = await fetch(
           "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent",
@@ -125,6 +117,7 @@ The code above is what's currently in the editor that the user is asking about. 
           throw new Error(`Error from Gemini API: ${geminiResponse.status}`);
         }
 
+        console.log("Gemini API response received");
         return await geminiResponse.json();
       }, 3, 2000);
 
@@ -142,6 +135,8 @@ The code above is what's currently in the editor that the user is asking about. 
         codeUpdate: null,
         editorContent: editorContent || null  // Pass back editor content for context
       };
+      
+      console.log("Returning successful response");
       
       // Return successful response
       return new Response(

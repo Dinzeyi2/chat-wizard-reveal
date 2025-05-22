@@ -98,6 +98,14 @@ export class GeminiVisionService {
         timestamp: new Date().toISOString()
       }
     }, '*');
+
+    // Immediately capture current content
+    const initialContent = captureCallback();
+    if (initialContent) {
+      this.lastContent = initialContent;
+      this.broadcastContentUpdate(initialContent);
+      this.processEditorContent(initialContent);
+    }
   }
   
   private broadcastContentUpdate(content: string): void {
@@ -179,8 +187,15 @@ export class GeminiVisionService {
         this.onVisionResponse(responseText);
       }
 
-      // Broadcast the content update with successful response
-      this.broadcastContentUpdate(content);
+      // Broadcast the editor content directly to the chat window
+      window.postMessage({
+        type: 'GEMINI_VISION_CONTENT',
+        data: {
+          timestamp: new Date().toISOString(),
+          editorContent: content,
+          visionResponse: responseText
+        }
+      }, '*');
 
     } catch (error: any) {
       console.error('Error in Gemini Vision processing:', error);
@@ -195,6 +210,13 @@ export class GeminiVisionService {
   // Get the last processed content (useful for the chat to know what's in the editor)
   public getLastContent(): string {
     return this.lastContent;
+  }
+
+  // Force immediate analysis of current content (useful for when user asks a question)
+  public forceAnalysis(): void {
+    if (this.lastContent) {
+      this.processEditorContent(this.lastContent);
+    }
   }
 
   private log(...args: any[]): void {

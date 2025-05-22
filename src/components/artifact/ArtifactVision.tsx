@@ -82,16 +82,6 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
       const content = getActiveFileContent(activeFile.id);
       if (content) {
         visionService.processEditorContent(content);
-        
-        // Also broadcast content directly
-        window.postMessage({
-          type: 'GEMINI_VISION_UPDATE',
-          data: {
-            timestamp: new Date().toISOString(),
-            activeFile: activeFile?.name,
-            editorContent: content
-          }
-        }, '*');
       }
     }
   }, [activeFile, isVisionActive, visionService]);
@@ -102,18 +92,6 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
     
     console.log("Capturing editor content for:", activeFile.name);
     const content = getActiveFileContent(activeFile.id);
-    
-    // Broadcast content to chat window via window messaging
-    if (content) {
-      window.postMessage({
-        type: 'GEMINI_VISION_UPDATE',
-        data: {
-          timestamp: new Date().toISOString(),
-          activeFile: activeFile?.name,
-          editorContent: content
-        }
-      }, '*');
-    }
     
     return content;
   };
@@ -137,28 +115,11 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
       const content = captureEditorContent();
       if (content) {
         console.log("Initial content captured, length:", content.length);
+        visionService.processEditorContent(content);
       }
-      
-      // Broadcast activation to chat window
-      window.postMessage({
-        type: 'GEMINI_VISION_ACTIVATED',
-        data: {
-          timestamp: new Date().toISOString(),
-          projectId,
-          activeFile: activeFile?.name
-        }
-      }, '*');
     } else {
       visionService.stopCapturing();
       setIsVisionActive(false);
-      
-      // Broadcast deactivation to chat window
-      window.postMessage({
-        type: 'GEMINI_VISION_DEACTIVATED',
-        data: {
-          timestamp: new Date().toISOString()
-        }
-      }, '*');
     }
   };
 

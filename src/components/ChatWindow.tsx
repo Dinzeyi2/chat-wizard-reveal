@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Message } from "@/types/chat";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { ArtifactProvider, useArtifact } from "./artifact/ArtifactSystem";
@@ -8,6 +8,7 @@ import { Button } from "./ui/button";
 import AgentOrchestration from "./AgentOrchestration";
 import { contentIncludes, getContentAsString } from "@/utils/contentUtils";
 import { getGeminiVisionService } from "@/utils/GeminiVisionService";
+import { useToast } from "@/hooks/use-toast";
 
 // Define the ChatWindowProps interface
 interface ChatWindowProps {
@@ -240,9 +241,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
   const [visionEnabled, setVisionEnabled] = useState(false);
   const [editorContent, setEditorContent] = useState<string>("");
   const [lastVisionUpdate, setLastVisionUpdate] = useState<string | null>(null);
+  const { toast } = useToast();
   
-  // Check if Gemini Vision is available
+  // Check if Gemini Vision is available and add message event listener
   useEffect(() => {
+    console.log("ChatWindow: Setting up Gemini Vision listener");
+    
     // Initialize Gemini Vision service if not already initialized
     const visionService = getGeminiVisionService();
     setVisionEnabled(visionService.isVisionEnabled());
@@ -250,24 +254,36 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
     // Get initial editor content if available
     const initialContent = visionService.getLastContent();
     if (initialContent) {
+      console.log("ChatWindow: Initial editor content found", initialContent.length);
       setEditorContent(initialContent);
     }
     
     // Listen for window messages from Gemini Vision
     const handleMessage = (event: MessageEvent) => {
       if (event.data && typeof event.data === 'object') {
-        console.log("Received message event in ChatWindow:", event.data.type);
+        console.log("ChatWindow received message event:", event.data.type);
         
         if (event.data.type === 'GEMINI_VISION_ACTIVATED') {
-          console.log("Vision activated event received");
+          console.log("ChatWindow: Vision activated event received");
           setVisionEnabled(true);
+          toast({
+            title: "Gemini Vision Activated",
+            description: "I can now see and analyze your code editor content"
+          });
         } else if (event.data.type === 'GEMINI_VISION_DEACTIVATED') {
-          console.log("Vision deactivated event received");
+          console.log("ChatWindow: Vision deactivated event received");
           setVisionEnabled(false);
           setEditorContent("");
         } else if (event.data.type === 'GEMINI_VISION_UPDATE') {
-          console.log("Vision update event received with content");
           if (event.data.data && event.data.data.editorContent) {
+            console.log("ChatWindow: Vision update with editor content received, length:", 
+              event.data.data.editorContent.length);
+            setEditorContent(event.data.data.editorContent);
+            setLastVisionUpdate(new Date().toLocaleTimeString());
+          }
+        } else if (event.data.type === 'GEMINI_VISION_CONTENT') {
+          if (event.data.data && event.data.data.editorContent) {
+            console.log("ChatWindow: Direct editor content received with vision response");
             setEditorContent(event.data.data.editorContent);
             setLastVisionUpdate(new Date().toLocaleTimeString());
           }
@@ -282,6 +298,31 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
       window.removeEventListener('message', handleMessage);
     };
   }, []);
+  
+  // Force content update when new questions are asked about the editor
+  useEffect(() => {
+    const userMessages = messages.filter(msg => msg.role === "user");
+    
+    // Check if the last user message is asking about code
+    if (userMessages.length > 0 && visionEnabled) {
+      const lastUserMessage = userMessages[userMessages.length - 1];
+      const content = getContentAsString(lastUserMessage.content) || "";
+      
+      const isAskingAboutCode = 
+        content.toLowerCase().includes("code") ||
+        content.toLowerCase().includes("editor") ||
+        content.toLowerCase().includes("what do you see") ||
+        content.toLowerCase().includes("explain") ||
+        content.toLowerCase().includes("analyze") ||
+        content.toLowerCase().includes("look at");
+        
+      if (isAskingAboutCode) {
+        console.log("User is asking about code - forcing Gemini Vision update");
+        const visionService = getGeminiVisionService();
+        visionService.forceAnalysis(); // Force a new analysis of current content
+      }
+    }
+  }, [messages, visionEnabled]);
   
   // Effect to check messages for app generation
   useEffect(() => {
@@ -300,14 +341,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
     }
   }, [messages, hasGeneratedApp]);
   
-  // Find the first message with a projectId
-  const firstAppMessage = messages.find(message => 
-    message.role === "assistant" && 
-    message.metadata?.projectId
-  );
-
   // Check if the last message is asking about code in the editor
-  const isAskingAboutCode = () => {
+  const isAskingAboutCode = useCallback(() => {
     const userMessages = messages.filter(msg => msg.role === "user");
     if (userMessages.length === 0) return false;
     
@@ -322,8 +357,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
            content.toLowerCase().includes("what is in the editor") ||
            content.toLowerCase().includes("what's in the editor") ||
            content.toLowerCase().includes("in the file") ||
-           content.toLowerCase().includes("explain");
-  };
+           content.toLowerCase().includes("explain") ||
+           content.toLowerCase().includes("analyze");
+  }, [messages]);
   
   return (
     <div className="px-4 py-5 md:px-8 lg:px-12">
@@ -343,7 +379,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
               {lastVisionUpdate && ` (Last update: ${lastVisionUpdate})`}
             </p>
             <p className="text-xs text-blue-600">
-              Ask me questions about the code you're writing, and I'll analyze it for you
+              Ask me questions about the code in your editor, and I'll analyze it for you
             </p>
           </div>
         </div>
@@ -390,8 +426,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, projectId 
                 {hasGeneratedApp && 
                  message.content.includes("I've generated") && 
                  message.metadata?.projectId && 
-                 firstAppMessage && 
-                 message.id !== firstAppMessage.id ? (
+                 messages.find(msg => 
+                   msg.role === "assistant" && 
+                   msg.metadata?.projectId &&
+                   msg.id !== message.id
+                 ) ? (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
                     <p className="text-amber-800 font-medium">
                       An app has already been generated in this conversation. If you'd like to create a new app, please start a new conversation.
