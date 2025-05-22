@@ -1,8 +1,7 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { agentOrchestrationService } from "./AgentOrchestrationService";
 
-class GeminiAIService {
+class OpenAIService {
   private apiKey: string | null = null;
   private maxRetries = 3;
   private baseBackoffMs = 2000;
@@ -11,11 +10,11 @@ class GeminiAIService {
   private mockEnabled = true; // Enable mock mode as fallback
 
   constructor() {
-    console.log("GeminiAIService initialized");
+    console.log("OpenAIService initialized");
   }
 
   /**
-   * Set the API key for Gemini API
+   * Set the API key for OpenAI API
    */
   setApiKey(apiKey: string) {
     this.apiKey = apiKey;
@@ -45,7 +44,7 @@ class GeminiAIService {
   }
 
   /**
-   * Initialize a project with Gemini AI
+   * Initialize a project with OpenAI
    * @param prompt User prompt for project generation
    * @param projectName Name for the project
    * @param useOrchestration Whether to use agent orchestration
@@ -58,33 +57,33 @@ class GeminiAIService {
       try {
         // Try to get API key from Supabase environment
         const { data, error } = await supabase.functions.invoke('get-env', {
-          body: { key: 'GEMINI_API_KEY' }
+          body: { key: 'OPENAI_API_KEY' }
         });
         
         if (!error && data?.value) {
           this.apiKey = data.value;
           agentOrchestrationService.setApiKey(data.value);
-          console.log("Successfully retrieved Gemini API key from environment");
+          console.log("Successfully retrieved OpenAI API key from environment");
         } else {
-          console.warn("No Gemini API key found in environment");
+          console.warn("No OpenAI API key found in environment");
           
           // If mock mode enabled, use that instead of throwing an error
           if (this.mockEnabled) {
             console.log("Using mock mode for app generation");
             return this.generateMockProject(prompt, projectName);
           } else {
-            throw new Error("Gemini API key not configured. Please contact support.");
+            throw new Error("OpenAI API key not configured. Please contact support.");
           }
         }
       } catch (error) {
-        console.error("Error retrieving Gemini API key:", error);
+        console.error("Error retrieving OpenAI API key:", error);
         
         // If mock mode enabled, use that as fallback
         if (this.mockEnabled) {
           console.log("Using mock mode for app generation due to API key retrieval error");
           return this.generateMockProject(prompt, projectName);
         } else {
-          throw new Error("Failed to access Gemini AI service. Please try again later.");
+          throw new Error("Failed to access OpenAI service. Please try again later.");
         }
       }
     }
@@ -175,23 +174,12 @@ class GeminiAIService {
             attempt++;
           } else {
             // Permanent error or out of retries
-            if (this.fallbackEnabled) {
-              if (this.mockEnabled) {
-                console.log("Using mock mode after API error");
-                return this.generateMockProject(prompt, projectName);
-              } else if (error.message && (error.message.includes('429') || error.message.includes('quota'))) {
-                console.log("Trying to use fallback AI service...");
-                try {
-                  // Try to fallback to OpenAI instead
-                  return await this.fallbackToOpenAI(prompt, projectName);
-                } catch (fallbackError) {
-                  console.error("Fallback also failed:", fallbackError);
-                  // Continue with mock mode as last resort
-                  return this.generateMockProject(prompt, projectName);
-                }
-              }
+            if (this.fallbackEnabled && this.mockEnabled) {
+              console.log("Using mock mode after API error");
+              return this.generateMockProject(prompt, projectName);
+            } else {
+              throw new Error("Failed to generate app: " + (error.message || "Unknown error"));
             }
-            throw new Error("Failed to generate app: " + (error.message || "Unknown error"));
           }
         }
       }
@@ -352,4 +340,4 @@ You can extend this app by completing the challenges I've included:
   }
 }
 
-export const geminiAIService = new GeminiAIService();
+export const geminiAIService = new OpenAIService();

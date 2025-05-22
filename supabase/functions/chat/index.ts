@@ -55,14 +55,14 @@ serve(async (req) => {
     }
     
     // Get the API key from environment
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!geminiApiKey) {
-      throw new Error("Gemini API key not configured");
+    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!openaiApiKey) {
+      throw new Error("OpenAI API key not configured");
     }
 
-    // Try to process with Gemini first with robust retries
+    // Try to process with OpenAI with robust retries
     try {
-      // Process the user query with the Gemini API
+      // Process the user query with the OpenAI API
       const response = await callWithRetries(async () => {
         let promptContext = "You are a helpful AI assistant specialized in helping with code. ";
         
@@ -79,54 +79,55 @@ The code above is what's currently in your editor. `;
           promptContext += `The user is working on a project with ID: ${projectId}. Here is the code context: ${code.substring(0, 5000)}...`;
         }
         
-        console.log("Calling Gemini API...");
+        console.log("Calling OpenAI API...");
         
-        const geminiResponse = await fetch(
-          "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent",
+        const openaiResponse = await fetch(
+          "https://api.openai.com/v1/chat/completions",
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "x-goog-api-key": geminiApiKey
+              "Authorization": `Bearer ${openaiApiKey}`
             },
             body: JSON.stringify({
-              contents: [
+              model: "gpt-4o-mini",
+              messages: [
+                { 
+                  role: "system", 
+                  content: promptContext
+                },
                 {
                   role: "user",
-                  parts: [{ text: `${promptContext}\n\nUser message: ${message}` }]
+                  content: message
                 }
               ],
-              generationConfig: {
-                temperature: 0.7,
-                topK: 40,
-                topP: 0.95,
-                maxOutputTokens: 8000
-              }
+              temperature: 0.7,
+              max_tokens: 8000
             })
           }
         );
 
-        if (!geminiResponse.ok) {
-          const errorText = await geminiResponse.text();
-          console.error(`Gemini API error (${geminiResponse.status}):`, errorText);
+        if (!openaiResponse.ok) {
+          const errorText = await openaiResponse.text();
+          console.error(`OpenAI API error (${openaiResponse.status}):`, errorText);
           
-          if (geminiResponse.status === 429) {
+          if (openaiResponse.status === 429) {
             throw new Error("Rate limit exceeded. Please try again in a few moments.");
           }
           
-          throw new Error(`Error from Gemini API: ${geminiResponse.status}`);
+          throw new Error(`Error from OpenAI API: ${openaiResponse.status}`);
         }
 
-        console.log("Gemini API response received");
-        return await geminiResponse.json();
+        console.log("OpenAI API response received");
+        return await openaiResponse.json();
       }, 3, 2000);
 
-      if (!response.candidates || !response.candidates[0]?.content?.parts?.length) {
-        throw new Error("Invalid response from Gemini API");
+      if (!response.choices || !response.choices[0]?.message?.content) {
+        throw new Error("Invalid response from OpenAI API");
       }
 
-      // Extract AI response from Gemini response
-      const aiResponse = response.candidates[0].content.parts[0].text;
+      // Extract AI response from OpenAI response
+      const aiResponse = response.choices[0].message.content;
       
       // Create response object
       const responseObj = {
@@ -144,60 +145,7 @@ The code above is what's currently in your editor. `;
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } catch (error) {
-      // If Gemini fails with rate limit, try to use fallback model if available
-      console.error("Gemini API failed:", error);
-      
-      // Get OpenAI API key as a fallback
-      const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
-      
-      if (openAiApiKey) {
-        console.log("Trying OpenAI fallback...");
-        
-        const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json", 
-            "Authorization": `Bearer ${openAiApiKey}`
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-              { 
-                role: "system", 
-                content: "You are a helpful AI assistant. Respond concisely and accurately to user queries."
-              },
-              // If we have editor content, include it for code-related questions
-              ...(editorContent ? [{
-                role: "system",
-                content: `Here is the code from the user's editor:\n\`\`\`\n${editorContent}\n\`\`\``
-              }] : []),
-              {
-                role: "user",
-                content: message
-              }
-            ],
-            max_tokens: 1000
-          })
-        });
-        
-        if (openAiResponse.ok) {
-          const data = await openAiResponse.json();
-          const fallbackResponse = data.choices[0].message.content;
-          
-          return new Response(
-            JSON.stringify({
-              response: `${fallbackResponse}\n\n(Note: This response was provided by a fallback AI system due to temporary issues with the primary system.)`,
-              projectId: projectId || null,
-              codeUpdate: null,
-              usedFallback: true,
-              editorContent: editorContent || null
-            }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-      }
-      
-      // If we get here, both Gemini and OpenAI failed or OpenAI wasn't available
+      console.error("OpenAI API failed:", error);
       throw new Error("AI service is temporarily unavailable due to high demand. Please try again in a few minutes with a simpler prompt.");
     }
   } catch (error) {

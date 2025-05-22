@@ -21,11 +21,11 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    // Get the Gemini API key from environment variables
-    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
-    if (!geminiApiKey) {
+    // Get the OpenAI API key from environment variables
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openaiApiKey) {
       return new Response(
-        JSON.stringify({ error: 'GEMINI_API_KEY is not set in environment variables' }),
+        JSON.stringify({ error: 'OPENAI_API_KEY is not set in environment variables' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -40,11 +40,11 @@ serve(async (req) => {
       );
     }
 
-    console.log("Processing code content with Gemini API, length:", content.length);
+    console.log("Processing code content with OpenAI API, length:", content.length);
     console.log("User question:", userQuestion || "None provided");
 
-    // Prepare the request to Gemini API
-    const apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+    // Prepare the request to OpenAI API
+    const apiUrl = 'https://api.openai.com/v1/chat/completions';
     
     // Create a more intelligent prompt based on user's question
     let effectivePrompt = prompt || 'Analyze this code and provide feedback:';
@@ -57,30 +57,25 @@ serve(async (req) => {
       suggest improvements or point out issues in the code.`;
     }
     
-    // Build the request payload
+    // Build the request payload for OpenAI
     const payload = {
-      contents: [
+      model: "gpt-4o-mini",
+      messages: [
         {
-          parts: [
-            {
-              text: `${effectivePrompt}\n\n\`\`\`\n${content}\n\`\`\``
-            }
-          ]
+          role: "user",
+          content: `${effectivePrompt}\n\n\`\`\`\n${content}\n\`\`\``
         }
       ],
-      generationConfig: {
-        temperature: 0.2,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 1024,
-      }
+      temperature: 0.2,
+      max_tokens: 1024
     };
 
-    // Call the Gemini API
-    const response = await fetch(`${apiUrl}?key=${geminiApiKey}`, {
+    // Call the OpenAI API
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openaiApiKey}`
       },
       body: JSON.stringify(payload),
     });
@@ -90,18 +85,17 @@ serve(async (req) => {
     
     // Extract the generated text from the response
     let generatedText = '';
-    if (data.candidates && data.candidates.length > 0 && 
-        data.candidates[0].content && 
-        data.candidates[0].content.parts && 
-        data.candidates[0].content.parts.length > 0) {
-      generatedText = data.candidates[0].content.parts[0].text;
-      console.log("Successfully received Gemini response");
+    if (data.choices && data.choices.length > 0 && 
+        data.choices[0].message && 
+        data.choices[0].message.content) {
+      generatedText = data.choices[0].message.content;
+      console.log("Successfully received OpenAI response");
     } else if (data.error) {
-      console.error("Gemini API error:", data.error);
-      throw new Error(data.error.message || 'Error from Gemini API');
+      console.error("OpenAI API error:", data.error);
+      throw new Error(data.error.message || 'Error from OpenAI API');
     } else {
       console.error("Unexpected response format:", data);
-      throw new Error('Unexpected response format from Gemini API');
+      throw new Error('Unexpected response format from OpenAI API');
     }
 
     // Return the analyzed content
@@ -115,7 +109,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error in gemini-vision function:', error);
+    console.error('Error in vision function:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

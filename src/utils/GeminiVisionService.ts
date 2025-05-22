@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+
 import { toast } from '@/hooks/use-toast';
 
 interface VisionServiceConfig {
@@ -10,8 +10,6 @@ interface VisionServiceConfig {
 
 export class GeminiVisionService {
   private apiKey?: string;
-  private genAI: GoogleGenerativeAI | null = null;
-  private model: any = null;
   private debug: boolean;
   private onVisionResponse: ((response: string) => void) | undefined;
   private onError: ((error: Error) => void) | undefined;
@@ -34,12 +32,15 @@ export class GeminiVisionService {
 
   private initialize() {
     try {
-      this.genAI = new GoogleGenerativeAI(this.apiKey!);
-      this.model = this.genAI.getGenerativeModel({ model: "gemini-pro" });
-      this.log('Gemini Vision Service initialized');
-      this.isEnabled = true;
+      // No need for initialization like with Gemini, just check if we have an API key
+      if (this.apiKey && this.apiKey.length > 0) {
+        this.log('OpenAI Vision Service initialized');
+        this.isEnabled = true;
+      } else {
+        throw new Error('Invalid API key');
+      }
     } catch (error) {
-      console.error('Failed to initialize Gemini Vision:', error);
+      console.error('Failed to initialize Vision Service:', error);
       this.isEnabled = false;
     }
   }
@@ -56,8 +57,8 @@ export class GeminiVisionService {
   public startCapturing(captureCallback: () => string | null): void {
     if (!this.isEnabled || !this.apiKey) {
       toast({
-        title: "Gemini Vision Not Available",
-        description: "Please set your Gemini API key to enable Vision features.",
+        title: "Vision Not Available",
+        description: "Please set your OpenAI API key to enable Vision features.",
         variant: "destructive"
       });
       return;
@@ -86,7 +87,7 @@ export class GeminiVisionService {
     }, 5000);
 
     toast({
-      title: "Gemini Vision Activated",
+      title: "Vision Activated",
       description: "Now monitoring your code edits in real-time."
     });
     
@@ -128,7 +129,7 @@ export class GeminiVisionService {
       this.log('Vision capture stopped');
       
       toast({
-        title: "Gemini Vision Deactivated",
+        title: "Vision Deactivated",
         description: "No longer monitoring your code edits."
       });
       
@@ -157,27 +158,25 @@ export class GeminiVisionService {
       // Store the content we're processing to avoid reprocessing
       this.lastProcessedContent = content;
 
-      // Format the content for better visualization
-      const formattedContent = `\`\`\`\n${content}\n\`\`\``;
-
-      // Create a chat session
-      const chat = this.model.startChat({
-        history: [
-          {
-            role: "user",
-            parts: [{ text: "Here's the code I'm currently working on in the editor. Just acknowledge you can see it but don't analyze it unless I ask you to:" }],
-          },
-          {
-            role: "model",
-            parts: [{ text: "I can see your code editor is active. I'm ready to help with your code when needed. Just let me know what you'd like me to do with it." }],
-          }
-        ],
+      // Call our edge function to process the content
+      const response = await fetch('/functions/v1/gemini-vision', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          content,
+          prompt: "Here's the code I'm currently working on in the editor. Just acknowledge you can see it but don't analyze it unless I ask you to:"
+        })
       });
 
-      // Send the content to Gemini
-      const result = await chat.sendMessage(formattedContent);
-      const response = result.response;
-      const responseText = response.text();
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error from vision function: ${response.status} ${errorText}`);
+      }
+
+      const result = await response.json();
+      const responseText = result.analysis;
 
       this.log('Received vision response:', responseText);
 
@@ -197,7 +196,7 @@ export class GeminiVisionService {
       }, '*');
 
     } catch (error: any) {
-      console.error('Error in Gemini Vision processing:', error);
+      console.error('Error in Vision processing:', error);
       if (this.onError) {
         this.onError(error);
       }
@@ -220,20 +219,20 @@ export class GeminiVisionService {
 
   private log(...args: any[]): void {
     if (this.debug) {
-      console.log('[GeminiVision]', ...args);
+      console.log('[Vision]', ...args);
     }
   }
 }
 
 // Create a singleton instance
-let geminiVisionInstance: GeminiVisionService | null = null;
+let visionServiceInstance: GeminiVisionService | null = null;
 
 export const getGeminiVisionService = (config?: VisionServiceConfig): GeminiVisionService => {
-  if (!geminiVisionInstance) {
-    geminiVisionInstance = new GeminiVisionService(config);
+  if (!visionServiceInstance) {
+    visionServiceInstance = new GeminiVisionService(config);
   } else if (config) {
     // Update existing instance with new config if provided
-    if (config.apiKey) geminiVisionInstance.setApiKey(config.apiKey);
+    if (config.apiKey) visionServiceInstance.setApiKey(config.apiKey);
   }
-  return geminiVisionInstance;
+  return visionServiceInstance;
 };

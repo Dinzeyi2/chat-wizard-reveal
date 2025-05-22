@@ -20,19 +20,19 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
   const [showApiKeyInput, setShowApiKeyInput] = useState<boolean>(false);
   const [lastProcessedTime, setLastProcessedTime] = useState<string | null>(null);
 
-  // Initialize the Gemini Vision service
+  // Initialize the Vision service
   useEffect(() => {
-    console.log("Initializing Gemini Vision service");
+    console.log("Initializing Vision service");
     
     const service = getGeminiVisionService({
       debug: true,
       onVisionResponse: (response) => {
-        console.log("Gemini Vision response received:", response.substring(0, 100) + "...");
+        console.log("Vision response received:", response.substring(0, 100) + "...");
         // Update last processed time
         setLastProcessedTime(new Date().toLocaleTimeString());
       },
       onError: (error) => {
-        console.error("Gemini Vision error:", error);
+        console.error("Vision error:", error);
         toast({
           title: "Vision Error",
           description: error.message,
@@ -137,7 +137,7 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
     
     toast({
       title: "API Key Set",
-      description: "Gemini Vision is now activated."
+      description: "Vision is now activated."
     });
   };
 
@@ -147,7 +147,7 @@ const ArtifactVision: React.FC<ArtifactVisionProps> = ({ projectId }) => {
         <div className="flex gap-2 items-center mb-2">
           <Input
             type="password"
-            placeholder="Enter Gemini API Key"
+            placeholder="Enter OpenAI API Key"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             className="text-xs h-8"

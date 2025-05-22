@@ -1,6 +1,4 @@
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
 export class BaseAgent {
   protected model: any;
   protected mockEnabled: boolean = false;
@@ -52,8 +50,21 @@ export class BaseAgent {
     }
     
     try {
-      const result = await this.model.generateContent(prompt);
-      return result.response.text();
+      // Use the OpenAI API directly instead of Gemini model
+      const response = await fetch('/functions/v1/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: prompt,
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data.response;
     } catch (error) {
       console.error('Error generating response:', error);
       
