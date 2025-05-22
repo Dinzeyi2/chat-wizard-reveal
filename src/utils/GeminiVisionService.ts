@@ -32,7 +32,7 @@ export class GeminiVisionService {
 
   private initialize() {
     try {
-      // No need for initialization like with Gemini, just check if we have an API key
+      // Check if we have an API key
       if (this.apiKey && this.apiKey.length > 0) {
         this.log('OpenAI Vision Service initialized');
         this.isEnabled = true;
